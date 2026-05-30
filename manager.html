@@ -584,6 +584,42 @@ table{overflow:visible!important;}
   .notice-toggle { display:inline-flex;align-items:center;justify-content:center;width:24px;height:22px;border-radius:5px;border:1.5px solid var(--border2);background:var(--surface2);color:var(--text3);font-size:10px;font-weight:800;font-family:var(--mono);cursor:pointer;transition:all .15s;user-select:none;flex-shrink:0; }
   .notice-toggle.on { background:var(--green);border-color:var(--green);color:#fff; }
 
+
+/* ── 모바일 추가 최적화 ── */
+@media (max-width: 768px) {
+  /* 탭바 */
+  .tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+  .tab-btn { white-space: nowrap; font-size: 11px; padding: 6px 10px; }
+  /* 학생 테이블 */
+  .student-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* 모달 */
+  .modal-sheet, .modal-overlay .modal-box { 
+    width: 96% !important; 
+    max-width: 96% !important; 
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  /* 수업선택 팝업 */
+  #ttSearchBg .tt-search-modal { width: 96% !important; }
+  /* 버튼 터치 영역 */
+  button { min-height: 36px; }
+  /* 입력창 iOS 자동확대 방지 */
+  input, select, textarea { font-size: 16px !important; }
+  /* 상단 카운터 */
+  .hdr-counts { font-size: 10px; gap: 4px; }
+  .count-badge { padding: 2px 6px; font-size: 10px; }
+  /* 배정표 */
+  .board-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* 헤더 저장/백업 버튼 */
+  .hdr-right-btns { gap: 4px; }
+  .hdr-right-btns button { font-size: 11px; padding: 5px 8px; }
+}
+@media (max-width: 480px) {
+  .header { height: auto; padding: 8px 10px; flex-wrap: wrap; }
+  .logo-text { font-size: 14px; }
+  .ef-row { flex-direction: column; }
+  .ef-sched-row { grid-template-columns: repeat(2, 1fr); }
+}
 </style>
 <script>
 // ── Firebase SDK 멀티-CDN 로더 ──
@@ -3214,6 +3250,17 @@ window.closeTimetableSearch = function() {
   _ttTargetRow = null;
   _ttSelected.clear();
 };
+
+// 모바일 터치 지원
+document.addEventListener('DOMContentLoaded', function() {
+  // ttSearchBg 배경 터치로 닫기
+  const bg = document.getElementById('ttSearchBg');
+  if (bg) {
+    bg.addEventListener('touchend', function(e) {
+      if (e.target === bg) window.closeTimetableSearch();
+    }, { passive: true });
+  }
+});
 
 // 월별 탭 생성
 

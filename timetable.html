@@ -84,6 +84,26 @@ tbody td{padding:8px 12px;vertical-align:middle;font-size:12px;}
 /* 로딩 */
 #loadingBar{display:none;height:3px;background:linear-gradient(90deg,var(--accent),var(--blue));border-radius:2px;margin-bottom:12px;animation:loading 1s ease infinite;}
 @keyframes loading{0%{width:0%}100%{width:100%}}
+
+/* 모바일 최적화 */
+@media (max-width: 768px) {
+  .upload-row { flex-direction: column; }
+  .upload-label { width: 100%; justify-content: center; }
+  .toolbar { flex-direction: column; }
+  .search-inp { max-width: 100%; width: 100%; }
+  table { font-size: 12px; }
+  thead { display: none; }
+  tbody tr.course-row { display: grid; grid-template-columns: 32px 1fr 1fr; border-bottom: 2px solid var(--border); padding: 4px 0; }
+  tbody tr.course-row td { border: none; padding: 4px 6px; }
+  tbody tr.course-row td:nth-child(1) { grid-row: 1/3; align-self: center; }
+  tbody tr.course-row td:nth-child(4)::before { content: '개강: '; color: #64748b; font-size: 10px; }
+  tbody tr.course-row td:nth-child(5)::before { content: '종강: '; color: #64748b; font-size: 10px; }
+  tbody tr.course-row td:nth-child(6)::before { content: '⏰ '; }
+  tbody tr.course-row td:nth-child(7)::before { content: '🏫 '; }
+  tbody tr.course-row td:nth-child(8)::before { content: '📅 '; }
+  .month-header-row td { font-size: 15px !important; padding: 14px 12px !important; }
+  .del-btn { padding: 4px 8px; font-size: 11px; }
+}
 </style>
 <script>
 // ── Firebase SDK 멀티-CDN 로더 ──
@@ -323,80 +343,74 @@ window.renderTable = function() {
   const timeF = document.getElementById('timeFilter').value;
 
   let items = Object.entries(allCourses).map(([key, val]) => ({key, ...val}));
-
   if (currentTab !== 'all') items = items.filter(c => c.type === currentTab);
   if (q) items = items.filter(c => (c.name||'').toLowerCase().includes(q) || (c.teacher||'').toLowerCase().includes(q));
   if (timeF) items = items.filter(c => c.time === timeF);
-
   items.sort((a,b) => (a.start||'9999').localeCompare(b.start||'9999'));
 
   document.getElementById('countBadge').textContent = items.length + '개';
 
   if (items.length === 0) {
-    document.getElementById('tableBody').innerHTML = `<tr><td colspan="10" class="empty"><div class="empty-icon">🔍</div><div>해당하는 강좌가 없습니다</div></td></tr>`;
+    document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" class="empty"><div class="empty-icon">🔍</div><div>해당하는 강좌가 없습니다</div></td></tr>';
     return;
   }
 
-  // 월별 그룹
+  // 월별 그룹 (개강일 기준)
   const groups = {};
   items.forEach(c => {
-    const mo = c.start ? c.start.slice(0,7) : '날짜미정';
+    const mo = (c.start||'').slice(0,7) || '날짜미정';
     if (!groups[mo]) groups[mo] = [];
     groups[mo].push(c);
   });
 
   const sortedMonths = Object.keys(groups).sort();
-  const today = new Date().toISOString().slice(0,7);
 
   let html = '';
   for (const mo of sortedMonths) {
-    const isCollapsed = _monthCollapsed[mo] !== false; // 기본 접힘(최신월 제외)
-    const isCurrent = mo === today;
-    if (isCurrent && _monthCollapsed[mo] === undefined) _monthCollapsed[mo] = false; // 이번달은 기본 펼침
-    const collapsed = _monthCollapsed[mo] !== false;
+    // 기본 모두 접힘 (_monthCollapsed[mo]가 false일 때만 펼침)
+    const collapsed = (_monthCollapsed[mo] !== false);
 
     const label = mo === '날짜미정' ? '날짜 미정' : (() => {
       const [y,m] = mo.split('-');
       return y + '년 ' + parseInt(m) + '월';
     })();
     const cnt = groups[mo].length;
-    const headerBg = isCurrent ? '#eff6ff' : '#f8fafc';
-    const headerColor = isCurrent ? '#1d4ed8' : '#64748b';
 
-    html += `<tr class="month-header-row" onclick="toggleMonth('${mo}')" style="cursor:pointer;background:${headerBg};">
-      <td colspan="10" style="padding:10px 14px;font-size:13px;font-weight:800;color:${headerColor};user-select:none;">
-        <span style="margin-right:8px;">${collapsed ? '▶' : '▼'}</span>
-        ${label}
-        <span style="font-size:11px;font-weight:500;margin-left:8px;opacity:0.7;">${cnt}개 강좌</span>
-        ${isCurrent ? '<span style="font-size:10px;padding:2px 7px;border-radius:8px;background:#2563eb;color:#fff;margin-left:6px;">이번달</span>' : ''}
-      </td>
-    </tr>`;
+    html += '<tr class="month-header-row" onclick="window.toggleMonth(\'' + mo + '\')" style="cursor:pointer;background:#f1f5f9;">'
+      + '<td colspan="10" style="padding:12px 16px;font-size:14px;font-weight:800;color:#334155;user-select:none;-webkit-user-select:none;">'
+      + '<span style="margin-right:8px;font-size:16px;">' + (collapsed ? '▶' : '▼') + '</span>'
+      + label
+      + '<span style="font-size:12px;font-weight:500;margin-left:10px;color:#64748b;">' + cnt + '개 강좌</span>'
+      + '</td></tr>';
 
     if (!collapsed) {
-      html += groups[mo].map(c => `
-        <tr class="course-row month-${mo.replace('-','_')}">
-          <td style="text-align:center;width:32px;"><input type="checkbox" class="tt-chk" data-key="${c.key}" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="updateBulkDel()"></td>
-          <td><span class="editable" onclick="editCell(this,'${c.key}','name')">${c.name||'-'}</span></td>
-          <td><span class="editable" onclick="editCell(this,'${c.key}','teacher')">${c.teacher||'-'}</span></td>
-          <td><span class="editable" onclick="editCell(this,'${c.key}','start')">${c.start||'-'}</span></td>
-          <td><span class="editable" onclick="editCell(this,'${c.key}','end')">${c.end||'-'}</span></td>
-          <td><span class="editable" onclick="editCell(this,'${c.key}','time')">${c.time||'-'}</span></td>
-          <td><span class="editable" onclick="editCell(this,'${c.key}','room')">${c.room||'-'}</span></td>
-          <td><span class="editable" onclick="editCell(this,'${c.key}','days')">${c.days||'-'}</span></td>
-          <td><span class="type-badge ${c.type==='주말'?'t-weekend':'t-weekday'}">${c.type||'평일'}</span></td>
-          <td><button class="del-btn" onclick="deleteCourse('${c.key}','${(c.name||'').replace(/'/g,"\\'")}')">삭제</button></td>
-        </tr>
-      `).join('');
+      html += groups[mo].map(c =>
+        '<tr class="course-row">'
+        + '<td style="text-align:center;width:36px;padding:8px 4px;"><input type="checkbox" class="tt-chk" data-key="' + c.key + '" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);" onchange="updateBulkDel()"></td>'
+        + '<td><span class="editable" onclick="editCell(this,\'' + c.key + '\',\'name\')">' + (c.name||'-') + '</span></td>'
+        + '<td><span class="editable" onclick="editCell(this,\'' + c.key + '\',\'teacher\')">' + (c.teacher||'-') + '</span></td>'
+        + '<td><span class="editable" onclick="editCell(this,\'' + c.key + '\',\'start\')">' + (c.start||'-') + '</span></td>'
+        + '<td><span class="editable" onclick="editCell(this,\'' + c.key + '\',\'end\')">' + (c.end||'-') + '</span></td>'
+        + '<td><span class="editable" onclick="editCell(this,\'' + c.key + '\',\'time\')">' + (c.time||'-') + '</span></td>'
+        + '<td><span class="editable" onclick="editCell(this,\'' + c.key + '\',\'room\')">' + (c.room||'-') + '</span></td>'
+        + '<td><span class="editable" onclick="editCell(this,\'' + c.key + '\',\'days\')">' + (c.days||'-') + '</span></td>'
+        + '<td><span class="type-badge ' + (c.type==='주말'?'t-weekend':'t-weekday') + '">' + (c.type||'평일') + '</span></td>'
+        + '<td><button class="del-btn" onclick="deleteCourse(\'' + c.key + '\',\'' + (c.name||'').replace(/'/g,"\\'") + '\')">삭제</button></td>'
+        + '</tr>'
+      ).join('');
     }
   }
-
   document.getElementById('tableBody').innerHTML = html;
 };
 
 window.toggleMonth = function(mo) {
-  _monthCollapsed[mo] = (_monthCollapsed[mo] !== false); // 토글
-  renderTable();
+  // false(펼침) ↔ true(접힘) 토글
+  _monthCollapsed[mo] = (_monthCollapsed[mo] !== false);
+  window.renderTable();
 };
+;
+
+;
 
 // ════════ 인라인 편집 ════════
 window.editCell = function(span, key, field) {
