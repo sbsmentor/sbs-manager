@@ -3160,49 +3160,14 @@ window.openTimetableSearch = function(row) {
   document.getElementById('ttSearchBg').style.display = 'flex';
   setTimeout(() => document.getElementById('ttSearchInp').focus(), 100);
 
-  function showResults() {
-    filterTimetable();
-  }
-
-  // ttClasses -> _ttCourses 변환 헬퍼
-  function syncFromDB() {
-    const saved = DB.get('ttClasses') || [];
-    if (saved.length > 0) {
-      _ttCourses = saved.map(c => ({
-        name: c.courseName || c.name || '',
-        teacher: c.instructor || c.teacher || '',
-        start: c.startDate || c.start || '',
-        end: c.endDate || c.end || '',
-        time: c.startTime || c.time || '',
-        room: c.room || '',
-        days: c.days || '',
-        type: c.type || '평일',
-      }));
-      return true;
-    }
-    return false;
-  }
-
-  // 이미 데이터 있으면 바로 표시
-  if (_ttCourses.length > 0) {
-    showResults();
-    return;
-  }
-
-  // localStorage에서 복원 시도
-  if (syncFromDB()) {
-    showResults();
-    return;
-  }
-
-  // Firebase에서 로드
+  // 무조건 Firebase에서 최신 데이터 로드
   if (window._fbDb && window._fbRef && window._fbOnValue) {
+    document.getElementById('ttResults').innerHTML = '<div style="text-align:center;padding:32px;color:var(--text3);">불러오는 중...</div>';
     const ttRef = window._fbRef(window._fbDb, 'timetable');
     window._fbOnValue(ttRef, snap => {
-      const data = snap.val() || {};
-      if (data && Object.keys(data).length > 0) {
-        _ttCourses = Object.values(data);
-        // localStorage에도 저장
+      const data = snap.val();
+      if (data) {
+        _ttCourses = Object.values(data).filter(c => c && c.name);
         DB.set('ttClasses', _ttCourses.map(c => ({
           id: c.name+'|'+(c.start||'')+'|'+(c.time||''),
           type: c.type||'평일',
@@ -3218,12 +3183,28 @@ window.openTimetableSearch = function(row) {
           enrollment: 0,
           attendance: 0,
         })));
+      } else {
+        // Firebase에 데이터 없음 - localStorage 시도
+        const saved = DB.get('ttClasses') || [];
+        _ttCourses = saved.map(c => ({
+          name: c.courseName||'', teacher: c.instructor||'',
+          start: c.startDate||'', end: c.endDate||'',
+          time: c.startTime||'', room: c.room||'',
+          days: c.days||'', type: c.type||'평일',
+        }));
       }
-      showResults();
+      filterTimetable();
     }, { onlyOnce: true });
   } else {
-    // Firebase 없어도 빈 상태로 표시
-    showResults();
+    // Firebase 없음 - localStorage에서 로드
+    const saved = DB.get('ttClasses') || [];
+    _ttCourses = saved.map(c => ({
+      name: c.courseName||'', teacher: c.instructor||'',
+      start: c.startDate||'', end: c.endDate||'',
+      time: c.startTime||'', room: c.room||'',
+      days: c.days||'', type: c.type||'평일',
+    }));
+    filterTimetable();
   }
 };
 

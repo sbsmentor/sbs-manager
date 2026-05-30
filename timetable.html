@@ -436,7 +436,18 @@ window.uploadTimetable = async function(event, scheduleType) {
         const timeVal = timeMatch ? timeMatch[1] : '';
 
         for (let colIdx = 1; colIdx < cells.length; colIdx++) {
-          const fullText = (cells[colIdx]?.textContent || '').replace(/\u00a0/g, ' ').trim();
+          // textContent는 li 줄바꿈 무시 → li를 \n으로 변환해서 강사명/요일 파싱 가능하게
+          const cellEl = cells[colIdx];
+          let fullText = '';
+          if (cellEl) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = cellEl.innerHTML;
+            // li 태그 뒤에 \n 삽입
+            tempDiv.querySelectorAll('li').forEach(li => {
+              li.insertAdjacentText('afterend', '\n');
+            });
+            fullText = (tempDiv.textContent || '').replace(/\u00a0/g, ' ').replace(/ {2,}/g, ' ').trim();
+          }
           if (!fullText || !fullText.includes('개:') || !fullText.includes('종:')) continue;
 
           // 강좌명
