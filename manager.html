@@ -1,6 +1,24 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+<script>
+// 크로스오리진/로컬파일 Script error 완전 억제
+window.onerror = function(msg, src, line, col, err) {
+  if (!msg) return true;
+  const m = String(msg).toLowerCase();
+  if (m.includes('script error') || m.includes('unsafe') || m.includes('cross-origin')) return true;
+  return false;
+};
+// Promise 에러 억제 (unhandledrejection)
+window.addEventListener('unhandledrejection', function(e) {
+  const msg = (e.reason && e.reason.message) ? e.reason.message : String(e.reason || '');
+  if (!msg || msg.toLowerCase().includes('script error') || msg.toLowerCase().includes('load fail')) {
+    e.preventDefault();
+  }
+});
+// SecurityError 억제
+window.addEventListener('securitypolicyviolation', function(e){ e.preventDefault(); }, true);
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SBS아카데미게임학원 수강생 관리</title>
@@ -640,25 +658,7 @@ table{overflow:visible!important;}
   tryLoadFirebase(0);
 })();
 </script>
-<script>
-// 크로스오리진 Script error 억제
-// 크로스오리진/로컬파일 Script error 완전 억제
-window.onerror = function(msg, src, line, col, err) {
-  if (!msg) return true;
-  const m = String(msg).toLowerCase();
-  if (m.includes('script error') || m.includes('unsafe') || m.includes('cross-origin')) return true;
-  return false;
-};
-// Promise 에러 억제 (unhandledrejection)
-window.addEventListener('unhandledrejection', function(e) {
-  const msg = (e.reason && e.reason.message) ? e.reason.message : String(e.reason || '');
-  if (!msg || msg.toLowerCase().includes('script error') || msg.toLowerCase().includes('load fail')) {
-    e.preventDefault();
-  }
-});
-// SecurityError 억제
-window.addEventListener('securitypolicyviolation', function(e){ e.preventDefault(); }, true);
-</script>
+
 <script>
 window.onerror = function(msg) {
   if(!msg || String(msg).includes('Script error') || String(msg).includes('unsafe')) return true;
@@ -2914,18 +2914,18 @@ function setAllData(d){
 // ════════════════════════════════════════════
 // localStorage 자동저장
 // ════════════════════════════════════════════
-const LS_KEY = 'sbs_students_v2';
+const LS_KEY = () => 'sbs_students_v2_' + (typeof MENTOR_ID !== 'undefined' ? MENTOR_ID : 'default'); // 멘토별 분리
 
 function saveToLocal(){
   try{
-    localStorage.setItem(LS_KEY, JSON.stringify(getAllData()));
+    localStorage.setItem(LS_KEY(), JSON.stringify(getAllData()));
     showToast('💾 저장 완료! 이 브라우저에 영구보관됩니다');
   }catch(e){ showToast('❌ 저장 실패: '+e.message); }
 }
 
 function loadFromLocal(){
   try{
-    const raw=localStorage.getItem(LS_KEY);
+    const raw=localStorage.getItem(LS_KEY());
     if(!raw) return false;
     setAllData(JSON.parse(raw));
     return true;
@@ -3190,26 +3190,25 @@ function loadTimetable() {
     window._fbOnValue(ttRef, snap => {
       const data = snap.val() || {};
       _ttCourses = Object.values(data);
-      // Firebase timetable → localStorage geo_ttClasses 동기화
-      // manager.html의 수업배정(배정표)이 DB.get('ttClasses')로 읽기 때문
-      if (_ttCourses.length > 0) {
-        const ttClassesFormatted = _ttCourses.map(c => ({
-          id: c.id || (c.name + '|' + (c.start||'') + '|' + (c.time||'')),
-          type: c.type || '평일',
-          courseName: c.name || '',
-          instructor: c.teacher || '',
-          startDate: c.start || '',
-          endDate: c.end || '',
-          startTime: c.time || '',
-          endTime: '',
-          days: c.days || '',
-          room: c.room || '',
-          roomGroup: '',
-          enrollment: 0,
-          attendance: 0,
-        }));
-        DB.set('ttClasses', ttClassesFormatted);
-      }
+      // Firebase timetable → localStorage 동기화 (멘토별 분리된 키에 저장)
+      const ttClassesFormatted = _ttCourses.map(c => ({
+        id: c.id || (c.name + '|' + (c.start||'') + '|' + (c.time||'')),
+        type: c.type || '평일',
+        courseName: c.name || '',
+        instructor: c.teacher || '',
+        startDate: c.start || '',
+        endDate: c.end || '',
+        startTime: c.time || '',
+        endTime: '',
+        days: c.days || '',
+        room: c.room || '',
+        roomGroup: '',
+        enrollment: 0,
+        attendance: 0,
+      }));
+      DB.set('ttClasses', ttClassesFormatted);
+      // 시간표 탭이 현재 열려있으면 즉시 다시 렌더
+      if (currentTab === 'timetable') renderTimetableTab();
     });
   };
   tryLoad();
@@ -3227,36 +3226,24 @@ window.openTimetableSearch = function(row) {
   document.getElementById('ttSearchInp').value = '';
   document.getElementById('ttSearchBg').style.display = 'flex';
 
-  // _ttCourses가 비어있으면 Firebase에서 즉시 재로드
-  if (_ttCourses.length === 0 && window._fbDb && window._fbRef && window._fbOnValue) {
+  const doShow = () => { buildMonthTabs(); filterTimetable(); };
+
+  if (window._fbDb && window._fbRef && window._fbOnValue) {
+    // 항상 Firebase에서 최신 데이터 가져오기
     const ttRef = window._fbRef(window._fbDb, 'timetable');
     window._fbOnValue(ttRef, snap => {
       const data = snap.val() || {};
       _ttCourses = Object.values(data);
-      if (_ttCourses.length > 0) {
-        const ttClassesFormatted = _ttCourses.map(c => ({
-          id: c.id || (c.name + '|' + (c.start||'') + '|' + (c.time||'')),
-          type: c.type || '평일',
-          courseName: c.name || '',
-          instructor: c.teacher || '',
-          startDate: c.start || '',
-          endDate: c.end || '',
-          startTime: c.time || '',
-          endTime: '',
-          days: c.days || '',
-          room: c.room || '',
-          roomGroup: '',
-          enrollment: 0,
-          attendance: 0,
-        }));
-        DB.set('ttClasses', ttClassesFormatted);
-      }
-      buildMonthTabs();
-      filterTimetable();
+      DB.set('ttClasses', _ttCourses.map(c => ({
+        id: c.id || (c.name+'|'+(c.start||'')+'|'+(c.time||'')),
+        type: c.type||'평일', courseName: c.name||'', instructor: c.teacher||'',
+        startDate: c.start||'', endDate: c.end||'', startTime: c.time||'',
+        endTime: '', days: c.days||'', room: c.room||'', roomGroup: '', enrollment: 0, attendance: 0,
+      })));
+      doShow();
     }, { onlyOnce: true });
   } else {
-    buildMonthTabs();
-    filterTimetable();
+    doShow();
   }
   setTimeout(() => document.getElementById('ttSearchInp').focus(), 100);
 };
@@ -3449,12 +3436,24 @@ async function loadExcelFile(event){
 
   // SheetJS 로드
   if(!window.XLSX){
-    await new Promise((res,rej)=>{
+    await new Promise((res)=>{
       const s=document.createElement('script');
+      s.crossOrigin='anonymous';
       s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      s.onload=res; s.onerror=rej;
+      s.onload=res;
+      s.onerror=()=>res(); // 실패해도 reject 하지 않고 계속 진행
       document.head.appendChild(s);
     });
+    if(!window.XLSX){
+      // fallback CDN
+      await new Promise((res)=>{
+        const s=document.createElement('script');
+        s.crossOrigin='anonymous';
+        s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+        s.onload=res; s.onerror=()=>res();
+        document.head.appendChild(s);
+      });
+    }
   }
 
   const buf = await file.arrayBuffer();
@@ -3973,7 +3972,7 @@ function _loadH2C(){
     const s=document.createElement('script');
     s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
     s.onload=()=>{ _h2cLoaded=true; res(); };
-    s.onerror=()=>rej(new Error('html2canvas 로드 실패'));
+    s.onerror=()=>res(); // 실패해도 조용히 처리
     document.head.appendChild(s);
   });
 }
@@ -4087,10 +4086,11 @@ function showNotif(title, body, type){ showToast((type==='warn'||type==='danger'
 
 // ttClasses: localStorage 'geo_ttClasses' 에 저장 (zio_crm 방식 그대로)
 const CRM_DB = {
-  get(key){ try{ return JSON.parse(localStorage.getItem('geo_'+key))||[]; }catch{ return []; } },
-  set(key,val){ localStorage.setItem('geo_'+key,JSON.stringify(val)); },
-  getObj(key,def={}){ try{ return JSON.parse(localStorage.getItem('geo_'+key))||def; }catch{ return def; } },
-  setObj(key,val){ localStorage.setItem('geo_'+key,JSON.stringify(val)); }
+  _k(key){ return 'geo_' + MENTOR_ID + '_' + key; }, // 멘토별 분리
+  get(key){ try{ return JSON.parse(localStorage.getItem(this._k(key)))||[]; }catch{ return []; } },
+  set(key,val){ localStorage.setItem(this._k(key),JSON.stringify(val)); },
+  getObj(key,def={}){ try{ return JSON.parse(localStorage.getItem(this._k(key)))||def; }catch{ return def; } },
+  setObj(key,val){ localStorage.setItem(this._k(key),JSON.stringify(val)); }
 };
 // 기존 DB 참조를 CRM_DB로 연결 (시간표/개강안내 함수들이 DB. 를 참조)
 const DB = CRM_DB;
