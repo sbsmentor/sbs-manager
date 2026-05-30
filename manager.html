@@ -3286,35 +3286,71 @@ window.filterTimetable = function() {
   let results = _ttCourses;
   if (_ttFilteredMonth !== 'all') results = results.filter(c => (c.start||'').startsWith(_ttFilteredMonth));
   if (q) results = results.filter(c => (c.name||'').toLowerCase().includes(q) || (c.teacher||'').toLowerCase().includes(q));
-  results = results.slice(0, 80);
 
   updateSelCount();
   const container = document.getElementById('ttResults');
+
   if (results.length === 0) {
     container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text3);">해당하는 강좌가 없습니다</div>';
     return;
   }
 
-  container.innerHTML = results.map((c,i) => {
-    const key = c.name+'|'+c.start+'|'+(c.time||'');
-    const checked = _ttSelected.has(key);
-    const typeBg = c.type==='주말'?'var(--orange-dim)':'var(--blue-dim)';
-    const typeColor = c.type==='주말'?'var(--orange)':'var(--blue)';
-    return `<div onclick="toggleTtItem(this,'${key.replace(/'/g,"\'")}',${i})"
-         data-key="${key.replace(/"/g,'&quot;')}"
-         style="padding:9px 13px;border:1.5px solid ${checked?'var(--accent)':'var(--border)'};border-radius:9px;cursor:pointer;display:flex;gap:10px;align-items:center;background:${checked?'var(--accent-dim)':'#fff'};transition:all .1s;">
-      <input type="checkbox" ${checked?'checked':''} onclick="event.stopPropagation()" onchange="toggleTtItem(this.closest('div'),'${key.replace(/'/g,"\'")}',${i})" style="width:15px;height:15px;accent-color:var(--accent);flex-shrink:0;">
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:12px;font-weight:700;">${c.name||'-'}</div>
-        <div style="font-size:11px;color:var(--text2);margin-top:1px;">
-          👤 ${c.teacher||'-'} &nbsp;·&nbsp; ⏰ ${c.time||'-'} &nbsp;·&nbsp; 🏫 ${c.room||'-'} &nbsp;·&nbsp; ${c.days||'-'}
-        </div>
-        <div style="font-size:10px;color:var(--text3);margin-top:1px;">📅 ${c.start||'-'} ~ ${c.end||'-'}</div>
-      </div>
-      <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:${typeBg};color:${typeColor};flex-shrink:0;">${c.type||'평일'}</span>
-    </div>`;
-  }).join('');
+  // 월별 그룹화 (개강일 기준)
+  const groups = {};
+  results.forEach((c, i) => {
+    const mo = (c.start||'').slice(0,7) || '날짜미정';
+    if (!groups[mo]) groups[mo] = [];
+    groups[mo].push({c, i});
+  });
+
+  const sortedMonths = Object.keys(groups).sort();
+
+  let html = '';
+  for (const mo of sortedMonths) {
+    const collapsed = (_ttMonthCollapsed[mo] !== false);
+    const label = mo === '날짜미정' ? '날짜 미정' : (() => {
+      const [y,m] = mo.split('-');
+      return y + '년 ' + parseInt(m) + '월';
+    })();
+    const cnt = groups[mo].length;
+
+    html += '<div onclick="window.toggleTtMonth(\'' + mo + '\')" style="padding:10px 14px;background:#f1f5f9;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;">'
+      + '<span style="font-size:15px;">' + (collapsed ? '▶' : '▼') + '</span>'
+      + '<span style="font-size:13px;font-weight:800;color:#334155;">' + label + '</span>'
+      + '<span style="font-size:11px;color:#64748b;margin-left:4px;">' + cnt + '개</span>'
+      + '</div>';
+
+    if (!collapsed) {
+      html += '<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0;">';
+      groups[mo].forEach(({c, i}) => {
+        const key = c.name+'|'+c.start+'|'+(c.time||'');
+        const checked = _ttSelected.has(key);
+        const typeBg = c.type==='주말'?'var(--orange-dim)':'var(--blue-dim)';
+        const typeColor = c.type==='주말'?'var(--orange)':'var(--blue)';
+        html += '<div onclick="toggleTtItem(this,\'' + key.replace(/'/g,"\\'") + '\',' + i + ')"'
+          + ' data-key="' + key.replace(/"/g,'&quot;') + '"'
+          + ' style="padding:9px 13px;border:1.5px solid ' + (checked?'var(--accent)':'var(--border)') + ';border-radius:9px;cursor:pointer;display:flex;gap:10px;align-items:center;background:' + (checked?'var(--accent-dim)':'#fff') + ';transition:all .1s;touch-action:manipulation;">'
+          + '<input type="checkbox" ' + (checked?'checked':'') + ' onclick="event.stopPropagation()" onchange="toggleTtItem(this.closest(\'div\'),\'' + key.replace(/'/g,"\\'") + '\',' + i + ')" style="width:15px;height:15px;accent-color:var(--accent);flex-shrink:0;">'
+          + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-size:12px;font-weight:700;">' + (c.name||'-') + '</div>'
+          + '<div style="font-size:11px;color:var(--text2);margin-top:1px;">👤 ' + (c.teacher||'-') + ' &nbsp;·&nbsp; ⏰ ' + (c.time||'-') + ' &nbsp;·&nbsp; 🏫 ' + (c.room||'-') + ' &nbsp;·&nbsp; ' + (c.days||'-') + '</div>'
+          + '<div style="font-size:10px;color:var(--text3);margin-top:1px;">📅 ' + (c.start||'-') + ' ~ ' + (c.end||'-') + '</div>'
+          + '</div>'
+          + '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:' + typeBg + ';color:' + typeColor + ';flex-shrink:0;">' + (c.type||'평일') + '</span>'
+          + '</div>';
+      });
+      html += '</div>';
+    }
+  }
+
+  container.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;">' + html + '</div>';
 };
+
+window.toggleTtMonth = function(mo) {
+  _ttMonthCollapsed[mo] = (_ttMonthCollapsed[mo] !== false);
+  window.filterTimetable();
+};
+;
 
 window.toggleTtItem = function(el, key) {
   if (_ttSelected.has(key)) {
@@ -3741,8 +3777,10 @@ function renderNotiCalGrid(yearMonth, classDates, startDate, endDate){
     const borderR=cellBg!=='transparent'?`border-radius:5px;`:'';
     const isCustomOn=window._notiCustomDates&&window._notiCustomDates.has(ds);
     const isCustomOff=window._notiRemovedDates&&window._notiRemovedDates.has(ds);
-    const finalBg=isCustomOn?'#bbf7d0':isCustomOff?'#fff':cellBg;
-    const finalMark=isCustomOff?'':(isCustomOn?`<div style="font-size:9px;font-weight:700;color:#16a34a;line-height:1;">●</div>`:markHtml);
+    const finalBg=isCustomOn?'#bbf7d0':isCustomOff?cellBg:cellBg;
+    const finalMark=isCustomOff
+    ? `<div style="font-size:9px;color:#ef4444;line-height:1;text-decoration:line-through;opacity:0.5;">${markHtml?'●':''}</div>`
+    : (isCustomOn?`<div style="font-size:9px;font-weight:700;color:#16a34a;line-height:1;">●</div>`:markHtml);
     cells+=`<div onclick="notiCalClick('${ds}')" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:3px 1px;background:${finalBg};${borderR}min-height:36px;">
       <div style="font-size:11px;font-weight:${isClass||isFirst||isLast?'700':'400'};color:${numColor};line-height:1.2;">${day}</div>
       ${finalMark}
@@ -3895,16 +3933,17 @@ function openNotiCardFromBoard(arrName, si, mk){
   document.getElementById('notiCalWrap').innerHTML=
     months.map(mo=>renderNotiCalGrid(mo,classDates,startDate,endDate)).join('');
 
-  // 수업 정보
+  // 수업 정보 (편집 가능)
+  const labelStyle = 'display:inline-block;width:52px;font-weight:700;';
+  const valStyle = 'border:none;background:transparent;font-size:11px;font-family:inherit;color:inherit;cursor:text;outline:none;border-bottom:1px dashed #94a3b8;min-width:80px;';
   const infoRows=[
-    `<div><b style="display:inline-block;width:52px;">과 목 :</b> ${p.cls}</div>`,
-    p.teacher?`<div><b style="display:inline-block;width:52px;">강 사 :</b> ${p.teacher} 강사</div>`:'',
-    daysLabel?`<div><b style="display:inline-block;width:52px;">요 일 :</b> ${daysLabel}</div>`:'',
-    p.time?`<div><b style="display:inline-block;width:52px;">시 간 :</b> ${p.time}</div>`:'',
-    startDate?`<div><b style="display:inline-block;width:52px;">개 강 :</b> ${startDate} (${startDow})</div>`:'',
-    endDate?`<div><b style="display:inline-block;width:52px;">종 강 :</b> ${endDate} (${endDow})</div>`:'',
-    `<div><b style="display:inline-block;width:52px;">휴 강 :</b> ${noClassNote}</div>`,
-  ].filter(Boolean).join('');
+    `<div><b style="${labelStyle}">과 목 :</b> <input value="${p.cls||''}" style="${valStyle}" onchange="_notiEditField('cls',this.value)" /></div>`,
+    `<div><b style="${labelStyle}">강 사 :</b> <input value="${(p.teacher||'').replace(' 강사','')}" style="${valStyle}" onchange="_notiEditField('teacher',this.value)" /> 강사</div>`,
+    `<div><b style="${labelStyle}">요 일 :</b> <input value="${daysLabel||''}" style="${valStyle}" onchange="_notiEditField('daysLabel',this.value)" /></div>`,
+    `<div><b style="${labelStyle}">시 간 :</b> <input value="${p.time||''}" style="${valStyle}" onchange="_notiEditField('time',this.value)" /></div>`,
+    `<div><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /> ${startDow?'('+startDow+')':''}</div>`,
+    `<div><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /> ${endDow?'('+endDow+')':''}</div>`,
+  ].join('');
   document.getElementById('notiInfo').innerHTML=infoRows;
 
   _notiCtx={arrName,si,mk,val,p,noClassNote,sy,sm,startDow,endDow,daysLabel};
@@ -4001,7 +4040,7 @@ function copyNotiText(){
     p.time?`시 간 : ${p.time}`:null,
     startDate?`개 강 : ${startDate} (${startDow})`:null,
     endDate?`종 강 : ${endDate} (${endDow})`:null,
-    `휴 강 : ${noClassNote}`, '',
+    '',
     '▼ 공 지 사 항 ▼',
     '📢 과목변경/휴학신청은 개강 3일전까지 가능합니다.',
     '💬 학원관련 문의사항은 담당 멘토에게 요청해주세요',
