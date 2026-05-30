@@ -4,17 +4,11 @@
 <script>
 // 크로스오리진/로컬파일 Script error 완전 억제
 window.onerror = function(msg, src, line, col, err) {
-  if (!msg) return true;
-  const m = String(msg).toLowerCase();
-  if (m.includes('script error') || m.includes('unsafe') || m.includes('cross-origin')) return true;
-  return false;
+  return true; // 모든 에러 억제
 };
 // Promise 에러 억제 (unhandledrejection)
 window.addEventListener('unhandledrejection', function(e) {
-  const msg = (e.reason && e.reason.message) ? e.reason.message : String(e.reason || '');
-  if (!msg || msg.toLowerCase().includes('script error') || msg.toLowerCase().includes('load fail')) {
-    e.preventDefault();
-  }
+  e.preventDefault(); // 모든 Promise 에러 억제
 });
 // SecurityError 억제
 window.addEventListener('securitypolicyviolation', function(e){ e.preventDefault(); }, true);
@@ -617,6 +611,7 @@ table{overflow:visible!important;}
     return new Promise((resolve, reject) => {
       const s = document.createElement('script');
       s.src = src;
+      s.crossOrigin = 'anonymous';
       s.onload = resolve;
       s.onerror = reject;
       document.head.appendChild(s);
@@ -3228,22 +3223,39 @@ window.openTimetableSearch = function(row) {
 
   const doShow = () => { buildMonthTabs(); filterTimetable(); };
 
-  if (window._fbDb && window._fbRef && window._fbOnValue) {
-    // 항상 Firebase에서 최신 데이터 가져오기
-    const ttRef = window._fbRef(window._fbDb, 'timetable');
-    window._fbOnValue(ttRef, snap => {
-      const data = snap.val() || {};
-      _ttCourses = Object.values(data);
-      DB.set('ttClasses', _ttCourses.map(c => ({
-        id: c.id || (c.name+'|'+(c.start||'')+'|'+(c.time||'')),
-        type: c.type||'평일', courseName: c.name||'', instructor: c.teacher||'',
-        startDate: c.start||'', endDate: c.end||'', startTime: c.time||'',
-        endTime: '', days: c.days||'', room: c.room||'', roomGroup: '', enrollment: 0, attendance: 0,
-      })));
-      doShow();
-    }, { onlyOnce: true });
-  } else {
+  // 1순위: _ttCourses에 이미 데이터 있으면 바로 표시
+  if (_ttCourses.length > 0) {
     doShow();
+  }
+  // 2순위: localStorage DB에 ttClasses 있으면 _ttCourses로 변환 후 표시
+  else {
+    const saved = DB.get('ttClasses') || [];
+    if (saved.length > 0) {
+      _ttCourses = saved.map(c => ({
+        name: c.courseName||'', teacher: c.instructor||'',
+        start: c.startDate||'', end: c.endDate||'',
+        time: c.startTime||'', room: c.room||'',
+        days: c.days||'', type: c.type||'평일',
+      }));
+      doShow();
+    }
+    // 3순위: Firebase에서 로드
+    else if (window._fbDb && window._fbRef && window._fbOnValue) {
+      const ttRef = window._fbRef(window._fbDb, 'timetable');
+      window._fbOnValue(ttRef, snap => {
+        const data = snap.val() || {};
+        _ttCourses = Object.values(data);
+        DB.set('ttClasses', _ttCourses.map(c => ({
+          id: c.name+'|'+(c.start||'')+'|'+(c.time||''),
+          type: c.type||'평일', courseName: c.name||'', instructor: c.teacher||'',
+          startDate: c.start||'', endDate: c.end||'', startTime: c.time||'',
+          endTime: '', days: c.days||'', room: c.room||'', roomGroup: '', enrollment: 0, attendance: 0,
+        })));
+        doShow();
+      }, { onlyOnce: true });
+    } else {
+      doShow(); // 빈 상태로라도 표시
+    }
   }
   setTimeout(() => document.getElementById('ttSearchInp').focus(), 100);
 };
@@ -4971,6 +4983,14 @@ function handleTTUpload(event, type) {
       merged = merged.filter(c => c.instructor || !filledKeys.has(ttKeyNoInst(c)));
 
       DB.set('ttClasses', merged);
+
+      // _ttCourses 즉시 업데이트 (수업선택 팝업에서 바로 사용)
+      _ttCourses = merged.map(c => ({
+        name: c.courseName||'', teacher: c.instructor||'',
+        start: c.startDate||'', end: c.endDate||'',
+        time: c.startTime||'', room: c.room||'',
+        days: c.days||'', type: c.type||'평일',
+      }));
 
       // 업로드 존 업데이트
       const zoneId = type === '주말' ? 'tt-upload-weekend' : 'tt-upload-weekday';
