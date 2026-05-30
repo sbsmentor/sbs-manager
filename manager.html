@@ -640,6 +640,19 @@ table{overflow:visible!important;}
   tryLoadFirebase(0);
 })();
 </script>
+<script>
+// 크로스오리진 Script error 억제
+window.onerror = function(msg, src, line, col, err) {
+  // Script error, Unsafe URL 등 로컬/크로스오리진 에러 억제
+  if (!msg) return true;
+  if (msg === 'Script error.' || msg === 'Uncaught Error: Script error.') return true;
+  if (String(msg).toLowerCase().includes('unsafe') || String(msg).toLowerCase().includes('script error')) return true;
+  return false;
+};
+
+// SecurityError (Unsafe URL) 억제
+window.addEventListener('securitypolicyviolation', function(e){ e.preventDefault(); }, true);
+</script>
 </head>
 <body>
 <!-- IP 차단 오버레이 -->
@@ -840,124 +853,11 @@ table{overflow:visible!important;}
   </div>
 </div>
 
-<!-- 수업 목록 관리 -->
+
+<!-- 수업 목록 관리 모달 -->
 <div class="cls-modal-bg" id="clsModalBg">
   <div class="cls-modal" id="clsModal"></div>
 </div>
-
-
-<!-- ═══ zio_crm 시간표/개강안내 모달 ═══ -->
-<div class="modal-overlay" id="modal-tt-assign">
-      <div class="modal" style="width:500px">
-        <div class="modal-header" style="background:linear-gradient(135deg,#2563eb,#1d4ed8)">
-          <h3 style="color:#fff">📅 수업 배정</h3>
-          <button class="modal-close" onclick="closeModal('modal-tt-assign')" style="color:#fff">×</button>
-        </div>
-        <div class="modal-body">
-          <!-- 수업 정보 (읽기 전용) -->
-          <div style="background:#eff6ff;border-radius:10px;padding:14px;margin-bottom:16px">
-            <div style="font-size:16px;font-weight:800;color:#1e40af;margin-bottom:6px" id="tta-course-name"></div>
-            <div style="font-size:12px;color:#3b82f6;display:flex;gap:12px;flex-wrap:wrap" id="tta-course-info"></div>
-          </div>
-          <!-- 기배정 학생 -->
-          <div id="tta-already-assigned"></div>
-          <!-- 학생 선택 -->
-          <div class="form-group">
-            <label>학생 선택 *</label>
-            <input type="text" id="tta-student-search" placeholder="🔍 이름·연락처 검색..." oninput="filterTTAStudents()" autocomplete="off"
-              style="margin-bottom:6px">
-            <input type="hidden" id="tta-student-id">
-            <div id="tta-student-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:#fff"></div>
-            <div id="tta-student-selected" style="display:none;margin-top:6px;padding:8px 12px;background:#eff6ff;border-radius:6px;border:1px solid #93c5fd;font-size:13px;font-weight:600;color:#1d4ed8"></div>
-          </div>
-          <div class="form-group">
-            <label>배정여부</label>
-            <select id="tta-assign-status">
-              <option value="대기중">대기중</option>
-              <option value="완료">완료</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>개강안내</label>
-            <select id="tta-noti-status">
-              <option value="대기중">대기중</option>
-              <option value="완료">완료</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>유/무료</label>
-            <select id="tta-fee-type">
-              <option value="유료">유료</option>
-              <option value="무료">무료</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>비고</label>
-            <input type="text" id="tta-notes" placeholder="추가 메모...">
-          </div>
-          <!-- 숨겨진 수업 데이터 -->
-          <input type="hidden" id="tta-data">
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="closeModal('modal-tt-assign')">취소</button>
-          <button class="btn btn-primary" onclick="confirmTTAssign()">✅ 배정 완료</button>
-        </div>
-      </div>
-    </div>
-
-    <
-
-<div class="modal-overlay" id="modal-noti-card">
-      <div class="modal" style="width:520px;max-height:95vh">
-        <div class="modal-header" style="background:linear-gradient(135deg,#2563eb,#7c3aed)">
-          <h3 style="color:#fff">📬 개강안내 카드</h3>
-          <button class="modal-close" onclick="closeModal('modal-noti-card')" style="color:#fff">×</button>
-        </div>
-        <div class="modal-body" style="overflow-y:auto;max-height:75vh;padding:0">
-          <div id="noti-card-content"></div>
-        </div>
-        <div class="modal-footer" style="justify-content:center;gap:10px;flex-wrap:wrap">
-          <button class="btn" style="background:#0f172a;color:white" id="noti-img-btn" onclick="">🖼 달력 이미지 저장</button>
-          <button class="btn btn-primary" id="noti-copy-btn" onclick="">📋 카카오톡 텍스트 복사</button>
-          <button class="btn btn-success" id="noti-done-btn" onclick="">✅ 안내완료 처리</button>
-          <button class="btn btn-secondary" onclick="closeModal('modal-noti-card')">닫기</button>
-        </div>
-      </div>
-    </div>
-
-    <
-
-<div class="modal-overlay" id="modal-course-add">
-      <div class="modal" style="width:680px">
-        <div class="modal-header">
-          <h3 id="course-modal-title">수업 추가</h3>
-          <button class="modal-close" onclick="closeModal('modal-course-add')">×</button>
-        </div>
-        <div class="modal-body">
-          <input type="hidden" id="c-student-id">
-          <input type="hidden" id="c-id">
-          <div id="course-modal-content"></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="closeModal('modal-course-add')">취소</button>
-          <button class="btn btn-primary" onclick="saveCourse()">저장</button>
-        </div>
-      </div>
-    </div>
-
-    <
-
-<div class="modal-overlay" id="modal-student-detail">
-      <div class="modal" style="width:700px;max-height:90vh">
-        <div class="modal-header">
-          <h3 id="student-detail-title">학생 상세</h3>
-          <button class="modal-close" onclick="closeModal('modal-student-detail')">×</button>
-        </div>
-        <div class="modal-body" id="student-detail-body" style="overflow-y:auto;max-height:70vh"></div>
-      </div>
-    </div>
-
-    <
 
 <div class="toast" id="toast"></div>
 
@@ -1378,11 +1278,6 @@ function addSchedRow(){
 // ════════════════════════════════════════════
 let clsTarget=null; // 'weekday'|'weekend'
 
-function openClsManager(type){
-  clsTarget=type;
-  renderClsModal();
-  document.getElementById('clsModalBg').classList.add('open');
-}
 function renderClsModal(){
   const list=clsTarget==='weekday'?WEEKDAY_CLASSES:WEEKEND_CLASSES;
   const title=clsTarget==='weekday'?'평일 수업 목록':'주말 수업 목록';
@@ -1561,7 +1456,6 @@ function openEditModal(arr,idx){
         수업 배정 일정
         <button class="ef-add-sched" onclick="addSchedRow()" id="addSchedBtn">+ 추가</button>
         <span id="sugang-remain" style="font-size:11px;font-family:var(--mono);margin-left:6px;"></span>
-        <button class="ef-add-sched" onclick="openClsManager('${isWeekend?'weekend':'weekday'}')" style="margin-left:4px">⚙️ ${clsMgrLabel} 수업 관리</button>
       </div>
       <div style="display:flex;gap:6px;font-size:10px;color:var(--text3);margin-bottom:8px;font-family:var(--mono);padding-left:4px">
         <span style="width:76px">연도</span><span style="width:60px">월</span><span style="width:72px">시작시간</span><span style="flex:1">수업종류</span><span style="width:80px">강사명</span><span style="width:55px;color:var(--accent)">배정✓ 개강</span>
@@ -3718,8 +3612,8 @@ function tabBulkAction(tab, action) {
 </script>
 
 <!-- 개강안내 카드 모달 (풀리디자인) -->
-<div id="notiCardBg" style="display:none;position:fixed;inset:0;z-index:1600;background:rgba(0,0,0,.55);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:12px;">
-  <div style="background:#fff;border-radius:18px;width:100%;max-width:480px;box-shadow:0 24px 80px rgba(0,0,0,.25);display:flex;flex-direction:column;max-height:96vh;">
+<div id="notiCardBg" style="display:none;position:fixed;inset:0;z-index:1600;background:rgba(0,0,0,.55);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:8px;">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:460px;box-shadow:0 24px 80px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden;">
 
     <!-- 헤더 -->
     <div style="padding:12px 16px 10px;background:linear-gradient(135deg,#2563eb,#7c3aed);border-radius:18px 18px 0 0;display:flex;align-items:center;flex-shrink:0;">
@@ -3728,21 +3622,21 @@ function tabBulkAction(tab, action) {
     </div>
 
     <!-- 카드 본체 (캡처 대상) -->
-    <div style="overflow-y:auto;flex:1;" id="notiCardScroll">
-      <div id="notiPrintable" style="background:#fff;padding:16px 18px;font-family:'Noto Sans KR',sans-serif;">
+    <div id="notiCardScroll">
+      <div id="notiPrintable" style="background:#fff;padding:10px 14px;font-family:'Noto Sans KR',sans-serif;">
 
         <!-- 제목 -->
-        <div id="notiTitle" style="text-align:center;font-size:15px;font-weight:900;color:#1e293b;margin-bottom:12px;letter-spacing:-.3px;"></div>
+        <div id="notiTitle" style="text-align:center;font-size:13px;font-weight:900;color:#1e293b;margin-bottom:8px;letter-spacing:-.3px;"></div>
 
         <!-- 달력 그리드 -->
         <div id="notiCalWrap"></div>
 
         <!-- 수업 정보 -->
-        <div id="notiInfo" style="margin-top:10px;background:#f8fafc;border-radius:8px;padding:10px 13px;font-size:12px;line-height:1.95;border:1px solid #e2e8f0;"></div>
+        <div id="notiInfo" style="margin-top:7px;background:#f8fafc;border-radius:8px;padding:8px 11px;font-size:11px;line-height:1.75;border:1px solid #e2e8f0;"></div>
 
         <!-- 공지사항 -->
-        <div style="margin-top:8px;background:#f0fdf4;border-radius:8px;padding:10px 13px;font-size:11px;line-height:1.85;color:#374151;border:1px solid #bbf7d0;">
-          <div style="font-weight:800;color:#16a34a;margin-bottom:2px;font-size:12px;">▼ 공 지 사 항 ▼</div>
+        <div style="margin-top:6px;background:#f0fdf4;border-radius:8px;padding:7px 11px;font-size:10px;line-height:1.7;color:#374151;border:1px solid #bbf7d0;">
+          <div style="font-weight:800;color:#16a34a;margin-bottom:2px;font-size:11px;">▼ 공 지 사 항 ▼</div>
           <div>📢 과목변경/휴학신청은 개강 3일전까지 가능합니다.</div>
           <div>💬 학원관련 문의사항은 담당 멘토에게 요청해주세요</div>
           <div>📆 상담/면담은 학원 운영시간 내 예약제로 진행됩니다.</div>
@@ -3763,7 +3657,6 @@ function tabBulkAction(tab, action) {
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <script>
 // ════════════════════════════════════════════
@@ -3823,13 +3716,8 @@ function getClassDatesForNoti(startDate, endDate, daysStr){
 
 // 공휴일 이름 축약 (5자 이하로, 안 끊어지게)
 function shortHoliday(name){
-  const map={
-    '설날연휴':'설연휴','추석연휴':'추석연휴','대체공휴일':'대체공휴',
-    '부처님오신날':'부처님날','어린이날':'어린이날','삼일절':'삼일절',
-    '광복절':'광복절','개천절':'개천절','한글날':'한글날','현충일':'현충일',
-    '성탄절':'성탄절','신정':'신정','설날':'설날','추석':'추석'
-  };
-  return map[name]||name.slice(0,5);
+  // 원래 이름 그대로 표시 (줄바꿈 허용)
+  return name;
 }
 
 function renderNotiCalGrid(yearMonth, classDates, startDate, endDate){
@@ -3862,17 +3750,17 @@ function renderNotiCalGrid(yearMonth, classDates, startDate, endDate){
       markHtml=`<div style="font-size:8px;font-weight:800;color:#ddd6fe;line-height:1;margin-top:1px;">종강</div>`;
     } else if(isClass&&holiday){
       cellBg='#fee2e2'; numColor='#dc2626';
-      markHtml=`<div style="font-size:7.5px;color:#dc2626;line-height:1.1;margin-top:1px;word-break:keep-all;white-space:nowrap;">${shortHoliday(holiday)}</div>`;
+      markHtml=`<div style="font-size:7px;color:#dc2626;line-height:1.15;margin-top:1px;word-break:keep-all;white-space:normal;text-align:center;">${shortHoliday(holiday)}</div>`;
     } else if(isClass){
       cellBg='#dbeafe'; numColor='#1d4ed8';
       markHtml=`<div style="font-size:9px;font-weight:700;color:#1d4ed8;line-height:1;">●</div>`;
     } else if(holiday){
       numColor=isWeekend?numColor:'#dc2626';
-      markHtml=`<div style="font-size:7.5px;color:#dc2626;line-height:1.1;margin-top:1px;word-break:keep-all;white-space:nowrap;">${shortHoliday(holiday)}</div>`;
+      markHtml=`<div style="font-size:7px;color:#dc2626;line-height:1.15;margin-top:1px;word-break:keep-all;white-space:normal;text-align:center;">${shortHoliday(holiday)}</div>`;
     }
 
     const borderR=cellBg!=='transparent'?`border-radius:5px;`:'';
-    cells+=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:3px 1px;background:${cellBg};${borderR}min-height:32px;">
+    cells+=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:3px 1px;background:${cellBg};${borderR}min-height:36px;">
       <div style="font-size:11px;font-weight:${isClass||isFirst||isLast?'700':'400'};color:${numColor};line-height:1.2;">${day}</div>
       ${markHtml}
     </div>`;
@@ -3880,7 +3768,7 @@ function renderNotiCalGrid(yearMonth, classDates, startDate, endDate){
 
   return `<div style="margin-bottom:10px;">
     <div style="text-align:center;font-size:11px;font-weight:700;color:#475569;margin-bottom:5px;">${y}년 ${m}월</div>
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#e2e8f0;border-radius:6px;overflow:hidden;">
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:0;background:#e2e8f0;border-radius:6px;overflow:hidden;">
       ${DOW.map((d,i)=>`<div style="background:#1e293b;padding:4px 1px;text-align:center;font-size:10px;font-weight:700;color:${i===0?'#fca5a5':i===6?'#93c5fd':'#e2e8f0'};">${d}</div>`).join('')}
       <div style="background:#fff;grid-column:1/-1;height:0;"></div>
       ${cells.replace(/<\/div>\s*<div/g,'</div><div').split('</div>').join('</div>').split('<div style="background:#fff;grid-column:1/-1;height:0;"></div>').join('<div style="background:#fff;grid-column:1/-1;height:0;"></div>')}
@@ -3899,7 +3787,7 @@ function renderNotiCalendar(yearMonth, classDates, startDate, endDate){
   let rows='';
   let day=1;
   // 헤더행
-  const hdr=DOW.map((d,i)=>`<td style="background:#1e293b;padding:4px 0;text-align:center;font-size:10px;font-weight:700;color:${i===0?'#fca5a5':i===6?'#93c5fd':'#e2e8f0'};">${d}</td>`).join('');
+  const hdr=DOW.map((d,i)=>`<td style="background:#1e293b;padding:3px 0;text-align:center;font-size:9px;font-weight:700;color:${i===0?'#fca5a5':i===6?'#93c5fd':'#e2e8f0'};">${d}</td>`).join('');
   rows+=`<tr>${hdr}</tr>`;
 
   for(let wk=0;wk<6&&day<=daysInMo;wk++){
@@ -3933,8 +3821,8 @@ function renderNotiCalendar(yearMonth, classDates, startDate, endDate){
 
       const br=cellBg!=='transparent'?'border-radius:4px;':'';
       row+=`<td style="padding:1px;text-align:center;vertical-align:top;">
-        <div style="background:${cellBg};${br}padding:3px 1px;min-height:30px;display:flex;flex-direction:column;align-items:center;">
-          <div style="font-size:11px;font-weight:${(isClass||isFirst||isLast)?'700':'400'};color:${numColor};line-height:1.2;">${day}</div>
+        <div style="background:${cellBg};${br}padding:2px 1px;min-height:22px;display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:10px;font-weight:${(isClass||isFirst||isLast)?'700':'400'};color:${numColor};line-height:1.2;">${day}</div>
           ${mark}
         </div>
       </td>`;
@@ -3944,8 +3832,8 @@ function renderNotiCalendar(yearMonth, classDates, startDate, endDate){
     rows+=row;
   }
 
-  return `<div style="margin-bottom:10px;">
-    <div style="text-align:center;font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">${y}년 ${m}월</div>
+  return `<div style="margin-bottom:6px;">
+    <div style="text-align:center;font-size:10px;font-weight:700;color:#64748b;margin-bottom:3px;">${y}년 ${m}월</div>
     <table style="width:100%;border-collapse:collapse;table-layout:fixed;">${rows}</table>
   </div>`;
 }
@@ -3986,7 +3874,7 @@ function openNotiCardFromBoard(arrName, si, mk){
 
   // 달력 (멀티 월)
   document.getElementById('notiCalWrap').innerHTML=
-    months.map(mo=>renderNotiCalendar(mo,classDates,startDate,endDate)).join('');
+    months.map(mo=>renderNotiCalGrid(mo,classDates,startDate,endDate)).join('');
 
   // 수업 정보
   const infoRows=[
@@ -4002,7 +3890,7 @@ function openNotiCardFromBoard(arrName, si, mk){
 
   _notiCtx={arrName,si,mk,val,p,noClassNote,sy,sm,startDow,endDow,daysLabel};
 
-  document.getElementById('notiImgCopyBtn').onclick=()=>copyNotiImage(p.cls,startDate);
+  document.getElementById('notiImgCopyBtn').onclick=()=>saveNotiImage(p.cls,startDate);
   document.getElementById('notiTxtCopyBtn').onclick=()=>copyNotiText();
   document.getElementById('notiDoneBtn').onclick=()=>markNotiDone();
   document.getElementById('notiCardBg').style.display='flex';
@@ -4013,47 +3901,72 @@ function closeNotiCard(){
   _notiCtx=null;
 }
 
-// 이미지를 클립보드에 복사 (카카오톡에 바로 붙여넣기 가능)
-async function copyNotiImage(courseName, startDate){
-  const el=document.getElementById('notiPrintable'); if(!el) return;
+
+// html2canvas 동적 로드 후 이미지 클립보드 복사
+let _h2cLoaded = false;
+function _loadH2C(){
+  return new Promise((res,rej)=>{
+    if(_h2cLoaded){ res(); return; }
+    if(typeof html2canvas!=='undefined'){ _h2cLoaded=true; res(); return; }
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+    s.onload=()=>{ _h2cLoaded=true; res(); };
+    s.onerror=()=>rej(new Error('html2canvas 로드 실패'));
+    document.head.appendChild(s);
+  });
+}
+
+async function saveNotiImage(courseName, startDate){
   const btn=document.getElementById('notiImgCopyBtn');
-  btn.innerHTML='⏳<br><span style="font-size:10px;">처리중...</span>'; btn.disabled=true;
-  if(typeof html2canvas==='undefined'){
-    showToast('⚠ 라이브러리 로딩 중... 잠시 후 다시 시도');
-    btn.innerHTML='📸<br><span style="font-size:10px;font-weight:500;opacity:.85;">이미지 복사</span>'; btn.disabled=false; return;
-  }
+  const el=document.getElementById('notiPrintable');
+  if(!el) return;
+  const origHTML=btn.innerHTML;
+  btn.innerHTML='⏳<br><span style="font-size:10px;">처리중...</span>';
+  btn.disabled=true;
+
   try{
-    const canvas=await html2canvas(el,{scale:2.5,backgroundColor:'#ffffff',useCORS:true,logging:false});
-    // ClipboardItem API 지원 여부 확인
-    if(navigator.clipboard&&window.ClipboardItem){
+    await _loadH2C();
+    const canvas=await html2canvas(el,{
+      scale:2.5,
+      backgroundColor:'#ffffff',
+      useCORS:true,
+      logging:false,
+      width:el.offsetWidth,
+      height:el.offsetHeight
+    });
+
+    // 클립보드에 복사 시도 (카카오톡 바로 붙여넣기)
+    if(navigator.clipboard && window.ClipboardItem){
       canvas.toBlob(async blob=>{
         try{
           await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
-          showToast('📸 이미지 클립보드 복사 완료! 카카오톡에 붙여넣기(Ctrl+V)하세요');
-        } catch(e){
-          // 복사 실패 시 다운로드로 폴백
-          fallbackDownload(canvas, courseName, startDate);
+          showToast('📸 이미지 복사 완료! 카카오톡에 Ctrl+V로 붙여넣기 하세요');
+        }catch(e){
+          // 클립보드 복사 실패 시 다운로드
+          _downloadCanvas(canvas, courseName, startDate);
         }
-        btn.innerHTML='📸<br><span style="font-size:10px;font-weight:500;opacity:.85;">이미지 복사</span>'; btn.disabled=false;
+        btn.innerHTML=origHTML; btn.disabled=false;
       },'image/png');
     } else {
-      // 미지원 브라우저: 다운로드
-      fallbackDownload(canvas, courseName, startDate);
-      btn.innerHTML='📸<br><span style="font-size:10px;font-weight:500;opacity:.85;">이미지 복사</span>'; btn.disabled=false;
+      // 미지원 브라우저 → 다운로드
+      _downloadCanvas(canvas, courseName, startDate);
+      btn.innerHTML=origHTML; btn.disabled=false;
     }
   }catch(e){
-    showToast('❌ 이미지 생성 실패');
-    btn.innerHTML='📸<br><span style="font-size:10px;font-weight:500;opacity:.85;">이미지 복사</span>'; btn.disabled=false;
+    showToast('⚠ 이미지 처리 실패. 스크린샷을 이용해주세요.');
+    btn.innerHTML=origHTML; btn.disabled=false;
   }
 }
 
-function fallbackDownload(canvas, courseName, startDate){
-  const link=document.createElement('a');
+function _downloadCanvas(canvas, courseName, startDate){
   const mo=startDate?startDate.slice(0,7).replace('-','.'):new Date().toISOString().slice(0,7);
+  const link=document.createElement('a');
   link.download=`개강안내_${courseName}_${mo}.png`;
-  link.href=canvas.toDataURL('image/png'); link.click();
-  showToast('📥 이미지 다운로드 완료 (클립보드 복사 미지원 브라우저)');
+  link.href=canvas.toDataURL('image/png');
+  link.click();
+  showToast('📥 이미지 저장 완료! (클립보드 미지원 브라우저)');
 }
+
 
 function copyNotiText(){
   if(!_notiCtx) return;
@@ -4210,16 +4123,6 @@ DB.set = function(key, val) {
   _origDBSet(key, val);
 };
 
-// openStudentDetail → manager의 수정 모달 열기
-function openStudentDetail(studentId) {
-  const parts = studentId.split('_');
-  const arrName = parts[0]; const idx = parseInt(parts[1]);
-  const arr = arrName==='WEEKDAY'?WEEKDAY:WEEKEND;
-  if(!arr||!arr[idx]) return;
-  window._bdReturnAfterSave = false;
-  currentTab = arrName==='WEEKDAY'?'students':'students';
-  openEditModal(arr, idx);
-}
 
 // 시간표 탭 전환 상태
 let ttTypeFilter = '전체';
@@ -4438,7 +4341,7 @@ function showParseDebug() {
   document.body.appendChild(modal);
 }
 
-function fetchHolidaysForMonth(year, month) {
+async function fetchHolidaysForMonth(year, month) {
   const key = getHolidayApiKey();
   if (!key) return;
   const cacheKey = `holidayCache_${year}${String(month).padStart(2,'0')}`;
@@ -4462,7 +4365,7 @@ function fetchHolidaysForMonth(year, month) {
   } catch(e) { /* 실패 시 fallback 유지 */ }
 }
 
-function prefetchHolidaysForRange(startDate, endDate) {
+async function prefetchHolidaysForRange(startDate, endDate) {
   if (!startDate) return;
   const s = new Date(startDate + 'T00:00:00');
   const e = endDate ? new Date(endDate + 'T00:00:00') : s;
@@ -4728,7 +4631,6 @@ function renderTimetable() {
             ${myStudents.length ? `<span style="font-size:11px;padding:2px 7px;border-radius:10px;background:#dcfce7;color:#15803d;font-weight:700">👤 내 학생 ${myStudents.length}명</span>` : ''}
           </div>
         </div>
-        <button class="btn btn-sm btn-primary" style="flex-shrink:0;white-space:nowrap" onclick="openTTAssign('${ckey}')">배정하기</button>
       </div>
       <div class="tt-card-body">
         <div class="tt-card-row">👨‍🏫 <strong>${c.instructor||'-'}</strong>
@@ -4783,116 +4685,10 @@ function renderTimetable() {
   }).join('');
 }
 
-function openTTAssign(ckey) {
-  const courseData = _ttMap[ckey];
-  if (!courseData) { showNotif('오류', '강좌 데이터를 찾을 수 없습니다', 'warn'); return; }
-  document.getElementById('tta-course-name').textContent = courseData.courseName;
-  document.getElementById('tta-course-info').innerHTML = `
-    <span>👨‍🏫 ${courseData.instructor||'-'}</span>
-    <span>📅 ${courseData.startDate||'-'} ~ ${courseData.endDate||'-'}</span>
-    ${courseData.startTime ? `<span>⏰ ${courseData.startTime}${courseData.endTime?' ~ '+courseData.endTime:''}</span>` : ''}
-    ${courseData.days ? `<span>🗓 ${courseData.days}</span>` : ''}
-    ${courseData.room ? `<span>🏫 ${courseData.room}</span>` : ''}`;
-  document.getElementById('tta-data').value = ckey;
-  document.getElementById('tta-assign-status').value = '대기중';
-  document.getElementById('tta-noti-status').value = '대기중';
-  document.getElementById('tta-fee-type').value = '유료';
-  document.getElementById('tta-notes').value = '';
 
-  // 학생 검색 초기화
-  const students = DB.get('students').sort((a,b) => a.name.localeCompare(b.name,'ko'));
-  document.getElementById('tta-student-search').value = '';
-  document.getElementById('tta-student-id').value = '';
-  document.getElementById('tta-student-selected').style.display = 'none';
-  document.getElementById('tta-student-selected').textContent = '';
-  renderTTAStudentList(students, '');
 
-  // 이미 배정된 학생 표시
-  const assigned = students.filter(s => s.courses.some(c => c.name === courseData.courseName && (c.startDate||'') === (courseData.startDate||'')));
-  const assignedEl = document.getElementById('tta-already-assigned');
-  if (assignedEl) {
-    if (assigned.length) {
-      assignedEl.innerHTML = `
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;margin-bottom:14px">
-          <div style="font-size:12px;font-weight:700;color:#15803d;margin-bottom:6px">✅ 이미 배정된 내 학생 (${assigned.length}명)</div>
-          ${assigned.map(s => {
-            const c = s.courses.find(c => c.name === courseData.courseName && (c.startDate||'') === (courseData.startDate||''));
-            return `<div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0">
-              <span style="font-weight:700">${s.name}</span>
-              <span class="assign-badge ${c?.assignStatus==='완료'?'done':'pending'}" style="font-size:10px">${c?.assignStatus==='완료'?'배정완료':'배정대기'}</span>
-              <span class="assign-badge ${c?.notiStatus==='완료'?'done':'pending'}" style="font-size:10px">${c?.notiStatus==='완료'?'안내완료':'안내대기'}</span>
-            </div>`;
-          }).join('')}
-        </div>`;
-    } else {
-      assignedEl.innerHTML = '';
-    }
-  }
 
-  openModal('modal-tt-assign');
-}
 
-function renderTTAStudentList(students, query) {
-  const el = document.getElementById('tta-student-list');
-  if (!el) return;
-  const q = query.toLowerCase();
-  const filtered = q
-    ? students.filter(s => s.name.toLowerCase().includes(q) || (s.phone||'').includes(q))
-    : students;
-  if (!filtered.length) {
-    el.innerHTML = `<div style="padding:12px;text-align:center;color:var(--text-muted);font-size:13px">검색 결과가 없습니다</div>`;
-    return;
-  }
-  el.innerHTML = filtered.map(s => `
-    <div onclick="selectTTAStudent('${s.id}','${s.name}')"
-      style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;transition:background 0.1s"
-      onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background=''">
-      <div style="width:30px;height:30px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">${s.name[0]}</div>
-      <div>
-        <div style="font-weight:600">${s.name}</div>
-        ${s.phone ? `<div style="font-size:11px;color:var(--text-muted)">${s.phone}</div>` : ''}
-      </div>
-      <div style="margin-left:auto;font-size:11px;color:#94a3b8">수업 ${s.courses.length}건</div>
-    </div>`).join('');
-}
-
-function filterTTAStudents() {
-  const q = document.getElementById('tta-student-search').value;
-  const students = DB.get('students').sort((a,b) => a.name.localeCompare(b.name,'ko'));
-  renderTTAStudentList(students, q);
-}
-
-function selectTTAStudent(id, name) {
-  document.getElementById('tta-student-id').value = id;
-  document.getElementById('tta-student-search').value = '';
-  document.getElementById('tta-student-list').innerHTML = '';
-  const sel = document.getElementById('tta-student-selected');
-  sel.textContent = `✅ 선택됨: ${name}`;
-  sel.style.display = '';
-}
-
-function confirmTTAssign() {
-  const studentId = document.getElementById('tta-student-id').value;
-  if (!studentId) { showNotif('선택 오류', '학생을 선택해주세요', 'warn'); return; }
-  const cd = _ttMap[document.getElementById('tta-data').value];
-  if (!cd) { showNotif('오류', '강좌 정보를 찾을 수 없습니다', 'warn'); return; }
-  const students = DB.get('students');
-  const s = students.find(s => s.id === studentId);
-  s.courses.push({
-    id: genId(),
-    name:         cd.courseName,
-    startDate:    cd.startDate,
-    endDate:      cd.endDate,
-    assignStatus: document.getElementById('tta-assign-status').value,
-    notiStatus:   document.getElementById('tta-noti-status').value,
-    feeType:      document.getElementById('tta-fee-type').value,
-    notes:        document.getElementById('tta-notes').value || (cd.instructor ? `강사: ${cd.instructor}` : ''),
-  });
-  DB.set('students', students);
-  closeModal('modal-tt-assign');
-  renderContent();
-  showNotif('배정 완료', `${s.name} → ${cd.courseName} 수업이 추가되었습니다 ✅`);
-}
 
 function renderTTMyStudents() {
   const el = document.getElementById('tt-my-students-view');
@@ -4947,7 +4743,7 @@ function renderTTMyStudents() {
       const typeCls = getCourseTypeCls(e.courseName);
 
       const studentRows = e.students.map(s => `
-        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f8fafc;border-radius:6px;margin-top:4px;cursor:pointer" onclick="openStudentDetail('${s.id}')">
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f8fafc;border-radius:6px;margin-top:4px;cursor:pointer">
           <span style="font-weight:700;font-size:13px">${s.name}</span>
           <span class="assign-badge ${s.assignStatus==='완료'?'done':'pending'}" style="font-size:10px">${s.assignStatus==='완료'?'배정완료':'배정대기'}</span>
           <span class="assign-badge ${s.notiStatus==='완료'?'done':'pending'}" style="font-size:10px">${s.notiStatus==='완료'?'안내완료':'안내대기'}</span>
@@ -5004,7 +4800,7 @@ function setWeekPatternOverride(studentId, courseId, value) {
   else delete c.weekPatternOverride;
   DB.set('students', students);
   // 개강안내 모달 다시 그림 (달력에 즉시 반영)
-  openNotiCard(studentId, courseId);
+  openNotiCardFromBoard && console && false /* notiCard removed */;
 }
 
 function promptDaysOverride(studentId, courseId) {
@@ -5030,7 +4826,7 @@ function promptDaysOverride(studentId, courseId) {
   c.daysOverride = trimmed;
   delete c.notAlternating; // 격주로 지정했으므로 비격주 플래그 해제
   DB.set('students', students);
-  openNotiCard(studentId, courseId);
+  openNotiCardFromBoard && console && false /* notiCard removed */;
 }
 
 function clearDaysOverride(studentId, courseId) {
@@ -5044,279 +4840,13 @@ function clearDaysOverride(studentId, courseId) {
   delete c.weekPatternOverride;
   c.notAlternating = true; // 명시적으로 격주 아님 표시
   DB.set('students', students);
-  openNotiCard(studentId, courseId);
+  openNotiCardFromBoard && console && false /* notiCard removed */;
 }
 
-function openNotiCard(studentId, courseId) {
-  const s = DB.get('students').find(s => s.id === studentId);
-  const course = s?.courses.find(c => c.id === courseId);
-  if (!course) return;
-  await prefetchHolidaysForRange(course.startDate, course.endDate);
-  const tc = _notiTTClass(course);
 
-  const instructor = (tc?.instructor || course.instructor || '');
-  const room       = (tc?.room || course.room || '').replace(/[\d\(\)\-층\s]/g, '').trim();
-  const daysStr    = normalizeDaysStr(tc?.days || course.days || ''); // 붙여쓴 격주 자동 변환
-  const startTime  = tc?.startTime  || course.startTime || '';
-  const endTime    = tc?.endTime    || course.endTime   || '';
 
-  // 격주 교대 패턴 처리용 course 객체 구성 (override는 학생 수업 기록에서)
-  const finalDays = course.daysOverride || daysStr;
-  const ctxCourse = {
-    id: tc?.id || '',
-    courseName: tc?.courseName || course.name || '',
-    startDate: course.startDate,
-    endDate: course.endDate,
-    days: finalDays,
-    weekPatternOverride: course.weekPatternOverride || ''
-  };
-  const classDates  = getClassDates(course.startDate, course.endDate, finalDays, ctxCourse);
-  const holidayHits = classDates.filter(d => KR_HOLIDAYS[d] && !KR_HOLIDAYS[d].includes('대체공휴일'));
 
-  const [sy, sm] = (course.startDate || today()).split('-');
-  const startDow = course.startDate ? ['일','월','화','수','목','금','토'][new Date(course.startDate+'T00:00:00').getDay()] : '';
-  const endDow   = course.endDate   ? ['일','월','화','수','목','금','토'][new Date(course.endDate+'T00:00:00').getDay()]   : '';
 
-  // 달력: 수업이 걸친 월 목록
-  const moSet = new Set(classDates.map(d => d.slice(0,7)));
-  if (!moSet.size && course.startDate) moSet.add(course.startDate.slice(0,7));
-  const months = [...moSet].sort();
-
-  let calHTML = months.map(mo => _renderNotiCalendar(mo, classDates, course.startDate, course.endDate)).join('');
-
-  // 범위형(월~금 등)·격주(월수금/월수)는 그대로, 개별 나열은 붙여서 표시
-  const daysLabel = finalDays
-    ? ((/[월화수목금토일]~[월화수목금토일]/.test(finalDays) || finalDays.indexOf('/') > 0) ? finalDays
-        : [...new Set(finalDays.split('').filter(c=>'월화수목금토일'.includes(c)))].join(''))
-    : '';
-  const noClassNote = holidayHits.length
-    ? holidayHits.map(d => `${KR_HOLIDAYS[d]}(${d.slice(5).replace('-','/')})`).join(', ')
-    : 'x';
-
-  // 격주 패턴 설정 UI (항상 표시, printable 영역 밖 → 이미지 캡처 미포함)
-  const effectiveDays = course.daysOverride || daysStr;
-  const isAlternating = shouldAlternate(effectiveDays, course);
-  const btnSty = (active) => `padding:6px 12px;border-radius:6px;border:1px solid ${active?'#2563eb':'#cbd5e1'};background:${active?'#2563eb':'#fff'};color:${active?'#fff':'#475569'};font-size:12px;font-weight:600;cursor:pointer`;
-  let altToggleHTML = '';
-
-  if (isAlternating) {
-    const slashIdx = effectiveDays.indexOf('/');
-    const patA = effectiveDays.slice(0, slashIdx);
-    const patB = effectiveDays.slice(slashIdx + 1);
-    const ov = course.weekPatternOverride || '';
-    const autoActive = !ov, aActive = ov === 'A', bActive = ov === 'B';
-    altToggleHTML = `
-      <div style="margin:10px 14px 0;padding:11px 13px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:12px">
-        <div style="font-weight:700;color:#9a3412;margin-bottom:6px">⚙ 격주 교대 패턴 — 첫 주 지정</div>
-        <div style="color:#78350f;margin-bottom:8px;line-height:1.5">
-          이 강좌는 <b>${patA}</b>(${patA.length}일) ↔ <b>${patB}</b>(${patB.length}일) 격주로 진행됩니다.<br>
-          ${autoActive ? '현재: <b>자동</b> (직전월 데이터 또는 개강일 기준)' : `현재: 첫 주 = <b>${ov === 'A' ? patA : patB}</b>`}
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-          <button style="${btnSty(autoActive)}" onclick="setWeekPatternOverride('${studentId}','${courseId}','')">자동</button>
-          <button style="${btnSty(aActive)}" onclick="setWeekPatternOverride('${studentId}','${courseId}','A')">첫주=${patA}</button>
-          <button style="${btnSty(bActive)}" onclick="setWeekPatternOverride('${studentId}','${courseId}','B')">첫주=${patB}</button>
-          <button style="padding:6px 10px;border-radius:6px;border:1px dashed #fb923c;background:#fff;color:#9a3412;font-size:11px;cursor:pointer" onclick="clearDaysOverride('${studentId}','${courseId}')">격주 해제</button>
-        </div>
-      </div>`;
-  } else {
-    // 일반 강좌라도 사용자가 격주로 지정 가능
-    altToggleHTML = `
-      <div style="margin:10px 14px 0;padding:11px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <div style="color:#475569">현재 요일: <b>${effectiveDays || '-'}</b> · 격주 강좌면 직접 지정 가능</div>
-          <button style="padding:5px 11px;border-radius:6px;border:1px solid #fb923c;background:#fff7ed;color:#9a3412;font-size:11px;font-weight:600;cursor:pointer" onclick="promptDaysOverride('${studentId}','${courseId}')">격주로 지정</button>
-        </div>
-      </div>`;
-  }
-
-  const content = document.getElementById('noti-card-content');
-  content.innerHTML = `
-    ${altToggleHTML}
-    <div id="noti-printable" style="background:#fff;padding:20px 22px;font-family:'Segoe UI',sans-serif">
-      <div style="text-align:center;font-size:18px;font-weight:900;color:#1e293b;margin-bottom:16px;letter-spacing:-0.3px">
-        ● ${sy}년 ${parseInt(sm)}월 개강안내 ●
-      </div>
-      ${calHTML}
-      <div style="margin-top:14px;background:#f8fafc;border-radius:10px;padding:14px 16px;font-size:13px;line-height:2.1;border:1px solid #e2e8f0">
-        <div><b style="display:inline-block;width:54px">과 목 :</b> ${course.name}</div>
-        ${instructor ? `<div><b style="display:inline-block;width:54px">강 사 :</b> ${instructor} 강사</div>` : ''}
-        ${room       ? `<div><b style="display:inline-block;width:54px">장 소 :</b> ${room}</div>` : ''}
-        ${daysLabel  ? `<div><b style="display:inline-block;width:54px">요 일 :</b> ${daysLabel}</div>` : ''}
-        ${startTime  ? `<div><b style="display:inline-block;width:54px">시 간 :</b> ${startTime}${endTime?' ~ '+endTime:''}</div>` : ''}
-        ${course.startDate ? `<div><b style="display:inline-block;width:54px">개 강 :</b> ${course.startDate} (${startDow})</div>` : ''}
-        ${course.endDate   ? `<div><b style="display:inline-block;width:54px">종 강 :</b> ${course.endDate} (${endDow})</div>` : ''}
-        <div><b style="display:inline-block;width:54px">휴 강 :</b> ${noClassNote}</div>
-      </div>
-      <div style="margin-top:10px;background:#f0fdf4;border-radius:10px;padding:12px 16px;font-size:12px;line-height:1.9;color:#374151;border:1px solid #bbf7d0">
-        <div style="font-weight:800;color:#16a34a;margin-bottom:2px">▼ 공 지 사 항 ▼</div>
-        <div>📢 과목변경/휴학신청은 개강 3일전까지 가능합니다.</div>
-        <div>💬 학원관련 문의사항은 담당 멘토에게 요청해주세요</div>
-        <div>📆 상담/면담은 학원 운영시간 내 예약제로 진행됩니다.</div>
-        <div>⏰ 학원 운영 : 평일 10:00 - 22:00ㅣ주말 10:00 - 19:00</div>
-        <div>⏰ 자습실(8층) 사용 : 평일 10:00 - 21:30ㅣ주말 10:00 - 18:30</div>
-      </div>
-    </div>`;
-
-  // 버튼 콜백 연결
-  document.getElementById('noti-img-btn').onclick  = () => _captureNotiCard(course.name, course.startDate);
-  document.getElementById('noti-copy-btn').onclick = () => _copyNotiText(studentId, courseId);
-  document.getElementById('noti-done-btn').onclick = () => _markNotiDone(studentId, courseId);
-
-  openModal('modal-noti-card');
-}
-
-function _renderNotiCalendar(yearMonth, classDates, startDate, endDate) {
-  const [y, m] = yearMonth.split('-').map(Number);
-  const firstDow  = new Date(y, m-1, 1).getDay();
-  const daysInMo  = new Date(y, m, 0).getDate();
-  const classSet  = new Set(classDates.filter(d => d.startsWith(yearMonth)));
-  const DOW_LABELS = ['일','월','화','수','목','금','토'];
-
-  let html = `<div style="margin-bottom:12px">
-    <div style="text-align:center;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px">${y}년 ${m}월</div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">
-      <tr style="background:#1e293b">
-        ${DOW_LABELS.map((d,i) => `<th style="padding:5px 2px;text-align:center;color:${i===0?'#fca5a5':i===6?'#93c5fd':'#e2e8f0'};font-size:11px">${d}</th>`).join('')}
-      </tr>`;
-
-  let day = 1;
-  for (let wk = 0; wk < 6 && day <= daysInMo; wk++) {
-    html += '<tr>';
-    for (let dow = 0; dow < 7; dow++) {
-      if (wk === 0 && dow < firstDow) { html += '<td style="padding:3px 1px"></td>'; continue; }
-      if (day > daysInMo) { html += '<td></td>'; continue; }
-
-      const ds = `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-      const isClass    = classSet.has(ds);
-      const isFirst    = ds === startDate;
-      const isLast     = ds === endDate;
-      const holidayName = KR_HOLIDAYS[ds];
-      const holiday    = (holidayName && !holidayName.includes('대체공휴일')) ? holidayName : null;
-      const isWeekend  = dow === 0 || dow === 6;
-
-      let bg = '', numColor = isWeekend ? (dow===0?'#ef4444':'#3b82f6') : '#374151';
-      let mark = '';
-
-      if (isClass) {
-        if (isFirst)      { bg = 'background:#2563eb;border-radius:6px'; numColor = '#fff'; mark = `<div style="font-size:9px;font-weight:800;color:#bfdbfe">개강</div>`; }
-        else if (isLast)  { bg = 'background:#7c3aed;border-radius:6px'; numColor = '#fff'; mark = `<div style="font-size:9px;font-weight:800;color:#ddd6fe">종강</div>`; }
-        else if (holiday) { bg = 'background:#fee2e2;border-radius:6px'; numColor = '#dc2626'; mark = `<div style="font-size:8px;color:#dc2626;line-height:1.1">${holiday.slice(0,4)}</div>`; }
-        else              { bg = 'background:#dbeafe;border-radius:6px'; numColor = '#1d4ed8'; mark = `<div style="font-size:10px;font-weight:700;color:#1d4ed8">O</div>`; }
-      } else if (holiday) {
-        numColor = '#dc2626';
-        mark = `<div style="font-size:8px;color:#dc2626;line-height:1.1">${holiday.slice(0,4)}</div>`;
-      }
-
-      html += `<td style="padding:2px 1px;text-align:center"><div style="${bg};padding:3px 1px">
-        <div style="font-size:12px;font-weight:${isClass?'700':'400'};color:${numColor}">${day}</div>
-        ${mark}
-      </div></td>`;
-      day++;
-    }
-    html += '</tr>';
-  }
-  return html + '</table></div>';
-}
-
-function _copyNotiText(studentId, courseId) {
-  const s = DB.get('students').find(s => s.id === studentId);
-  const course = s?.courses.find(c => c.id === courseId);
-  if (!course) return;
-  const tc = _notiTTClass(course);
-
-  const instructor = tc?.instructor || '';
-  const room       = tc?.room       || '';
-  const daysStr    = normalizeDaysStr(tc?.days || ''); // 붙여쓴 격주 자동 변환
-  const startTime  = tc?.startTime  || '';
-  const endTime    = tc?.endTime    || '';
-
-  const [sy, sm] = (course.startDate || today()).split('-');
-  const finalDays = course.daysOverride || daysStr;
-  const ctxCourse = {
-    id: tc?.id || '',
-    courseName: tc?.courseName || course.name || '',
-    startDate: course.startDate,
-    endDate: course.endDate,
-    days: finalDays,
-    weekPatternOverride: course.weekPatternOverride || ''
-  };
-  const classDates  = getClassDates(course.startDate, course.endDate, finalDays, ctxCourse);
-  const holidayHits = classDates.filter(d => KR_HOLIDAYS[d] && !KR_HOLIDAYS[d].includes('대체공휴일'));
-  const startDow = course.startDate ? ['일','월','화','수','목','금','토'][new Date(course.startDate+'T00:00:00').getDay()] : '';
-  const endDow   = course.endDate   ? ['일','월','화','수','목','금','토'][new Date(course.endDate+'T00:00:00').getDay()]   : '';
-  // 범위형(월~금 등)·격주(월수금/월수)는 그대로, 개별 나열은 붙여서 표시
-  const daysLabel = finalDays
-    ? ((/[월화수목금토일]~[월화수목금토일]/.test(finalDays) || finalDays.indexOf('/') > 0) ? finalDays
-        : [...new Set(finalDays.split('').filter(c=>'월화수목금토일'.includes(c)))].join(''))
-    : '';
-  const 휴강 = holidayHits.length
-    ? holidayHits.map(d => `${KR_HOLIDAYS[d]}(${d.slice(5).replace('-','/')})`).join(', ')
-    : 'x';
-
-  const lines = [
-    `● ${sy}년 ${parseInt(sm)}월 개강안내 ●`,
-    '',
-    `과 목 : ${course.name}`,
-    instructor ? `강 사 : ${instructor} 강사` : null,
-    room       ? `장 소 : ${room}`             : null,
-    daysLabel  ? `요 일 : ${daysLabel}`        : null,
-    startTime  ? `시 간 : ${startTime}${endTime?' ~ '+endTime:''}` : null,
-    course.startDate ? `개 강 : ${course.startDate} (${startDow})` : null,
-    course.endDate   ? `종 강 : ${course.endDate} (${endDow})`     : null,
-    `휴 강 : ${휴강}`,
-    '',
-    '▼ 공 지 사 항 ▼',
-    '📢 과목변경/휴학신청은 개강 3일전까지 가능합니다.',
-    '💬 학원관련 문의사항은 담당 멘토에게 요청해주세요',
-    '📆 상담/면담은 학원 운영시간 내 예약제로 진행됩니다.',
-    '⏰ 학원 운영 : 평일 10:00 - 22:00ㅣ주말 10:00 - 19:00',
-    '⏰ 자습실(8층) 사용 : 평일 10:00 - 21:30ㅣ주말 10:00 - 18:30',
-  ].filter(l => l !== null).join('\n');
-
-  navigator.clipboard.writeText(lines).then(() => {
-    showNotif('복사 완료', '카카오톡에 붙여넣기 하세요 📬', 'success');
-  }).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = lines; document.body.appendChild(ta); ta.select();
-    document.execCommand('copy'); document.body.removeChild(ta);
-    showNotif('복사 완료', '카카오톡에 붙여넣기 하세요 📬', 'success');
-  });
-}
-
-function _captureNotiCard(courseName, startDate) {
-  const el = document.getElementById('noti-printable');
-  if (!el) return;
-  const btn = document.getElementById('noti-img-btn');
-  btn.textContent = '⏳ 처리 중...';
-  btn.disabled = true;
-  html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true }).then(canvas => {
-    const link = document.createElement('a');
-    const mo = startDate ? startDate.slice(0,7).replace('-','.') : '';
-    link.download = `개강안내_${courseName}_${mo}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-    btn.textContent = '🖼 달력 이미지 저장';
-    btn.disabled = false;
-    showNotif('이미지 저장', `${courseName} 개강안내 이미지가 다운로드됩니다`, 'success');
-  }).catch(() => {
-    btn.textContent = '🖼 달력 이미지 저장';
-    btn.disabled = false;
-    showNotif('오류', '이미지 생성에 실패했습니다', 'warn');
-  });
-}
-
-function _markNotiDone(studentId, courseId) {
-  const students = DB.get('students');
-  const s = students.find(s => s.id === studentId);
-  const c = s?.courses.find(c => c.id === courseId);
-  if (!c) return;
-  c.notiStatus = '완료';
-  DB.set('students', students);
-  closeModal('modal-noti-card');
-  renderContent();
-  showNotif('안내완료', `${s.name} 학생 ${c.name} 개강안내 완료 처리했습니다`, 'success');
-}
 
 function handleTTUpload(event, type) {
   const file = event.target.files[0];
