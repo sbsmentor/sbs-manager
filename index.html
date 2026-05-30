@@ -448,40 +448,60 @@ function renderMentors(){
 
   container.innerHTML = html;
 
-  // 수강생 수 로드
-  // Firebase는 배열을 {0:item, 1:item} 형태의 객체로 저장하므로 Object.values()로 처리
-  mentors.forEach(m=>{
-    fbOnValue(`mentors/${m.id}/data`, snap=>{
-      const d=snap.val();
-      let cnt=0;
-      if(d){
-        // Firebase는 배열을 {0:item,1:item} 객체로 저장
-        // 수강생은 이름(이름)이 있는 항목만 카운트
-        const countArr = (arr)=>{
-          if(!arr) return 0;
-          // 숫자 키 객체({0:...,1:...}) 또는 배열 모두 처리
-          const vals = Array.isArray(arr)
-            ? arr
-            : Object.values(arr);
-          return vals.filter(v=>{
-            if(!v || typeof v!=='object') return false;
-            // 이름 또는 연락처가 있는 실제 수강생만 카운트
-            // 이름이 실제 문자열이고 비어있지 않아야 함
-          const name = v['이름'] || v['name'] || '';
-          return typeof name==='string' && name.trim().length > 0;
-          }).length;
+  // 수강생 수 로드 - 리스너 중복 방지
+  const countArr = (arr)=>{
+    if(!arr) return 0;
+    const vals = Array.isArray(arr) ? arr : Object.values(arr);
+    return vals.filter(v=>{
+      if(!v || typeof v!=='object') return false;
+      const name = v['이름'] || v['name'] || '';
+      return typeof name==='string' && name.trim().length > 0;
+    }).length;
+  };
+
+  // 이미 등록된 리스너가 없을 때만 등록
+  if (!window._cntListenersRegistered) {
+    window._cntListenersRegistered = true;
+    mentors.forEach(m=>{
+      fbOnValue(`mentors/${m.id}/data`, snap=>{
+        const d=snap.val();
+        let cnt=0;
+        if(d){
+          const WEEKDAY = d.WEEKDAY || d.weekday || null;
+          const WEEKEND = d.WEEKEND || d.weekend || null;
+          const COD = d.COD_DATA || null;
+          const NATL = d.NATL_DATA || null;
+          cnt = countArr(WEEKDAY)+countArr(WEEKEND)+countArr(COD)+countArr(NATL);
+        }
+        // 요소가 없을 수 있으니 재시도
+        const updateEl = ()=>{
+          const el=document.getElementById(`cnt-${m.id}`);
+          if(el) el.textContent=cnt;
         };
-        // _v 같은 메타 필드 제외, 실제 배열 키만
-        const WEEKDAY = d.WEEKDAY || d.weekday || null;
-        const WEEKEND = d.WEEKEND || d.weekend || null;
-        const COD = d.COD_DATA || null;
-        const NATL = d.NATL_DATA || null;
-        cnt = countArr(WEEKDAY)+countArr(WEEKEND)+countArr(COD)+countArr(NATL);
-      }
-      const el=document.getElementById(`cnt-${m.id}`);
-      if(el) el.textContent=cnt;
+        updateEl();
+        // 카드 재렌더 후 요소가 생성될 수 있으므로 약간 지연 후 재시도
+        setTimeout(updateEl, 300);
+      });
     });
-  });
+  } else {
+    // 리스너 이미 있으면 현재 캐시된 값으로 즉시 업데이트
+    setTimeout(()=>{
+      mentors.forEach(m=>{
+        fbGet(`mentors/${m.id}/data`).then(snap=>{
+          const d=snap.val();
+          let cnt=0;
+          if(d){
+            cnt = countArr(d.WEEKDAY||d.weekday||null)
+                + countArr(d.WEEKEND||d.weekend||null)
+                + countArr(d.COD_DATA||null)
+                + countArr(d.NATL_DATA||null);
+          }
+          const el=document.getElementById(`cnt-${m.id}`);
+          if(el) el.textContent=cnt;
+        });
+      });
+    }, 100);
+  }
 }
 
 // ═══════════════════════════════════════════
