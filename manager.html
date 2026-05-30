@@ -3161,41 +3161,19 @@ window.openTimetableSearch = function(row) {
   document.getElementById('ttSearchBg').style.display = 'flex';
   setTimeout(() => document.getElementById('ttSearchInp').focus(), 100);
 
-  // _ttCourses에 이미 로드된 데이터 있으면 바로 표시
-  if (window._ttLoaded && _ttCourses.length > 0) {
+  // 이미 로드된 데이터 있으면 바로 표시
+  if (_ttCourses.length > 0) {
     filterTimetable();
     return;
   }
-  // localStorage 먼저 시도 (즉시 표시)
-  const saved = DB.get('ttClasses') || [];
-  if (saved.length > 0) {
-    _ttCourses = saved.map(c => ({
-      name: c.courseName||c.name||'', teacher: c.instructor||c.teacher||'',
-      start: c.startDate||c.start||'', end: c.endDate||c.end||'',
-      time: c.startTime||c.time||'', room: c.room||'',
-      days: c.days||'', type: c.type||'평일',
-    }));
-    filterTimetable();
-  } else if (window._fbDb && window._fbRef && window._fbOnValue) {
-    // localStorage 없으면 Firebase에서 로드
-    document.getElementById('ttResults').innerHTML = '<div style="text-align:center;padding:32px;color:var(--text3);">불러오는 중...</div>';
-    
-    // 5초 타임아웃
-    let done = false;
-    const timeout = setTimeout(() => {
-      if (!done) {
-        done = true;
-        filterTimetable(); // 빈 상태로 표시
-      }
-    }, 5000);
-    
-    const ttRef = window._fbRef(window._fbDb, 'timetable');
-    window._fbOnValue(ttRef, snap => {
-      if (done) return;
-      done = true;
-      clearTimeout(timeout);
-      const data = snap.val();
-      if (data) {
+
+  // Firebase REST API로 직접 읽기 (SDK 불필요)
+  document.getElementById('ttResults').innerHTML = '<div style="text-align:center;padding:32px;color:var(--text3);">불러오는 중...</div>';
+  
+  fetch('https://sbs-academy-game-default-rtdb.firebaseio.com/timetable.json')
+    .then(r => r.json())
+    .then(data => {
+      if (data && typeof data === 'object') {
         _ttCourses = Object.values(data).filter(c => c && c.name);
         DB.set('ttClasses', _ttCourses.map(c => ({
           id: c.name+'|'+(c.start||'')+'|'+(c.time||''),
@@ -3206,10 +3184,29 @@ window.openTimetableSearch = function(row) {
         })));
       }
       filterTimetable();
-    }, { onlyOnce: true });
-  } else {
-    filterTimetable();
-  }
+    })
+    .catch(() => {
+      // REST 실패 시 SDK로 폴백
+      if (window._fbDb && window._fbRef && window._fbOnValue) {
+        const ttRef = window._fbRef(window._fbDb, 'timetable');
+        window._fbOnValue(ttRef, snap => {
+          const data = snap.val();
+          if (data) {
+            _ttCourses = Object.values(data).filter(c => c && c.name);
+            DB.set('ttClasses', _ttCourses.map(c => ({
+              id: c.name+'|'+(c.start||'')+'|'+(c.time||''),
+              type: c.type||'평일', courseName: c.name||'', instructor: c.teacher||'',
+              startDate: c.start||'', endDate: c.end||'', startTime: c.time||'',
+              endTime: '', days: c.days||'', room: c.room||'', roomGroup: '',
+              enrollment: 0, attendance: 0,
+            })));
+          }
+          filterTimetable();
+        }, { onlyOnce: true });
+      } else {
+        filterTimetable();
+      }
+    });
 };
 
 window.closeTimetableSearch = function() {
