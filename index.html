@@ -117,9 +117,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
     try{
       await loadScript(CDNS[i].app);
       await loadScript(CDNS[i].db);
+      // SDK 객체가 제대로 로드됐는지 검증
+      if(typeof firebase === 'undefined' || typeof firebase.database !== 'function'){
+        throw new Error('firebase 객체 불완전');
+      }
       window._fbLoaded=true;
-      console.log('✅ Firebase:',CDNS[i].app.split('/')[2]);
-    }catch(e){ console.warn('⚠',CDNS[i].app.split('/')[2]); tryLoad(i+1); }
+    }catch(e){ tryLoad(i+1); }
   }
   window._fbLoaded=null;
   tryLoad(0);
@@ -647,9 +650,16 @@ async function init(){
   });
 
   if(window._fbLoaded===true){
-    const fbApp = firebase.initializeApp(FB_CONFIG);
-    _db = firebase.database(fbApp);
-  } else {
+    try {
+      const fbApp = (firebase.apps && firebase.apps.length)
+        ? firebase.apps[0]
+        : firebase.initializeApp(FB_CONFIG);
+      _db = firebase.database(fbApp);
+    } catch(e) {
+      window._fbLoaded = false;
+    }
+  }
+  if(window._fbLoaded!==true){
     document.getElementById('loadingScreen').style.display='none';
     document.getElementById('mainScreen').style.display='block';
     document.getElementById('mentorGrid').innerHTML=

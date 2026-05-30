@@ -607,7 +607,6 @@ table{overflow:visible!important;}
 
   async function tryLoadFirebase(cdnIdx) {
     if (cdnIdx >= CDNS.length) {
-      console.error('Firebase SDK: 모든 CDN 로드 실패');
       window._firebaseLoaded = false;
       return;
     }
@@ -632,9 +631,7 @@ table{overflow:visible!important;}
         push: (ref, val) => ref.push(val)
       };
       window._firebaseLoaded = true;
-      console.log('Firebase SDK 로드 성공:', cdn.app.split('/')[2]);
     } catch(e) {
-      console.warn('Firebase CDN 실패, 다음 시도:', cdn.app.split('/')[2], e.message);
       tryLoadFirebase(cdnIdx + 1);
     }
   }
@@ -3195,7 +3192,10 @@ async function loadFirebase() {
       appId: "1:120735998268:web:9d0d5c778451f69d63fe39"
     };
 
-    const fbApp = m.initializeApp(firebaseConfig);
+    // 중복 초기화 방지
+    const fbApp = (firebase.apps && firebase.apps.length)
+      ? firebase.apps[0]
+      : m.initializeApp(firebaseConfig);
     const db    = d.getDatabase(fbApp);
     const ref     = (path) => d.ref(db, path);
     const onValue = (r, cb, opts) => d.onValue(r, cb, opts);
@@ -3244,7 +3244,6 @@ async function loadFirebase() {
     };
 
   } catch(e) {
-    console.warn('Firebase 로드 실패, 로컬 데이터로 계속:', e.message);
   }
 }
 
@@ -5383,7 +5382,6 @@ function handleTTUpload(event, type) {
       showNotif('업로드 완료', `${type} 시간표 — 신규 ${addedCount}개 추가, ${updatedCount}개 업데이트 완료 🎉`);
     } catch(err) {
       showNotif('파싱 오류', '파일을 읽는 중 오류가 발생했습니다: ' + err.message, 'danger');
-      console.error(err);
     }
   };
   reader.readAsArrayBuffer(file);
