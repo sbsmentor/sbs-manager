@@ -438,17 +438,23 @@ window.uploadTimetable = async function(event, scheduleType) {
         const timeVal = timeMatch ? timeMatch[1] : '';
 
         for (let colIdx = 1; colIdx < cells.length; colIdx++) {
-          // textContent는 li 줄바꿈 무시 → li를 \n으로 변환해서 강사명/요일 파싱 가능하게
+          // li 태그에서 텍스트 추출 (innerHTML → li 내용만 \n으로 조인)
           const cellEl = cells[colIdx];
-          let fullText = '';
-          if (cellEl) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = cellEl.innerHTML;
-            // li 태그 뒤에 \n 삽입
-            tempDiv.querySelectorAll('li').forEach(li => {
-              li.insertAdjacentText('afterend', '\n');
-            });
-            fullText = (tempDiv.textContent || '').replace(/\u00a0/g, ' ').replace(/ {2,}/g, ' ').trim();
+          if (!cellEl) continue;
+          const cellHTML = cellEl.innerHTML || '';
+          let fullText;
+          if (cellHTML.includes('<li')) {
+            // li 태그 내용을 추출해서 \n으로 연결
+            const liTexts = [];
+            const liReg = /<li[^>]*>([\s\S]*?)<\/li>/gi;
+            let m;
+            while ((m = liReg.exec(cellHTML)) !== null) {
+              const txt = m[1].replace(/<[^>]+>/g, '').replace(/ /g, ' ').trim();
+              if (txt) liTexts.push(txt);
+            }
+            fullText = liTexts.join('\n');
+          } else {
+            fullText = (cellEl.textContent || '').replace(/ /g, ' ').trim();
           }
           if (!fullText || !fullText.includes('개:') || !fullText.includes('종:')) continue;
 
