@@ -608,12 +608,12 @@ table{overflow:visible!important;}
   ];
 
   function loadScript(src) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const s = document.createElement('script');
       s.src = src;
       s.crossOrigin = 'anonymous';
       s.onload = resolve;
-      s.onerror = reject;
+      s.onerror = resolve; // 실패해도 reject 안 함 - Script error 콘솔 출력 방지
       document.head.appendChild(s);
     });
   }
@@ -627,6 +627,8 @@ table{overflow:visible!important;}
     try {
       await loadScript(cdn.app);
       await loadScript(cdn.db);
+      // 로드 실패 시 firebase 객체 없음 → 다음 CDN으로
+      if (typeof firebase === 'undefined' || !firebase.initializeApp) throw new Error('firebase not loaded');
       // compat SDK는 window.firebase 전역으로 노출됨
       window.firebaseAppModule = {
         initializeApp: firebase.initializeApp.bind(firebase)

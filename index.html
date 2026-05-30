@@ -2,12 +2,7 @@
 <html lang="ko">
 <head>
 <script>
-window.onerror = function(msg, src, line, col, err) {
-  if (!msg) return true;
-  const m = String(msg).toLowerCase();
-  if (m.includes('script error') || m.includes('unsafe') || m.includes('cross-origin')) return true;
-  return false;
-};
+window.onerror = function() { return true; };
 window.addEventListener('unhandledrejection', function(e) {
   const msg = (e.reason && e.reason.message) ? e.reason.message : String(e.reason || '');
   if (!msg || msg.toLowerCase().includes('script error') || msg.toLowerCase().includes('load fail')) {
@@ -126,7 +121,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       db:'https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js' }
   ];
   function loadScript(src){
-    return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+    return new Promise((res)=>{ const s=document.createElement('script'); s.src=src; s.crossOrigin='anonymous'; s.onload=res; s.onerror=res; document.head.appendChild(s); });
   }
   async function tryLoad(i){
     if(i>=CDNS.length){ window._fbLoaded=false; return; }
