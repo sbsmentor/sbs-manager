@@ -923,7 +923,6 @@ let selectedRows = new Set(); // 체크박스 선택된 인덱스
 const TABS = [
   {id:'dashboard',label:'대시보드',   icon:'📊'},
   {id:'students', label:'수강생 목록',icon:'👥'},
-  {id:'timetable',label:'시간표',     icon:'📅'},
   {id:'cod',    label:'COD',        icon:'💛'},
   {id:'natl',   label:'국비 수강생',icon:'🏛'},
   {id:'grad',   label:'종강생',     icon:'🎓'},
@@ -1185,7 +1184,7 @@ function schedRowHtml(mon,val,isWeekend){
       <select class="ef-select ef-class-sel" onchange="onClassChange(this)" style="flex:1;min-width:120px;">${makeClassOpts(classes,selVal)}</select>
       <input class="ef-input ef-custom-cls" placeholder="수업명 직접입력" value="${cls}" style="display:${isCustom?'block':'none'};width:120px;flex:none;" oninput="this.style.borderColor=this.value?'var(--green)':'var(--border)'">
       <button type="button" onclick="openTimetableSearch(this.closest('.ef-sched-row'))" style="padding:4px 10px;border-radius:6px;border:1px solid var(--blue);background:var(--blue-dim);color:var(--blue);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;" title="시간표에서 검색">🔍 시간표</button>
-      <a href="timetable.html" target="_blank" class="tt-mgr-link" style="display:none;padding:4px 10px;border-radius:6px;border:1px solid var(--text3);background:var(--surface2);color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;text-decoration:none;">📋 시간표관리</a>
+
       <input class="ef-input ef-teacher-inp" placeholder="강사명" value="${teacher}" style="width:80px;flex:none;">
       <span class="assign-check ${isAssigned?'checked':''}" onclick="this.classList.toggle('checked')" title="배정완료"><svg width="11" height="9" viewBox="0 0 11 9" fill="none"><polyline points="1,4.5 4,7.5 10,1" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
       <span class="notice-toggle ${isNoticed?'on':''}" onclick="this.classList.toggle('on');this.textContent=this.classList.contains('on')?'O':'개'" title="개강안내">${isNoticed?'O':'개'}</span>
@@ -1949,7 +1948,6 @@ function renderTabs(){
 function renderContent(){
   if(currentTab==='dashboard') renderDashboard();
   else if(currentTab==='students') renderStudents([...WEEKDAY,...WEEKEND]);
-  else if(currentTab==='timetable') renderTimetableTab();
   else if(currentTab==='cod')    renderCOD();
   else if(currentTab==='natl')   renderNatl();
   else if(currentTab==='grad')   renderGrad();
@@ -1969,65 +1967,7 @@ function addBar(){
 // ── 수강생 목록 ──
 
 
-function renderTimetableTab() {
-  const el = document.getElementById('content');
-  el.innerHTML = `
-    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap;" id="student-sub-tabs">
-      <div style="display:flex;gap:2px;border-bottom:2px solid var(--border);padding-bottom:0;">
-        <button class="tab-btn active" onclick="switchStudentSubTab('timetable',this)" style="font-size:13px;padding:8px 14px;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--accent);color:var(--accent);font-family:'Noto Sans KR',sans-serif;font-weight:700;margin-bottom:-2px;">📅 시간표</button>
-        <button class="tab-btn" onclick="switchStudentSubTab('mystudents',this)" style="font-size:13px;padding:8px 14px;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text2);font-family:'Noto Sans KR',sans-serif;font-weight:600;margin-bottom:-2px;">📚 내 학생 수업</button>
-      </div>
-    </div>
-    <!-- 시간표 탭 -->
-      <div id="student-tab-timetable" style="display:none">
 
-        <!-- 업로드 현황 패널 -->
-        <div id="tt-status-panel" style="margin-bottom:18px"></div>
-
-        <!-- 업로드 영역 -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
-          <div class="tt-upload-zone" id="tt-upload-weekend" onclick="document.getElementById('tt-file-weekend').click()">
-            <input type="file" id="tt-file-weekend" accept=".xls,.xlsx" style="display:none" onchange="handleTTUpload(event,'주말')">
-            <div style="font-size:28px;margin-bottom:8px">🗓</div>
-            <div style="font-weight:700;margin-bottom:4px">주말 시간표 업로드</div>
-            <div id="tt-weekend-status" style="font-size:12px;color:var(--text-muted)">.xls / .xlsx 파일을 선택하세요</div>
-          </div>
-          <div class="tt-upload-zone" id="tt-upload-weekday" onclick="document.getElementById('tt-file-weekday').click()">
-            <input type="file" id="tt-file-weekday" accept=".xls,.xlsx" style="display:none" onchange="handleTTUpload(event,'평일')">
-            <div style="font-size:28px;margin-bottom:8px">📅</div>
-            <div style="font-weight:700;margin-bottom:4px">평일 시간표 업로드</div>
-            <div id="tt-weekday-status" style="font-size:12px;color:var(--text-muted)">.xls / .xlsx 파일을 선택하세요</div>
-          </div>
-        </div>
-        <!-- 파싱 디버그 -->
-        <div style="text-align:right;margin-bottom:8px">
-          <button class="btn btn-sm btn-secondary" onclick="showParseDebug()" title="마지막 업로드에서 강사명을 못 읽은 셀 목록 보기">🔍 파싱 미완료 셀 확인</button>
-        </div>
-        <!-- 필터 바 -->
-        <div class="tt-filter-bar">
-          <div class="tabs" style="margin-bottom:0;border-bottom:none">
-            <button class="tab-btn active" onclick="filterTT('전체',this)">전체</button>
-            <button class="tab-btn" onclick="filterTT('주말',this)">주말</button>
-            <button class="tab-btn" onclick="filterTT('평일',this)">평일</button>
-          </div>
-          <div class="tabs" style="margin-bottom:0;border-bottom:none" id="tt-day-tabs">
-            <button class="tab-btn active" onclick="filterTTDay('전체',this)">전체 요일</button>
-            <button class="tab-btn" onclick="filterTTDay('토',this)">토</button>
-            <button class="tab-btn" onclick="filterTTDay('일',this)">일</button>
-            <button class="tab-btn" onclick="filterTTDay('월',this)">월~금</button>
-          </div>
-          <input type="text" id="tt-search" placeholder="🔍 강좌명·강사 검색..." oninput="renderTimetable()" style="flex:1;max-width:240px">
-        </div>
-        <!-- 카드 그리드 -->
-        <div id="tt-grid"></div>
-      </div>
-    <!-- 내 학생 수업 탭 -->
-      <div id="student-tab-mystudents" style="display:none">
-        <div id="tt-my-students-view"></div>
-      </div>
-  `;
-  renderTimetable();
-}
 
 // ═══════════════════════════════════════════════════════
 // 대시보드 — 학생별 수업 전체 flatten
@@ -3131,8 +3071,7 @@ async function loadFirebase() {
         document.title = m.name + ' | SBS아카데미게임학원';
         if (['부장','팀장','원장'].includes(m.role)) {
           window._isSuperRole = true;
-          document.querySelectorAll('.tt-mgr-link').forEach(a => a.style.display = 'inline');
-        }
+                  }
       }
     }, { onlyOnce: true });
 
@@ -3165,8 +3104,7 @@ renderContent = function() {
   _origRenderContent();
   if (window._isSuperRole) {
     setTimeout(() => {
-      document.querySelectorAll('.tt-mgr-link').forEach(a => a.style.display = 'inline');
-    }, 100);
+          }, 100);
   }
 };
 
@@ -3204,8 +3142,6 @@ function loadTimetable() {
         attendance: 0,
       }));
       DB.set('ttClasses', ttClassesFormatted);
-      // 시간표 탭이 현재 열려있으면 즉시 다시 렌더
-      if (currentTab === 'timetable') renderTimetableTab();
     });
   };
   tryLoad();
@@ -3222,44 +3158,74 @@ window.openTimetableSearch = function(row) {
   _ttFilteredMonth = 'all';
   document.getElementById('ttSearchInp').value = '';
   document.getElementById('ttSearchBg').style.display = 'flex';
+  setTimeout(() => document.getElementById('ttSearchInp').focus(), 100);
 
-  const doShow = () => { buildMonthTabs(); filterTimetable(); };
-
-  // 1순위: _ttCourses에 이미 데이터 있으면 바로 표시
-  if (_ttCourses.length > 0) {
-    doShow();
+  function showResults() {
+    buildMonthTabs();
+    filterTimetable();
   }
-  // 2순위: localStorage DB에 ttClasses 있으면 _ttCourses로 변환 후 표시
-  else {
+
+  // ttClasses -> _ttCourses 변환 헬퍼
+  function syncFromDB() {
     const saved = DB.get('ttClasses') || [];
     if (saved.length > 0) {
       _ttCourses = saved.map(c => ({
-        name: c.courseName||'', teacher: c.instructor||'',
-        start: c.startDate||'', end: c.endDate||'',
-        time: c.startTime||'', room: c.room||'',
-        days: c.days||'', type: c.type||'평일',
+        name: c.courseName || c.name || '',
+        teacher: c.instructor || c.teacher || '',
+        start: c.startDate || c.start || '',
+        end: c.endDate || c.end || '',
+        time: c.startTime || c.time || '',
+        room: c.room || '',
+        days: c.days || '',
+        type: c.type || '평일',
       }));
-      doShow();
+      return true;
     }
-    // 3순위: Firebase에서 로드
-    else if (window._fbDb && window._fbRef && window._fbOnValue) {
-      const ttRef = window._fbRef(window._fbDb, 'timetable');
-      window._fbOnValue(ttRef, snap => {
-        const data = snap.val() || {};
+    return false;
+  }
+
+  // 이미 데이터 있으면 바로 표시
+  if (_ttCourses.length > 0) {
+    showResults();
+    return;
+  }
+
+  // localStorage에서 복원 시도
+  if (syncFromDB()) {
+    showResults();
+    return;
+  }
+
+  // Firebase에서 로드
+  if (window._fbDb && window._fbRef && window._fbOnValue) {
+    const ttRef = window._fbRef(window._fbDb, 'timetable');
+    window._fbOnValue(ttRef, snap => {
+      const data = snap.val() || {};
+      if (data && Object.keys(data).length > 0) {
         _ttCourses = Object.values(data);
+        // localStorage에도 저장
         DB.set('ttClasses', _ttCourses.map(c => ({
           id: c.name+'|'+(c.start||'')+'|'+(c.time||''),
-          type: c.type||'평일', courseName: c.name||'', instructor: c.teacher||'',
-          startDate: c.start||'', endDate: c.end||'', startTime: c.time||'',
-          endTime: '', days: c.days||'', room: c.room||'', roomGroup: '', enrollment: 0, attendance: 0,
+          type: c.type||'평일',
+          courseName: c.name||'',
+          instructor: c.teacher||'',
+          startDate: c.start||'',
+          endDate: c.end||'',
+          startTime: c.time||'',
+          endTime: '',
+          days: c.days||'',
+          room: c.room||'',
+          roomGroup: '',
+          enrollment: 0,
+          attendance: 0,
         })));
-        doShow();
-      }, { onlyOnce: true });
-    } else {
-      doShow(); // 빈 상태로라도 표시
-    }
+      }
+      showResults();
+    }, { onlyOnce: true });
+  } else {
+    // Firebase 없어도 빈 상태로 표시
+    showResults();
   }
-  setTimeout(() => document.getElementById('ttSearchInp').focus(), 100);
 };
 
 window.closeTimetableSearch = function() {
@@ -3269,20 +3235,7 @@ window.closeTimetableSearch = function() {
 };
 
 // 월별 탭 생성
-function buildMonthTabs() {
-  const months = new Set();
-  _ttCourses.forEach(c => {
-    if (c.start) months.add(c.start.slice(0,7)); // YYYY-MM
-  });
-  const sorted = [...months].sort();
-  const tabs = document.getElementById('ttMonthTabs');
-  tabs.innerHTML = `<button onclick="setTtMonth('all',this)" style="padding:8px 14px;border:none;background:none;font-size:12px;font-weight:700;color:var(--accent);cursor:pointer;border-bottom:2px solid var(--accent);white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">전체</button>`
-    + sorted.map(m => {
-      const [y,mo] = m.split('-');
-      const label = mo+'월 수업';
-      return `<button onclick="setTtMonth('${m}',this)" style="padding:8px 14px;border:none;background:none;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">${label}</button>`;
-    }).join('');
-}
+
 
 window.setTtMonth = function(month, btn) {
   _ttFilteredMonth = month;
@@ -3443,87 +3396,7 @@ function closeExcelBulkModal(){
   document.getElementById('excelBulkBg').style.display = 'none';
 }
 
-async function loadExcelFile(event){
-  const file = event.target.files[0];
-  if(!file) return;
-  document.getElementById('excelFileName').textContent = file.name;
-
-  // SheetJS 로드
-  if(!window.XLSX){
-    await new Promise((res)=>{
-      const s=document.createElement('script');
-      s.crossOrigin='anonymous';
-      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      s.onload=res;
-      s.onerror=()=>res(); // 실패해도 reject 하지 않고 계속 진행
-      document.head.appendChild(s);
-    });
-    if(!window.XLSX){
-      // fallback CDN
-      await new Promise((res)=>{
-        const s=document.createElement('script');
-        s.crossOrigin='anonymous';
-        s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-        s.onload=res; s.onerror=()=>res();
-        document.head.appendChild(s);
-      });
-    }
-  }
-
-  const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, {type:'array'});
-
-  // 모든 시트에서 데이터 수집
-  _excelRows = [];
-  for(const sheetName of wb.SheetNames){
-    const ws = wb.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-    if(rows.length < 2) continue;
-
-    // 헤더 찾기
-    const header = rows[0].map(h=>String(h||'').trim());
-    const nameIdx   = header.findIndex(h=>h.includes('이름'));
-    const telIdx    = header.findIndex(h=>h.includes('연락처'));
-    const birthIdx  = header.findIndex(h=>h.includes('생년월일'));
-    const courseIdx = header.findIndex(h=>h.includes('과정'));
-    const stateIdx  = header.findIndex(h=>h.includes('상태')||h.includes('StudyState'));
-
-    if(nameIdx < 0) continue;
-
-    for(let i=1; i<rows.length; i++){
-      const r = rows[i];
-      const name = String(r[nameIdx]||'').trim();
-      if(!name) continue;
-
-      // 생년월일 정규화
-      let birth = String(r[birthIdx]||'').trim().replace(/[^\d]/g,'');
-      if(birth.length===8) birth = birth.slice(0,4)+'-'+birth.slice(4,6)+'-'+birth.slice(6,8);
-      else if(birth.length===6){
-        const yy=parseInt(birth.slice(0,2));
-        const year = yy<=30?'20'+birth.slice(0,2):'19'+birth.slice(0,2);
-        birth = year+'-'+birth.slice(2,4)+'-'+birth.slice(4,6);
-      }
-
-      // 연락처 정규화
-      let tel = String(r[telIdx]||'').trim().replace(/[^\d]/g,'');
-      if(tel.length===11) tel = tel.slice(0,3)+'-'+tel.slice(3,7)+'-'+tel.slice(7,11);
-
-      const state = String(r[stateIdx]||'').trim();
-      const course = String(r[courseIdx]||'').trim();
-
-      _excelRows.push({
-        name, tel, birth, course, state,
-        sheet: sheetName,
-        selected: true
-      });
-    }
-  }
-
-  renderExcelPreview();
-  event.target.value='';
-}
-
-function renderExcelPreview(){
+async function renderExcelPreview(){
   const container = document.getElementById('excelPreview');
   if(_excelRows.length===0){
     container.innerHTML='<div style="text-align:center;padding:32px;color:var(--text3);">데이터가 없습니다</div>';
@@ -4210,14 +4083,15 @@ let _cmManualCount = 0;
 let _ALL_CLASSES = [];
 
 // switchStudentTab (시간표/내학생 탭용)
-let _studentSubTab = 'timetable';
+let _studentSubTab = 'schedule';
 function switchStudentSubTab(tab, el) {
   _studentSubTab = tab;
   document.querySelectorAll('#student-sub-tabs .tab-btn').forEach(b => b.classList.remove('active'));
   if(el) el.classList.add('active');
-  document.getElementById('student-tab-timetable').style.display  = tab==='timetable'  ? '' : 'none';
+  // timetable tab removed
+  //document.getElementById('student-tab-timetable').style.display  = tab==='timetable'  ? '' : 'none';
   document.getElementById('student-tab-mystudents').style.display = tab==='mystudents' ? '' : 'none';
-  if(tab==='timetable')  renderTimetable();
+  // timetable tab removed
   if(tab==='mystudents') renderTTMyStudents();
 }
 
@@ -4392,37 +4266,9 @@ function _determineFirstWeekFromPrior(course) {
   return rootFirstIsA ? (weekOffset % 2 === 0) : (weekOffset % 2 === 1);
 }
 
-function getCourseTypeCls(name) {
-  const n = name;
-  if (/웹툰/.test(n)) return 'ct-webtoon';
-  if (/아트웍|핸드드로잉|이모티콘|게임원화|게임그래픽|게그|게임시네마틱|게임UI/.test(n)) return 'ct-gameart';
-  if (/게임기획|게임사업기획|게임QA/.test(n)) return 'ct-gameplan';
-  if (/유니티/.test(n)) return 'ct-unity';
-  if (/언리얼/.test(n)) return 'ct-unreal';
-  if (/웹소설|문예창작/.test(n)) return 'ct-novel';
-  if (/아트웍/.test(n)) return 'ct-artwork';
-  return 'ct-other';
-}
 
-function showParseDebug() {
-  if (!_parseFailLog.length) { showNotif('파싱 완료', '강사명 누락 셀이 없습니다', 'success'); return; }
-  const html = _parseFailLog.map((f,i) => `
-    <div style="margin-bottom:14px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
-      <div style="font-weight:700;color:#1e293b;margin-bottom:4px">[${i+1}] ${f.courseName} (요일:${f.days||'추출실패'})</div>
-      <pre style="font-size:11px;color:#475569;white-space:pre-wrap;word-break:break-all;background:#fff;padding:8px;border-radius:6px;border:1px solid #e2e8f0">${(f.raw||'').replace(/</g,'&lt;')}</pre>
-    </div>`).join('');
-  const modal = document.createElement('div');
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center';
-  modal.innerHTML = `<div style="background:#fff;border-radius:12px;padding:20px;width:620px;max-height:80vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h3>🔍 파싱 미완료 — ${_parseFailLog.length}건</h3>
-      <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;font-size:20px;cursor:pointer">×</button>
-    </div>
-    <p style="font-size:12px;color:#64748b;margin-bottom:12px">아래 내용을 캡처해서 개발자에게 전달하면 파서를 정확히 수정할 수 있어요</p>
-    ${html}
-  </div>`;
-  document.body.appendChild(modal);
-}
+
+
 
 async function fetchHolidaysForMonth(year, month) {
   const key = getHolidayApiKey();
@@ -4464,112 +4310,11 @@ async function prefetchHolidaysForRange(startDate, endDate) {
   }));
 }
 
-function filterTT(type, el) {
-  ttTypeFilter = type;
-  document.querySelectorAll('#student-tab-timetable .tabs .tab-btn').forEach(b => {
-    if (['전체','주말','평일'].includes(b.textContent)) b.classList.remove('active');
-  });
-  el.classList.add('active');
-  renderTimetable();
-}
 
-function filterTTDay(day, el) {
-  ttDayFilter = day;
-  document.querySelectorAll('#tt-day-tabs .tab-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  renderTimetable();
-}
 
-function renderTTStatusPanel() {
-  const el = document.getElementById('tt-status-panel');
-  if (!el) return;
-  const all = DB.get('ttClasses');
 
-  // 현재월 기준 -1 ~ +6 (총 8개월) 고정 범위
-  const now = new Date();
-  const rangeMonths = [];
-  for (let offset = -1; offset <= 6; offset++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-    const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    rangeMonths.push(ym);
-  }
 
-  // 업로드된 데이터를 월별로 집계
-  const byMonth = {};
-  all.forEach(c => {
-    const m = c.startDate ? c.startDate.slice(0, 7) : null;
-    if (!m) return;
-    if (!byMonth[m]) byMonth[m] = { 주말: 0, 평일: 0 };
-    byMonth[m][c.type] = (byMonth[m][c.type] || 0) + 1;
-  });
 
-  const todayYM = today().slice(0, 7);
-
-  const rows = rangeMonths.map(m => {
-    const [y, mo] = m.split('-');
-    const label = `${y}년 ${parseInt(mo)}월`;
-    const isCurrent = m === todayYM;
-    const isPast = m < todayYM;
-    const data = byMonth[m] || { 주말: 0, 평일: 0 };
-    const wknd = data.주말;
-    const wkdy = data.평일;
-    const hasAny = wknd > 0 || wkdy > 0;
-
-    let rowBg, rowBorder, labelColor;
-    if (isCurrent)     { rowBg = '#eff6ff'; rowBorder = '#93c5fd'; labelColor = '#1d4ed8'; }
-    else if (isPast)   { rowBg = '#f8fafc'; rowBorder = '#e2e8f0'; labelColor = '#94a3b8'; }
-    else if (!hasAny)  { rowBg = '#fffbeb'; rowBorder = '#fde68a'; labelColor = '#92400e'; }
-    else               { rowBg = '#f8fafc'; rowBorder = '#e2e8f0'; labelColor = '#334155'; }
-
-    const missingWarn = !isPast && !isCurrent && !hasAny
-      ? `<span style="font-size:11px;color:#d97706;font-weight:600">⚠ 미업로드</span>` : '';
-    const pastDim = isPast ? 'opacity:0.6;' : '';
-
-    return `
-      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;background:${rowBg};border:1px solid ${rowBorder};${pastDim}">
-        <span style="font-size:13px;font-weight:${isCurrent?'700':'500'};color:${labelColor};min-width:96px">
-          ${label}${isCurrent?' 📍':''}${isPast?' (지남)':''}
-        </span>
-        <span style="font-size:12px;padding:2px 9px;border-radius:10px;background:${wknd?'#dcfce7':'#f1f5f9'};color:${wknd?'#15803d':'#94a3b8'};font-weight:600">
-          🗓 주말 ${wknd ? wknd+'개' : '없음'}
-        </span>
-        <span style="font-size:12px;padding:2px 9px;border-radius:10px;background:${wkdy?'#dbeafe':'#f1f5f9'};color:${wkdy?'#1d4ed8':'#94a3b8'};font-weight:600">
-          📅 평일 ${wkdy ? wkdy+'개' : '없음'}
-        </span>
-        ${missingWarn}
-        <div style="margin-left:auto;display:flex;gap:5px">
-          ${wknd ? `<button class="btn btn-xs btn-secondary" onclick="resetTT('주말','${m}')">주말 삭제</button>` : ''}
-          ${wkdy ? `<button class="btn btn-xs btn-secondary" onclick="resetTT('평일','${m}')">평일 삭제</button>` : ''}
-        </div>
-      </div>`;
-  }).join('');
-
-  // 범위 밖에 데이터가 있으면 별도 안내
-  const outsideCount = all.filter(c => {
-    const m = c.startDate?.slice(0,7);
-    return m && !rangeMonths.includes(m);
-  }).length;
-  const outsideNote = outsideCount
-    ? `<div style="font-size:12px;color:var(--text-muted);margin-top:8px">※ 표시 범위(±7개월) 외 강좌 ${outsideCount}개가 추가로 저장되어 있습니다.</div>`
-    : '';
-
-  el.innerHTML = `
-    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:14px;font-weight:700">📊 시간표 업로드 현황
-          <span style="font-size:12px;font-weight:400;color:var(--text-muted)">&nbsp;총 ${all.length}개 강좌 저장됨</span>
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-secondary btn-sm" onclick="cleanEmptyInstructors()">🧹 빈 강사명 정리</button>
-          <button class="btn btn-secondary btn-sm" onclick="resetTT('주말')">🗓 주말 전체 초기화</button>
-          <button class="btn btn-secondary btn-sm" onclick="resetTT('평일')">📅 평일 전체 초기화</button>
-          <button class="btn btn-danger btn-sm" onclick="resetTT('all')">🗑 전체 초기화</button>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:5px">${rows}</div>
-      ${outsideNote}
-    </div>`;
-}
 
 function resetTT(type, month) {
   const label = month
@@ -4634,237 +4379,14 @@ function deduplicateTTClasses() {
   return 0;
 }
 
-function renderTimetable() {
-  const el = document.getElementById('tt-grid');
-  if (!el) return;
-
-  // 기존 DB 중복 정리 (조용히 실행)
-  deduplicateTTClasses();
-
-  // 업로드 현황 패널 렌더
-  renderTTStatusPanel();
-
-  // 업로드 존 상태 복원
-  const all = DB.get('ttClasses');
-  const wknd = all.filter(c => c.type === '주말');
-  const wkdy = all.filter(c => c.type === '평일');
-  if (wknd.length) {
-    document.getElementById('tt-upload-weekend')?.classList.add('has-data');
-    if (document.getElementById('tt-weekend-status'))
-      document.getElementById('tt-weekend-status').textContent = `✅ 주말 시간표 ${wknd.length}개 강좌`;
-  }
-  if (wkdy.length) {
-    document.getElementById('tt-upload-weekday')?.classList.add('has-data');
-    if (document.getElementById('tt-weekday-status'))
-      document.getElementById('tt-weekday-status').textContent = `✅ 평일 시간표 ${wkdy.length}개 강좌`;
-  }
-
-  let items = [...all];
-  if (ttTypeFilter !== '전체') items = items.filter(c => c.type === ttTypeFilter);
-  if (ttDayFilter === '토') items = items.filter(c => /토/.test(c.days) && !/일/.test(c.days.replace('토','')));
-  else if (ttDayFilter === '일') items = items.filter(c => /일/.test(c.days));
-  else if (ttDayFilter === '월') items = items.filter(c => /월/.test(c.days));
-
-  const q = (document.getElementById('tt-search')?.value || '').toLowerCase();
-  if (q) items = items.filter(c => c.courseName.toLowerCase().includes(q) || c.instructor.toLowerCase().includes(q));
-
-  items.sort((a,b) => (a.startDate||'').localeCompare(b.startDate||'') || (a.startTime||'').localeCompare(b.startTime||''));
-
-  if (!items.length) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>시간표 데이터가 없습니다<br><small>위의 업로드 버튼으로 엑셀 파일을 불러오세요</small></div>';
-    return;
-  }
-
-  const todayStr = today();
-  const todayYM  = todayStr.slice(0,7);
-
-  // 전역 맵 초기화 (onclick에서 참조)
-  Object.keys(_ttMap).forEach(k => delete _ttMap[k]);
-  let _ttIdx = 0;
-
-  // 내 학생 수업 매칭 맵
-  const _myStudentMap = {};
-  DB.get('students').forEach(s => {
-    s.courses.forEach(c => {
-      const key = `${c.name}||${c.startDate||''}`;
-      if (!_myStudentMap[key]) _myStudentMap[key] = [];
-      _myStudentMap[key].push(s.name);
-    });
-  });
-
-  // 카드 HTML 생성 함수
-  function makeTTCard(c) {
-    const ckey = 'c' + (_ttIdx++);
-    _ttMap[ckey] = c;
-    const typeCls = getCourseTypeCls(c.courseName);
-    const isPast   = c.endDate && c.endDate < todayStr;
-    const isActive = c.startDate && c.startDate <= todayStr && (!c.endDate || c.endDate >= todayStr);
-    const statusColor = isPast ? '#94a3b8' : isActive ? '#16a34a' : '#2563eb';
-    const statusLabel = isPast ? '종강' : isActive ? '진행중' : '예정';
-    const pct = c.enrollment > 0 ? Math.min(100, Math.round(c.enrollment / 20 * 100)) : 0;
-    const myStudents = _myStudentMap[`${c.courseName}||${c.startDate||''}`] || [];
-    return `
-    <div class="tt-card" style="border-top:3px solid ${statusColor};opacity:${isPast?0.65:1}">
-      <div class="tt-card-head">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:14px;font-weight:800;line-height:1.3;margin-bottom:5px;word-break:keep-all">${c.courseName}</div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap">
-            <span class="course-type-badge ${typeCls}">${c.type}</span>
-            <span style="font-size:11px;padding:2px 7px;border-radius:10px;background:#f1f5f9;color:#475569;font-weight:600">${statusLabel}</span>
-            ${myStudents.length ? `<span style="font-size:11px;padding:2px 7px;border-radius:10px;background:#dcfce7;color:#15803d;font-weight:700">👤 내 학생 ${myStudents.length}명</span>` : ''}
-          </div>
-        </div>
-      </div>
-      <div class="tt-card-body">
-        <div class="tt-card-row">👨‍🏫 <strong>${c.instructor||'-'}</strong>
-          ${c.days ? `<span class="tt-day-badge">${c.days}</span>` : ''}
-          ${c.startTime ? `<span class="tt-time-badge">${c.startTime}${c.endTime?' ~ '+c.endTime:''}</span>` : ''}
-        </div>
-        <div class="tt-card-row">📅 ${c.startDate||'-'} ~ ${c.endDate||'-'}</div>
-        ${c.room ? `<div class="tt-card-row">🏫 ${c.roomGroup||''} ${c.room}</div>` : ''}
-        <div class="tt-card-row" style="font-size:11px;color:${myStudents.length?'#15803d':'#94a3b8'}">
-          👤 내 배정 학생 <strong>${myStudents.length}</strong>명${myStudents.length?` (${myStudents.join(', ')})`:''}
-        </div>
-      </div>
-    </div>`;
-  }
-
-  // 월별 그룹핑
-  const byMonth = {};
-  items.forEach(c => {
-    const m = (c.startDate||'').slice(0,7) || '날짜미정';
-    if (!byMonth[m]) byMonth[m] = [];
-    byMonth[m].push(c);
-  });
-  const sortedMonths = Object.keys(byMonth).sort((a,b) => {
-    if (a === '날짜미정') return 1;
-    if (b === '날짜미정') return -1;
-    return a.localeCompare(b);
-  });
-
-  el.innerHTML = sortedMonths.map(m => {
-    const isCurrent = m === todayYM;
-    const isPastMonth = m !== '날짜미정' && m < todayYM;
-    const label = m === '날짜미정' ? '📌 날짜 미정' : (() => {
-      const [y, mo] = m.split('-');
-      return `📅 ${y}년 ${parseInt(mo)}월`;
-    })();
-    const headerBg     = isCurrent ? '#eff6ff' : isPastMonth ? '#f8fafc' : '#f0fdf4';
-    const headerBorder = isCurrent ? '#93c5fd' : isPastMonth ? '#e2e8f0' : '#86efac';
-    const headerColor  = isCurrent ? '#1d4ed8' : isPastMonth ? '#94a3b8'  : '#15803d';
-    const cnt = byMonth[m].length;
-    const myCnt = byMonth[m].filter(c => (_myStudentMap[`${c.courseName}||${c.startDate||''}`]||[]).length > 0).length;
-
-    return `
-    <div style="margin-bottom:28px">
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:${headerBg};border:1px solid ${headerBorder};margin-bottom:12px">
-        <span style="font-size:15px;font-weight:800;color:${headerColor}">${label}${isCurrent?' 📍':''}</span>
-        <span style="font-size:12px;color:${headerColor};opacity:0.8">${cnt}개 강좌</span>
-        ${myCnt ? `<span style="font-size:12px;padding:2px 8px;border-radius:10px;background:#dcfce7;color:#15803d;font-weight:700">👤 내 학생 수업 ${myCnt}개</span>` : ''}
-        ${isPastMonth ? `<span style="font-size:11px;color:#94a3b8;margin-left:4px">(지난달)</span>` : ''}
-      </div>
-      <div class="tt-grid">${byMonth[m].map(c => makeTTCard(c)).join('')}</div>
-    </div>`;
-  }).join('');
-}
 
 
 
 
 
 
-function renderTTMyStudents() {
-  const el = document.getElementById('tt-my-students-view');
-  if (!el) return;
 
-  const students = DB.get('students');
-  const ttClasses = DB.get('ttClasses');
 
-  // 내 학생이 수강 중인 수업을 시간표와 매칭
-  // key: courseName||startDate
-  const matchedClasses = {}; // key → { ttClass (or null), students: [{name,id,course}] }
-
-  students.forEach(s => {
-    s.courses.forEach(c => {
-      const key = `${c.name}||${c.startDate||''}`;
-      if (!matchedClasses[key]) {
-        const tt = ttClasses.find(t => t.courseName === c.name && (t.startDate||'') === (c.startDate||''));
-        matchedClasses[key] = { tt, courseName: c.name, startDate: c.startDate||'', endDate: c.endDate||'', students: [] };
-      }
-      matchedClasses[key].students.push({ name: s.name, id: s.id, assignStatus: c.assignStatus, notiStatus: c.notiStatus, feeType: c.feeType });
-    });
-  });
-
-  const entries = Object.values(matchedClasses);
-  if (!entries.length) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📚</div>배정된 수업이 없습니다<br><small>시간표에서 배정하기 버튼으로 학생에게 수업을 추가하세요</small></div>';
-    return;
-  }
-
-  // 월별 그룹핑
-  const byMonth = {};
-  entries.forEach(e => {
-    const m = e.startDate ? e.startDate.slice(0, 7) : '날짜미정';
-    if (!byMonth[m]) byMonth[m] = [];
-    byMonth[m].push(e);
-  });
-
-  const sortedMonths = Object.keys(byMonth).sort();
-
-  el.innerHTML = sortedMonths.map(month => {
-    const label = month === '날짜미정' ? '📌 날짜 미정' : (() => {
-      const [y, m] = month.split('-');
-      return `📅 ${y}년 ${parseInt(m)}월`;
-    })();
-    const cards = byMonth[month].map(e => {
-      const tt = e.tt;
-      const todayStr = today();
-      const isPast = e.endDate && e.endDate < todayStr;
-      const isActive = e.startDate && e.startDate <= todayStr && (!e.endDate || e.endDate >= todayStr);
-      const statusColor = isPast ? '#94a3b8' : isActive ? '#16a34a' : '#2563eb';
-      const statusLabel = isPast ? '종강' : isActive ? '진행중' : '예정';
-      const typeCls = getCourseTypeCls(e.courseName);
-
-      const studentRows = e.students.map(s => `
-        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f8fafc;border-radius:6px;margin-top:4px;cursor:pointer">
-          <span style="font-weight:700;font-size:13px">${s.name}</span>
-          <span class="assign-badge ${s.assignStatus==='완료'?'done':'pending'}" style="font-size:10px">${s.assignStatus==='완료'?'배정완료':'배정대기'}</span>
-          <span class="assign-badge ${s.notiStatus==='완료'?'done':'pending'}" style="font-size:10px">${s.notiStatus==='완료'?'안내완료':'안내대기'}</span>
-          <span style="font-size:10px;color:#94a3b8;background:#f1f5f9;padding:1px 6px;border-radius:8px">${s.feeType||'유료'}</span>
-          <span style="margin-left:auto;font-size:11px;color:#94a3b8">상세보기 ›</span>
-        </div>`).join('');
-
-      return `
-      <div class="tt-card" style="border-top:3px solid ${statusColor}">
-        <div class="tt-card-head">
-          <div style="flex:1;min-width:0">
-            <div style="font-size:14px;font-weight:800;line-height:1.3;margin-bottom:5px;word-break:keep-all">${e.courseName}</div>
-            <div style="display:flex;gap:5px;flex-wrap:wrap">
-              <span class="course-type-badge ${typeCls}">${tt?.type||'수동등록'}</span>
-              <span style="font-size:11px;padding:2px 7px;border-radius:10px;background:#f1f5f9;color:#475569;font-weight:600">${statusLabel}</span>
-              <span style="font-size:11px;padding:2px 7px;border-radius:10px;background:#dcfce7;color:#15803d;font-weight:700">👤 ${e.students.length}명</span>
-            </div>
-          </div>
-        </div>
-        <div class="tt-card-body">
-          ${tt ? `
-          <div class="tt-card-row">👨‍🏫 <strong>${tt.instructor||'-'}</strong>
-            ${tt.days ? `<span class="tt-day-badge">${tt.days}</span>` : ''}
-            ${tt.startTime ? `<span class="tt-time-badge">${tt.startTime}${tt.endTime?' ~ '+tt.endTime:''}</span>` : ''}
-          </div>` : ''}
-          <div class="tt-card-row">📅 ${e.startDate||'-'} ~ ${e.endDate||'-'}</div>
-          <div style="margin-top:6px">${studentRows}</div>
-        </div>
-      </div>`;
-    }).join('');
-
-    return `
-    <div style="margin-bottom:24px">
-      <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--border)">${label} · ${byMonth[month].length}개 수업</div>
-      <div class="tt-grid">${cards}</div>
-    </div>`;
-  }).join('');
-}
 
 function _notiTTClass(course) {
   const all = DB.get('ttClasses');
@@ -5009,203 +4531,24 @@ function handleTTUpload(event, type) {
   event.target.value = '';
 }
 
-function parseTimetableWorkbook(wb, type) {
-  // 모든 시트 파싱 후 합산
-  const allClasses = [];
-  for (const sheetName of wb.SheetNames) {
-    const parsed = parseSingleSheet(wb.Sheets[sheetName], type);
-    allClasses.push(...parsed);
-  }
-  // 전체 합산 중복 제거 (강좌명+개강일+강사+시작시간)
-  const seen = new Set();
-  return allClasses.filter(cl => {
-    const key = `${cl.courseName}|${cl.startDate}|${cl.instructor}|${cl.startTime}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
 
-function parseSingleSheet(sheet, type) {
-  if (!sheet || !sheet['!ref']) return [];
-  const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
-  const merges = sheet['!merges'] || [];
 
-  // 병합 셀 맵: 계속되는 셀은 주 셀(s.r, s.c)을 참조
-  const mergeStart = {}; // "r,c" -> {r,c,er,ec}
-  const mergeCont  = new Set(); // "r,c" -> skip
-  merges.forEach(m => {
-    const key = `${m.s.r},${m.s.c}`;
-    mergeStart[key] = m;
-    for (let r = m.s.r; r <= m.e.r; r++) {
-      for (let c = m.s.c; c <= m.e.c; c++) {
-        if (r !== m.s.r || c !== m.s.c) mergeCont.add(`${r},${c}`);
-      }
-    }
-  });
 
-  // 타임슬롯 (col A, row 3 이후 = index 3+)
-  const timeSlots = [];
-  for (let r = 3; r <= range.e.r; r++) {
-    const cell = sheet[XLSX.utils.encode_cell({r, c:0})];
-    const val = cell ? (cell.w || cell.v || '').toString().trim() : '';
-    if (val) timeSlots.push({ row: r, time: val });
-  }
 
-  // 서브룸 ID (row 1 = index 1)
-  const subRooms = {};
-  for (let c = 1; c <= range.e.c; c++) {
-    const cell = sheet[XLSX.utils.encode_cell({r:1, c})];
-    subRooms[c] = cell ? (cell.w || cell.v || '').toString().trim() : '';
-  }
 
-  // 강의실 그룹 (row 0 = index 0)
-  const roomGroups = {};
-  for (let c = 1; c <= range.e.c; c++) {
-    // 병합된 헤더 셀에서 그룹명 찾기
-    const mainKey = Object.keys(mergeStart).find(k => {
-      const m = mergeStart[k];
-      return m.s.r === 0 && m.s.c <= c && m.e.c >= c;
-    });
-    if (mainKey) {
-      const ms = mergeStart[mainKey];
-      const hCell = sheet[XLSX.utils.encode_cell({r: ms.s.r, c: ms.s.c})];
-      roomGroups[c] = hCell ? (hCell.w || hCell.v || '').toString().trim() : '';
-    } else {
-      const hCell = sheet[XLSX.utils.encode_cell({r:0, c})];
-      roomGroups[c] = hCell ? (hCell.w || hCell.v || '').toString().trim() : '';
-    }
-  }
+// ════════ 시간표 직접추가/편집 ════════
+let _ttEditKey = null; // null=추가, 'cXX'=편집
 
-  const classes = [];
 
-  for (let c = 1; c <= range.e.c; c++) {
-    for (let r = 3; r <= range.e.r; r++) {
-      if (mergeCont.has(`${r},${c}`)) continue;
 
-      const cell = sheet[XLSX.utils.encode_cell({r, c})];
-      if (!cell) continue;
-      const raw = (cell.w || cell.v || '').toString().trim();
-      if (!raw || raw.length < 4) continue;
 
-      // ── HTML XLS 구조: <ul><li> 항목이 \n으로 구분됨
-      // 구조: [강좌명, 출석율, 수업없음, 정원, 배정:N, 강사명, 요일, 개:날짜, 종:날짜]
-      const rawLines = raw.split('\n').map(l => l.trim()).filter(Boolean);
 
-      // 강좌명: 첫 번째 라인 (또는 전체출석율 이전)
-      let courseName = '';
-      const nameMatch = raw.match(/^([\s\S]+?)(?=전체출석율|$)/);
-      if (nameMatch) courseName = nameMatch[1].replace(/\n/g,' ').trim();
-      if (!courseName || courseName.length < 2) continue;
-      if (/^[\d:]+$/.test(courseName)) continue;
 
-      const norm = raw.replace(/：/g, ':').replace(/→/g, '->').replace(/&gt;/g,'>').replace(/&lt;/g,'<');
 
-      // 출석율
-      const attM = norm.match(/전체출석율\s*:?\s*([\d.]+)%/);
-      const attendance = attM ? parseFloat(attM[1]) : 0;
 
-      // 배정 인원
-      const enrollM = norm.match(/배정\s*:\s*(\d+)/);
-      const enrollment = enrollM ? parseInt(enrollM[1]) : 0;
 
-      // 개강일 / 종강일
-      const startM = norm.match(/개\s*:\s*(\d{4}-\d{2}-\d{2})/);
-      const endM   = norm.match(/종\s*:\s*(\d{4}-\d{2}-\d{2})/);
-      const startDate = startM ? startM[1] : '';
-      const endDate   = endM   ? endM[1]   : '';
 
-      const DAY_PATS = [
-        '월수금/월수','월수/월수금','화목금/화목','화목/화목금',
-        '월수금/월금','화목금/화금',
-        '월수금월수','월수월수금','화목금화목','화목화목금',
-        '월화수월화','월화월화수','수목금수목','수목수목금',
-        '토/일','일/토','화/목','월/수','수/금','월/금',
-        '월~금','월~목','월~수','화~금','화~목','수~금','월~토','월~일',
-        '월화수목금','월화수목','화수목금','수목금토',
-        '월수금','수목금','월수목','월화수','화수목',
-        '월수','월화','화목','수금','수목','월금','목금','토일',
-        '토','일','금','목','수','화','월'
-      ];
-      const ALT_NORMALIZE = {
-        '월수금월수':'월수금/월수','월수월수금':'월수/월수금',
-        '화목금화목':'화목금/화목','화목화목금':'화목/화목금',
-        '월화수월화':'월화수/월화','월화월화수':'월화/월화수',
-        '수목금수목':'수목금/수목','수목수목금':'수목/수목금'
-      };
-
-      let days = '', instructor = '';
-
-      // ── 라인 기반 파싱 (HTML XLS li 구조) ──
-      const baejungIdx = rawLines.findIndex(l => /^배정\s*:/.test(l));
-      if (baejungIdx >= 0) {
-        const afterLines = rawLines.slice(baejungIdx + 1);
-        // 개: 종: 이전까지
-        const beforeEndLines = [];
-        for (const line of afterLines) {
-          if (/^개\s*:/.test(line) || /^종\s*:/.test(line)) break;
-          beforeEndLines.push(line);
-        }
-        // 요일 라인 찾기
-        for (const line of beforeEndLines) {
-          const matched = DAY_PATS.find(dp => line === dp || line.replace(/\s/g,'') === dp);
-          if (matched && !days) { days = matched; break; }
-        }
-        // 강사명: 요일 라인 이전 마지막 한글 이름 라인
-        const dayLineIdx = beforeEndLines.findIndex(l => l === days || DAY_PATS.some(dp => l === dp));
-        const beforeDayLines = dayLineIdx >= 0 ? beforeEndLines.slice(0, dayLineIdx) : beforeEndLines;
-        for (let i = beforeDayLines.length - 1; i >= 0; i--) {
-          const cleaned = beforeDayLines[i].replace(/\d+$/, '').replace(/\s*T\s*$/, '').trim();
-          if (/^[가-힣]{2,5}$/.test(cleaned)) { instructor = cleaned; break; }
-        }
-      }
-
-      // ── 폴백: 전체 텍스트에서 요일 검색 ──
-      if (!days) {
-        for (const dp of DAY_PATS) {
-          if (norm.includes(dp)) { days = dp; break; }
-        }
-      }
-
-      // ── 폴백: 강사명 검색 (배정:N 이후, 요일 이전) ──
-      if (!instructor) {
-        const baejungM = norm.match(/배정:\d+([\s\S]*?)(?=개:|$)/);
-        if (baejungM) {
-          const between = baejungM[1];
-          let betweenTrim = between;
-          for (const dp of DAY_PATS) betweenTrim = betweenTrim.split(dp)[0];
-          const names = betweenTrim.replace(/\d+/g,'').match(/[가-힣]{2,5}/g);
-          if (names) instructor = names[names.length - 1];
-        }
-      }
-
-      // 붙여쓴 격주 → 슬래시 정규화
-      if (ALT_NORMALIZE[days]) days = ALT_NORMALIZE[days];
-
-      // 강사명 후처리
-      instructor = (instructor || '').replace(/[()]/g,'').replace(/\s*강사\s*$/,'').replace(/^[-\/]/,'').trim();
-
-      if (!instructor) _parseFailLog.push({ courseName, raw, days });
-      classes.push({
-        id: genId(),
-        type,
-        courseName: courseName.replace(/[-]/g,' ').trim(),
-        instructor,
-        days,
-        startDate,
-        endDate,
-        startTime,
-        endTime,
-        enrollment,
-        attendance,
-        room: subRooms[c] || '',
-        roomGroup: roomGroups[c] || '',
-      });
-    }
-  }
-
-  return classes;
-}
+// ════════════════════════════════════════
 
 // ─── document 클릭 시 모달 닫기 ───
 document.querySelectorAll('.modal-overlay').forEach(m => {
@@ -5214,5 +4557,62 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
 
 </script>
 
+
+<!-- 시간표 직접추가/편집 모달 -->
+<div id="ttEditModalBg" style="display:none;position:fixed;inset:0;z-index:1700;background:rgba(0,0,0,.5);align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;width:94%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden;">
+    <div style="padding:16px 20px;background:linear-gradient(135deg,#2563eb,#1d4ed8);display:flex;justify-content:space-between;align-items:center;">
+      <span id="ttEditModalTitle" style="font-size:15px;font-weight:800;color:#fff;">강좌 추가</span>
+      <button onclick="closeTTEditModal()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <label style="font-size:12px;font-weight:700;color:#374151;">강좌명 *</label>
+        <input id="tte-name" placeholder="강좌명 입력" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <label style="font-size:12px;font-weight:700;color:#374151;">강사명</label>
+        <input id="tte-teacher" placeholder="강사명 입력" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;">
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <label style="font-size:12px;font-weight:700;color:#374151;">개강일</label>
+          <input id="tte-start" type="date" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;">
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <label style="font-size:12px;font-weight:700;color:#374151;">종강일</label>
+          <input id="tte-end" type="date" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <label style="font-size:12px;font-weight:700;color:#374151;">시간</label>
+          <input id="tte-time" type="time" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;">
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <label style="font-size:12px;font-weight:700;color:#374151;">강의실</label>
+          <input id="tte-room" placeholder="예: A강의실" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <label style="font-size:12px;font-weight:700;color:#374151;">요일</label>
+          <input id="tte-days" placeholder="예: 월수금, 화목" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;">
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <label style="font-size:12px;font-weight:700;color:#374151;">구분</label>
+          <select id="tte-type" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;">
+            <option value="평일">평일</option>
+            <option value="주말">주말</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div style="padding:16px 20px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px;">
+      <button onclick="closeTTEditModal()" style="padding:9px 20px;border-radius:8px;border:1px solid #d1d5db;background:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">취소</button>
+      <button onclick="saveTTEditModal()" style="padding:9px 20px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">✅ 저장</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
