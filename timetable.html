@@ -53,6 +53,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 table{width:100%;border-collapse:collapse;min-width:800px;}
 thead th{background:#f8f8fc;padding:9px 12px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text2);border-bottom:1px solid var(--border);white-space:nowrap;font-family:var(--mono);text-transform:uppercase;}
 tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+.month-header-row:hover td{filter:brightness(0.97);}
+.course-row td{background:#fff;}
 tbody tr:last-child{border-bottom:none;}
 tbody tr:hover{background:var(--surface2);}
 tbody td{padding:8px 12px;vertical-align:middle;font-size:12px;}
@@ -313,6 +315,9 @@ window.switchTab = function(tab, btn) {
 };
 
 // ════════ 테이블 렌더 ════════
+// 월별 접힘 상태 저장
+const _monthCollapsed = {};
+
 window.renderTable = function() {
   const q = document.getElementById('searchInp').value.toLowerCase();
   const timeF = document.getElementById('timeFilter').value;
@@ -323,30 +328,74 @@ window.renderTable = function() {
   if (q) items = items.filter(c => (c.name||'').toLowerCase().includes(q) || (c.teacher||'').toLowerCase().includes(q));
   if (timeF) items = items.filter(c => c.time === timeF);
 
-  // 개강일 기준 정렬
-  items.sort((a,b) => (b.start||'').localeCompare(a.start||''));
+  items.sort((a,b) => (a.start||'9999').localeCompare(b.start||'9999'));
 
   document.getElementById('countBadge').textContent = items.length + '개';
 
   if (items.length === 0) {
-    document.getElementById('tableBody').innerHTML = `<tr><td colspan="9" class="empty"><div class="empty-icon">🔍</div><div>해당하는 강좌가 없습니다</div></td></tr>`;
+    document.getElementById('tableBody').innerHTML = `<tr><td colspan="10" class="empty"><div class="empty-icon">🔍</div><div>해당하는 강좌가 없습니다</div></td></tr>`;
     return;
   }
 
-  document.getElementById('tableBody').innerHTML = items.map(c => `
-    <tr>
-      <td style="text-align:center;width:32px;"><input type="checkbox" class="tt-chk" data-key="${c.key}" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="updateBulkDel()"></td>
-      <td><span class="editable" onclick="editCell(this,'${c.key}','name')">${c.name||'-'}</span></td>
-      <td><span class="editable" onclick="editCell(this,'${c.key}','teacher')">${c.teacher||'-'}</span></td>
-      <td><span class="editable" onclick="editCell(this,'${c.key}','start')">${c.start||'-'}</span></td>
-      <td><span class="editable" onclick="editCell(this,'${c.key}','end')">${c.end||'-'}</span></td>
-      <td><span class="editable" onclick="editCell(this,'${c.key}','time')">${c.time||'-'}</span></td>
-      <td><span class="editable" onclick="editCell(this,'${c.key}','room')">${c.room||'-'}</span></td>
-      <td><span class="editable" onclick="editCell(this,'${c.key}','days')">${c.days||'-'}</span></td>
-      <td><span class="type-badge ${c.type==='주말'?'t-weekend':'t-weekday'}">${c.type||'평일'}</span></td>
-      <td><button class="del-btn" onclick="deleteCourse('${c.key}','${(c.name||'').replace(/'/g,"\\'")}')">삭제</button></td>
-    </tr>
-  `).join('');
+  // 월별 그룹
+  const groups = {};
+  items.forEach(c => {
+    const mo = c.start ? c.start.slice(0,7) : '날짜미정';
+    if (!groups[mo]) groups[mo] = [];
+    groups[mo].push(c);
+  });
+
+  const sortedMonths = Object.keys(groups).sort();
+  const today = new Date().toISOString().slice(0,7);
+
+  let html = '';
+  for (const mo of sortedMonths) {
+    const isCollapsed = _monthCollapsed[mo] !== false; // 기본 접힘(최신월 제외)
+    const isCurrent = mo === today;
+    if (isCurrent && _monthCollapsed[mo] === undefined) _monthCollapsed[mo] = false; // 이번달은 기본 펼침
+    const collapsed = _monthCollapsed[mo] !== false;
+
+    const label = mo === '날짜미정' ? '날짜 미정' : (() => {
+      const [y,m] = mo.split('-');
+      return y + '년 ' + parseInt(m) + '월';
+    })();
+    const cnt = groups[mo].length;
+    const headerBg = isCurrent ? '#eff6ff' : '#f8fafc';
+    const headerColor = isCurrent ? '#1d4ed8' : '#64748b';
+
+    html += `<tr class="month-header-row" onclick="toggleMonth('${mo}')" style="cursor:pointer;background:${headerBg};">
+      <td colspan="10" style="padding:10px 14px;font-size:13px;font-weight:800;color:${headerColor};user-select:none;">
+        <span style="margin-right:8px;">${collapsed ? '▶' : '▼'}</span>
+        ${label}
+        <span style="font-size:11px;font-weight:500;margin-left:8px;opacity:0.7;">${cnt}개 강좌</span>
+        ${isCurrent ? '<span style="font-size:10px;padding:2px 7px;border-radius:8px;background:#2563eb;color:#fff;margin-left:6px;">이번달</span>' : ''}
+      </td>
+    </tr>`;
+
+    if (!collapsed) {
+      html += groups[mo].map(c => `
+        <tr class="course-row month-${mo.replace('-','_')}">
+          <td style="text-align:center;width:32px;"><input type="checkbox" class="tt-chk" data-key="${c.key}" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="updateBulkDel()"></td>
+          <td><span class="editable" onclick="editCell(this,'${c.key}','name')">${c.name||'-'}</span></td>
+          <td><span class="editable" onclick="editCell(this,'${c.key}','teacher')">${c.teacher||'-'}</span></td>
+          <td><span class="editable" onclick="editCell(this,'${c.key}','start')">${c.start||'-'}</span></td>
+          <td><span class="editable" onclick="editCell(this,'${c.key}','end')">${c.end||'-'}</span></td>
+          <td><span class="editable" onclick="editCell(this,'${c.key}','time')">${c.time||'-'}</span></td>
+          <td><span class="editable" onclick="editCell(this,'${c.key}','room')">${c.room||'-'}</span></td>
+          <td><span class="editable" onclick="editCell(this,'${c.key}','days')">${c.days||'-'}</span></td>
+          <td><span class="type-badge ${c.type==='주말'?'t-weekend':'t-weekday'}">${c.type||'평일'}</span></td>
+          <td><button class="del-btn" onclick="deleteCourse('${c.key}','${(c.name||'').replace(/'/g,"\\'")}')">삭제</button></td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  document.getElementById('tableBody').innerHTML = html;
+};
+
+window.toggleMonth = function(mo) {
+  _monthCollapsed[mo] = (_monthCollapsed[mo] !== false); // 토글
+  renderTable();
 };
 
 // ════════ 인라인 편집 ════════

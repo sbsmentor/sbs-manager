@@ -3689,9 +3689,13 @@ function renderNotiCalGrid(yearMonth, classDates, startDate, endDate){
     }
 
     const borderR=cellBg!=='transparent'?`border-radius:5px;`:'';
-    cells+=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:3px 1px;background:${cellBg};${borderR}min-height:36px;">
+    const isCustomOn=window._notiCustomDates&&window._notiCustomDates.has(ds);
+    const isCustomOff=window._notiRemovedDates&&window._notiRemovedDates.has(ds);
+    const finalBg=isCustomOn?'#bbf7d0':isCustomOff?'#fff':cellBg;
+    const finalMark=isCustomOff?'':(isCustomOn?`<div style="font-size:9px;font-weight:700;color:#16a34a;line-height:1;">●</div>`:markHtml);
+    cells+=`<div onclick="notiCalClick('${ds}')" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:3px 1px;background:${finalBg};${borderR}min-height:36px;">
       <div style="font-size:11px;font-weight:${isClass||isFirst||isLast?'700':'400'};color:${numColor};line-height:1.2;">${day}</div>
-      ${markHtml}
+      ${finalMark}
     </div>`;
   }
 
@@ -3767,6 +3771,42 @@ function renderNotiCalendar(yearMonth, classDates, startDate, endDate){
   </div>`;
 }
 
+
+// 개강안내 달력 날짜 클릭 토글
+window._notiCustomDates = new Set();  // 수동 추가
+window._notiRemovedDates = new Set(); // 수동 제거
+
+function notiCalClick(ds) {
+  if (!_notiCtx) return;
+  // 원래 수업일이면 제거 토글, 아니면 추가 토글
+  const origDates = getClassDatesForNoti(
+    _notiCtx.p.startDate, _notiCtx.p.endDate, _notiCtx.p.days
+  );
+  const isOrig = origDates.includes(ds);
+  if (isOrig) {
+    // 원래 수업일: 제거/복원 토글
+    if (window._notiRemovedDates.has(ds)) {
+      window._notiRemovedDates.delete(ds);
+    } else {
+      window._notiRemovedDates.add(ds);
+    }
+  } else {
+    // 원래 수업일 아님: 추가/제거 토글
+    if (window._notiCustomDates.has(ds)) {
+      window._notiCustomDates.delete(ds);
+    } else {
+      window._notiCustomDates.add(ds);
+    }
+  }
+  // 달력 다시 렌더
+  const allDates = [...origDates.filter(d => !window._notiRemovedDates.has(d)), ...window._notiCustomDates];
+  const moSet = new Set(allDates.map(d => d.slice(0,7)));
+  if (!moSet.size && _notiCtx.p.startDate) moSet.add(_notiCtx.p.startDate.slice(0,7));
+  const months = [...moSet].sort();
+  document.getElementById('notiCalWrap').innerHTML =
+    months.map(mo => renderNotiCalGrid(mo, allDates, _notiCtx.p.startDate, _notiCtx.p.endDate)).join('');
+}
+
 function openNotiCardFromBoard(arrName, si, mk){
   const arr=window[arrName];
   if(!arr||!arr[si]) return;
@@ -3822,6 +3862,8 @@ function openNotiCardFromBoard(arrName, si, mk){
   document.getElementById('notiImgCopyBtn').onclick=()=>saveNotiImage(p.cls,startDate);
   document.getElementById('notiTxtCopyBtn').onclick=()=>copyNotiText();
   document.getElementById('notiDoneBtn').onclick=()=>markNotiDone();
+  window._notiCustomDates = new Set();
+  window._notiRemovedDates = new Set();
   document.getElementById('notiCardBg').style.display='flex';
 }
 

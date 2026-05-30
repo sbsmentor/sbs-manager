@@ -147,6 +147,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   <div class="header-right">
     <span class="login-status" id="loginStatus"></span>
     <a id="ttBtn" href="timetable.html" class="hdr-link-btn btn-timetable">📋 시간표</a>
+    <button class="hdr-link-btn" id="loginBtn" onclick="document.getElementById('loginModalBg').style.display='flex'" style="border-color:var(--accent);color:var(--accent);background:var(--accent-dim);">🔑 로그인</button>
     <button class="hdr-link-btn btn-logout" id="logoutBtn" onclick="doLogout()">🚪 로그아웃</button>
     <button class="admin-toggle" id="adminToggle" onclick="toggleAdmin()">⚙ 관리</button>
   </div>
@@ -289,10 +290,12 @@ function updateLoginUI(){
   const ttBtn     = document.getElementById('ttBtn');
   const subText   = document.getElementById('pageSubText');
 
+  const loginBtn = document.getElementById('loginBtn');
   if(m){
     statusEl.textContent = `${m.name} ${m.role||'멘토'}님`;
     statusEl.style.display = 'inline';
     logoutBtn.style.display = 'inline';
+    if(loginBtn) loginBtn.style.display = 'none';
     // 팀장/부장/원장이면 시간표 버튼
     if(['팀장','부장','원장'].includes(m.role)) ttBtn.style.display='inline';
     else ttBtn.style.display='none';
@@ -300,6 +303,7 @@ function updateLoginUI(){
   } else {
     statusEl.style.display='none';
     logoutBtn.style.display='none';
+    if(loginBtn) loginBtn.style.display = 'inline';
     ttBtn.style.display='none';
     if(subText) subText.textContent='이름 카드를 클릭하면 비밀번호 입력 후 수강생 관리 페이지로 이동합니다.';
   }
