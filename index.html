@@ -378,8 +378,11 @@ function renderMentors(){
   // Firebase는 배열을 {0:item, 1:item} 형태의 객체로 저장하므로 Object.values()로 처리
   function safeLen(arr){
     if(!arr) return 0;
-    if(Array.isArray(arr)) return arr.filter(v=>v!=null).length;
-    if(typeof arr==='object') return Object.values(arr).filter(v=>v!=null).length;
+    // Firebase는 배열을 객체로 저장 {0:item, 1:item}
+    if(Array.isArray(arr)) return arr.filter(v=>v!=null && v!==false && v!=='').length;
+    if(typeof arr==='object'){
+      return Object.values(arr).filter(v=>v!=null && v!==false && v!=='' && typeof v==='object').length;
+    }
     return 0;
   }
   mentors.forEach(m=>{

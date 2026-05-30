@@ -653,6 +653,12 @@ window.onerror = function(msg, src, line, col, err) {
 // SecurityError (Unsafe URL) 억제
 window.addEventListener('securitypolicyviolation', function(e){ e.preventDefault(); }, true);
 </script>
+<script>
+window.onerror = function(msg) {
+  if(!msg || String(msg).includes('Script error') || String(msg).includes('unsafe')) return true;
+  return false;
+};
+</script>
 </head>
 <body>
 <!-- IP 차단 오버레이 -->
@@ -4206,6 +4212,13 @@ function parseDayPattern(daysStr) {
   }
   return [...result].sort((a,b)=>a-b);
 }
+
+const ALT_NORMALIZE_MAP = {
+  '월수금월수':'월수금/월수','월수월수금':'월수/월수금',
+  '화목금화목':'화목금/화목','화목화목금':'화목/화목금',
+  '월화수월화':'월화수/월화','월화월화수':'월화/월화수',
+  '수목금수목':'수목금/수목','수목수목금':'수목/수목금'
+};
 
 function normalizeDaysStr(d) {
   if (!d) return '';
