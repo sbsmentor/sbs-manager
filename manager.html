@@ -5010,22 +5010,24 @@ function parseSingleSheet(sheet, type) {
       const raw = (cell.w || cell.v || '').toString().trim();
       if (!raw || raw.length < 4) continue;
 
-      // 강좌명 파싱 — "전체출석율" 이전
+      // ── HTML XLS 구조: <ul><li> 항목이 \n으로 구분됨
+      // 구조: [강좌명, 출석율, 수업없음, 정원, 배정:N, 강사명, 요일, 개:날짜, 종:날짜]
+      const rawLines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+
+      // 강좌명: 첫 번째 라인 (또는 전체출석율 이전)
       let courseName = '';
       const nameMatch = raw.match(/^([\s\S]+?)(?=전체출석율|$)/);
       if (nameMatch) courseName = nameMatch[1].replace(/\n/g,' ').trim();
       if (!courseName || courseName.length < 2) continue;
-      // "수업없음" or pure header rows skip
       if (/^[\d:]+$/.test(courseName)) continue;
 
-      // 전각 콜론(：)·전각 화살표(→) 정규화
-      const norm = raw.replace(/：/g, ':').replace(/→/g, '->');
+      const norm = raw.replace(/：/g, ':').replace(/→/g, '->').replace(/&gt;/g,'>').replace(/&lt;/g,'<');
 
       // 출석율
       const attM = norm.match(/전체출석율\s*:?\s*([\d.]+)%/);
       const attendance = attM ? parseFloat(attM[1]) : 0;
 
-      // 배정 인원 (입시배정 포함)
+      // 배정 인원
       const enrollM = norm.match(/배정\s*:\s*(\d+)/);
       const enrollment = enrollM ? parseInt(enrollM[1]) : 0;
 
@@ -5035,29 +5037,18 @@ function parseSingleSheet(sheet, type) {
       const startDate = startM ? startM[1] : '';
       const endDate   = endM   ? endM[1]   : '';
 
-      // 패턴 우선순위: (1) 슬래시 격주 → (2) 붙여쓴 격주(월수금월수 등) → (3) 범위 → (4) 일반
       const DAY_PATS = [
-        // (1) 격주 교대 — 슬래시 명시
         '월수금/월수','월수/월수금','화목금/화목','화목/화목금',
         '월수금/월금','화목금/화금',
-        // (2) 격주 교대 — 슬래시 없이 붙여 쓴 형태 (5글자)
         '월수금월수','월수월수금','화목금화목','화목화목금',
         '월화수월화','월화월화수','수목금수목','수목수목금',
-        // 슬래시 페어
         '토/일','일/토','화/목','월/수','수/금','월/금',
-        // 물결 범위
         '월~금','월~목','월~수','화~금','화~목','수~금','월~토','월~일',
-        // 5일·4일 연속
         '월화수목금','월화수목','화수목금','수목금토',
-        // 3일
         '월수금','수목금','월수목','월화수','화수목',
-        // 2일
         '월수','월화','화목','수금','수목','월금','목금','토일',
-        // 단일
         '토','일','금','목','수','화','월'
       ];
-
-      // 붙여쓴 격주 → 슬래시 형태로 정규화하는 맵
       const ALT_NORMALIZE = {
         '월수금월수':'월수금/월수','월수월수금':'월수/월수금',
         '화목금화목':'화목금/화목','화목화목금':'화목/화목금',
@@ -5067,87 +5058,54 @@ function parseSingleSheet(sheet, type) {
 
       let days = '', instructor = '';
 
-      // ── 요일 추출: 셀 전체에서 가장 긴 요일 패턴 우선 매칭 ──
-      for (const dp of DAY_PATS) {
-        if (norm.includes(dp)) { days = dp; break; }
+      // ── 라인 기반 파싱 (HTML XLS li 구조) ──
+      const baejungIdx = rawLines.findIndex(l => /^배정\s*:/.test(l));
+      if (baejungIdx >= 0) {
+        const afterLines = rawLines.slice(baejungIdx + 1);
+        // 개: 종: 이전까지
+        const beforeEndLines = [];
+        for (const line of afterLines) {
+          if (/^개\s*:/.test(line) || /^종\s*:/.test(line)) break;
+          beforeEndLines.push(line);
+        }
+        // 요일 라인 찾기
+        for (const line of beforeEndLines) {
+          const matched = DAY_PATS.find(dp => line === dp || line.replace(/\s/g,'') === dp);
+          if (matched && !days) { days = matched; break; }
+        }
+        // 강사명: 요일 라인 이전 마지막 한글 이름 라인
+        const dayLineIdx = beforeEndLines.findIndex(l => l === days || DAY_PATS.some(dp => l === dp));
+        const beforeDayLines = dayLineIdx >= 0 ? beforeEndLines.slice(0, dayLineIdx) : beforeEndLines;
+        for (let i = beforeDayLines.length - 1; i >= 0; i--) {
+          const cleaned = beforeDayLines[i].replace(/\d+$/, '').replace(/\s*T\s*$/, '').trim();
+          if (/^[가-힣]{2,5}$/.test(cleaned)) { instructor = cleaned; break; }
+        }
       }
-      // 붙여쓴 격주 → 슬래시 형태로 변환 (월수금월수 → 월수금/월수)
+
+      // ── 폴백: 전체 텍스트에서 요일 검색 ──
+      if (!days) {
+        for (const dp of DAY_PATS) {
+          if (norm.includes(dp)) { days = dp; break; }
+        }
+      }
+
+      // ── 폴백: 강사명 검색 (배정:N 이후, 요일 이전) ──
+      if (!instructor) {
+        const baejungM = norm.match(/배정:\d+([\s\S]*?)(?=개:|$)/);
+        if (baejungM) {
+          const between = baejungM[1];
+          let betweenTrim = between;
+          for (const dp of DAY_PATS) betweenTrim = betweenTrim.split(dp)[0];
+          const names = betweenTrim.replace(/\d+/g,'').match(/[가-힣]{2,5}/g);
+          if (names) instructor = names[names.length - 1];
+        }
+      }
+
+      // 붙여쓴 격주 → 슬래시 정규화
       if (ALT_NORMALIZE[days]) days = ALT_NORMALIZE[days];
 
-      // ── 강사명 추출 (4단계 전략) ──
-      // 강사교체 패턴: ->이름 or ->이름T
-      const changeM = norm.match(/->([가-힣]{2,5})\s*T?/);
-      if (changeM) {
-        instructor = changeM[1];
-      } else {
-        // 전략 1: 배정:N 이후 개: 이전 구간 (형식 B)
-        const betweenM = norm.match(/배정:\d+([^]+?)(?=개:)/);
-        const between = betweenM ? betweenM[1] : '';
-        if (between) {
-          // 요일 패턴 앞의 마지막 한글 이름
-          for (const dp of DAY_PATS) {
-            const di = between.indexOf(dp);
-            if (di < 0) continue;
-            const prefix = between.slice(0, di);
-            const nm = [...prefix.matchAll(/([가-힣]{2,5})/g)];
-            if (nm.length) { instructor = nm[nm.length - 1][1]; break; }
-            break; // 요일은 찾았지만 이름 없으면 전략 2로
-          }
-        }
-
-        // 전략 2: 배정: 앞 구간 (형식 A) — "이름T" 패턴
-        if (!instructor) {
-          const beforeBaejung = norm.split(/배정:/)[0] || '';
-          const tNames = [...beforeBaejung.matchAll(/([가-힣]{2,5})\s*T/g)];
-          if (tNames.length) instructor = tNames[tNames.length - 1][1];
-        }
-
-        // 전략 3: 배정: 앞 구간 — T 없이 한글 이름 (괄호/슬래시 앞, 또는 배정 앞)
-        if (!instructor) {
-          const beforeBaejung = norm.split(/배정:/)[0] || '';
-          const kNames = [...beforeBaejung.matchAll(/([가-힣]{2,5})(?=\s*[\/(배])/g)];
-          if (kNames.length) instructor = kNames[kNames.length - 1][1];
-        }
-
-        // 전략 4: 최후 수단 — 셀 전체에서 한글 이름 후보 추출
-        // 강좌명에 포함된 단어 제거 후 남은 한글 이름 사용
-        if (!instructor) {
-          // 강좌명의 한글 단어들 제거
-          const courseWords = [...courseName.matchAll(/[가-힣]{2,}/g)].map(m => m[0]);
-          // 날짜·숫자·키워드 제거 후 한글 이름 탐색
-          let stripped = norm
-            .replace(/\d{4}-\d{2}-\d{2}/g, '')
-            .replace(/\d+(\.\d+)?%?/g, '')
-            .replace(/전체출석률|수업없음|정원|배정|개강|종강/g, '');
-          // 강좌명 한글 제거
-          courseWords.forEach(w => { stripped = stripped.replace(new RegExp(w, 'g'), ''); });
-          // 요일 패턴 제거
-          for (const dp of DAY_PATS) stripped = stripped.replace(new RegExp(dp.replace(/\//g,'\\/'), 'g'), '');
-          const allNames = [...stripped.matchAll(/([가-힣]{2,5})/g)].map(m => m[1]);
-          if (allNames.length) instructor = allNames[allNames.length - 1];
-        }
-      }
-
       // 강사명 후처리
-      instructor = (instructor || '')
-        .replace(/\([^)]*\)/g, '')
-        .replace(/\s*강사\s*$/g, '')
-        .replace(/^\s*[-\/]\s*/g, '')
-        .replace(/\d+$/, '')
-        .trim();
-
-      // 시간 계산 (병합 행 범위)
-      const mergeInfo = mergeStart[`${r},${c}`];
-      const endRow = mergeInfo ? mergeInfo.e.r : r;
-      const startTime = timeSlots.find(t => t.row === r)?.time || '';
-      const endTimeSlot = timeSlots.find(t => t.row === endRow)?.time;
-      // 종료 시간은 마지막 슬롯 + 30분
-      let endTime = '';
-      if (endTimeSlot) {
-        const [hh,mm] = endTimeSlot.split(':').map(Number);
-        const totalMin = hh * 60 + mm + 30;
-        endTime = `${String(Math.floor(totalMin/60)).padStart(2,'0')}:${String(totalMin%60).padStart(2,'0')}`;
-      }
+      instructor = (instructor || '').replace(/[()]/g,'').replace(/\s*강사\s*$/,'').replace(/^[-\/]/,'').trim();
 
       if (!instructor) _parseFailLog.push({ courseName, raw, days });
       classes.push({

@@ -376,20 +376,34 @@ function renderMentors(){
 
   // 수강생 수 로드
   // Firebase는 배열을 {0:item, 1:item} 형태의 객체로 저장하므로 Object.values()로 처리
-  function safeLen(arr){
-    if(!arr) return 0;
-    // Firebase는 배열을 객체로 저장 {0:item, 1:item}
-    if(Array.isArray(arr)) return arr.filter(v=>v!=null && v!==false && v!=='').length;
-    if(typeof arr==='object'){
-      return Object.values(arr).filter(v=>v!=null && v!==false && v!=='' && typeof v==='object').length;
-    }
-    return 0;
-  }
   mentors.forEach(m=>{
     fbOnValue(`mentors/${m.id}/data`, snap=>{
       const d=snap.val();
       let cnt=0;
-      if(d) cnt+=safeLen(d.WEEKDAY)+safeLen(d.WEEKEND)+safeLen(d.COD_DATA)+safeLen(d.NATL_DATA);
+      if(d){
+        // Firebase는 배열을 {0:item,1:item} 객체로 저장
+        // 수강생은 이름(이름)이 있는 항목만 카운트
+        const countArr = (arr)=>{
+          if(!arr) return 0;
+          // 숫자 키 객체({0:...,1:...}) 또는 배열 모두 처리
+          const vals = Array.isArray(arr)
+            ? arr
+            : Object.values(arr);
+          return vals.filter(v=>{
+            if(!v || typeof v!=='object') return false;
+            // 이름 또는 연락처가 있는 실제 수강생만 카운트
+            // 이름이 실제 문자열이고 비어있지 않아야 함
+          const name = v['이름'] || v['name'] || '';
+          return typeof name==='string' && name.trim().length > 0;
+          }).length;
+        };
+        // _v 같은 메타 필드 제외, 실제 배열 키만
+        const WEEKDAY = d.WEEKDAY || d.weekday || null;
+        const WEEKEND = d.WEEKEND || d.weekend || null;
+        const COD = d.COD_DATA || null;
+        const NATL = d.NATL_DATA || null;
+        cnt = countArr(WEEKDAY)+countArr(WEEKEND)+countArr(COD)+countArr(NATL);
+      }
       const el=document.getElementById(`cnt-${m.id}`);
       if(el) el.textContent=cnt;
     });
