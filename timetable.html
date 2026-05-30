@@ -122,6 +122,8 @@ tbody td{padding:8px 12px;vertical-align:middle;font-size:12px;}
         remove: (ref) => ref.remove(),
         push:   (ref, val) => ref.push(val)
       };
+      // firebase 객체 실제 존재 확인
+      if (typeof firebase === 'undefined' || !firebase.database) throw new Error('firebase not loaded');
       window._firebaseLoaded = true;
     } catch(e) {
       tryLoad(i + 1);
