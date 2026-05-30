@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시간표 관리 | SBS아카데미게임학원</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap');
+:root{
+  --bg:#f5f5f8;--surface:#fff;--surface2:#f0f0f5;--surface3:#e8e8f0;
+  --border:#e0e0ea;--border2:#d0d0e0;
+  --accent:#5b4fff;--accent-dim:rgba(91,79,255,.08);
+  --green:#18a963;--green-dim:rgba(24,169,99,.08);
+  --red:#e03050;--red-dim:rgba(224,48,80,.08);
+  --orange:#d97706;--orange-dim:rgba(217,119,6,.08);
+  --blue:#2563eb;--blue-dim:rgba(37,99,235,.08);
+  --text:#1a1a2e;--text2:#6b6b8a;--text3:#a0a0bc;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+
+.header{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;gap:12px;}
+.logo{font-weight:900;font-size:14px;color:var(--accent);}
+.back-btn{font-size:12px;color:var(--text2);text-decoration:none;font-family:var(--mono);padding:4px 10px;border:1px solid var(--border);border-radius:6px;white-space:nowrap;transition:all .15s;}
+.back-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+.content{padding:20px 24px;max-width:1400px;margin:0 auto;}
+
+/* 탭 */
+.tab-bar{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;}
+.tab-btn{padding:10px 20px;border:none;background:none;font-family:'Noto Sans KR',sans-serif;font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-btn:hover:not(.active){color:var(--text);}
+
+/* 업로드 영역 */
+.upload-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px;}
+.upload-title{font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.upload-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.upload-label{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px dashed var(--accent);color:var(--accent);background:var(--accent-dim);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;}
+.upload-label:hover{background:var(--accent);color:#fff;}
+.upload-info{font-size:11px;color:var(--text3);}
+
+/* 검색/필터 */
+.toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+.search-inp{flex:1;min-width:200px;max-width:320px;border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;background:var(--surface2);}
+.search-inp:focus{border-color:var(--accent);background:#fff;}
+.filter-sel{border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;background:var(--surface2);cursor:pointer;}
+.count-badge{font-family:var(--mono);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid var(--accent);color:var(--accent);background:var(--accent-dim);}
+
+/* 테이블 */
+.table-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border);background:var(--surface);}
+table{width:100%;border-collapse:collapse;min-width:800px;}
+thead th{background:#f8f8fc;padding:9px 12px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text2);border-bottom:1px solid var(--border);white-space:nowrap;font-family:var(--mono);text-transform:uppercase;}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:var(--surface2);}
+tbody td{padding:8px 12px;vertical-align:middle;font-size:12px;}
+
+/* 인라인 편집 */
+.editable{cursor:pointer;border-bottom:1px dashed transparent;transition:all .1s;}
+.editable:hover{border-bottom-color:var(--accent);color:var(--accent);}
+.edit-inp{border:1px solid var(--accent);border-radius:4px;padding:2px 6px;font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;width:100%;}
+
+/* 뱃지 */
+.type-badge{display:inline-block;font-size:10px;font-weight:700;font-family:var(--mono);padding:2px 7px;border-radius:4px;}
+.t-weekday{background:var(--blue-dim);color:var(--blue);}
+.t-weekend{background:var(--orange-dim);color:var(--orange);}
+
+/* 삭제 버튼 */
+.del-btn{font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid var(--red);color:var(--red);background:var(--red-dim);cursor:pointer;white-space:nowrap;transition:all .1s;}
+.del-btn:hover{background:var(--red);color:#fff;}
+
+/* TOAST */
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(16px);background:#1a1a2e;color:#fff;padding:10px 22px;border-radius:20px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:9999;pointer-events:none;white-space:nowrap;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* 빈 상태 */
+.empty{text-align:center;padding:48px;color:var(--text3);}
+.empty-icon{font-size:36px;margin-bottom:12px;}
+
+/* 로딩 */
+#loadingBar{display:none;height:3px;background:linear-gradient(90deg,var(--accent),var(--blue));border-radius:2px;margin-bottom:12px;animation:loading 1s ease infinite;}
+@keyframes loading{0%{width:0%}100%{width:100%}}
+</style>
+<script>
+// ── Firebase SDK 멀티-CDN 로더 ──
+(function() {
+  const CDNS = [
+    {
+      app: 'https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-app-compat.min.js',
+      db:  'https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-database-compat.min.js'
+    },
+    {
+      app: 'https://unpkg.com/firebase@10.12.0/firebase-app-compat.js',
+      db:  'https://unpkg.com/firebase@10.12.0/firebase-database-compat.js'
+    },
+    {
+      app: 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
+      db:  'https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js'
+    }
+  ];
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src; s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  async function tryLoad(i) {
+    if (i >= CDNS.length) { window._firebaseLoaded = false; return; }
+    try {
+      await loadScript(CDNS[i].app);
+      await loadScript(CDNS[i].db);
+      window.firebaseAppModule = { initializeApp: (cfg) => firebase.initializeApp(cfg) };
+      window.firebaseDatabaseModule = {
+        getDatabase: (app) => firebase.database(app || undefined),
+        ref:    (db, path) => db.ref(path),
+        onValue:(ref, cb, opts) => opts && opts.onlyOnce ? ref.once('value').then(snap=>cb(snap)) : ref.on('value', cb),
+        set:    (ref, val) => ref.set(val),
+        get:    (ref) => ref.once('value'),
+        remove: (ref) => ref.remove(),
+        push:   (ref, val) => ref.push(val)
+      };
+      window._firebaseLoaded = true;
+      console.log('✅ Firebase 로드 성공:', CDNS[i].app.split('/')[2]);
+    } catch(e) {
+      console.warn('⚠ Firebase CDN 실패:', CDNS[i].app.split('/')[2]);
+      tryLoad(i + 1);
+    }
+  }
+  window._firebaseLoaded = null;
+  tryLoad(0);
+})();
+</script>
+</head>
+<body>
+
+<header class="header">
+  <a href="index.html" class="back-btn">← 목록</a>
+  <div class="logo">📋 시간표 관리</div>
+  <span style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-left:4px;">SBS아카데미게임학원</span>
+</header>
+
+<div class="content">
+  <div id="loadingBar"></div>
+
+  <!-- 업로드 섹션 -->
+  <div class="upload-section">
+    <div class="upload-title">📂 시간표 업로드 <span style="font-size:11px;font-weight:400;color:var(--text3);">XLS 파일을 업로드하면 기존 데이터에 추가됩니다</span></div>
+    <div class="upload-row">
+      <label class="upload-label">
+        📅 평일 시간표 업로드
+        <input type="file" accept=".xls,.xlsx" style="display:none" onchange="uploadTimetable(event,'평일')">
+      </label>
+      <label class="upload-label" style="border-color:var(--orange);color:var(--orange);background:var(--orange-dim);">
+        🗓 주말 시간표 업로드
+        <input type="file" accept=".xls,.xlsx" style="display:none" onchange="uploadTimetable(event,'주말')">
+      </label>
+      <span class="upload-info">※ 같은 강좌(강좌명+강사+개강일 동일)는 중복 추가되지 않습니다</span>
+      <button id="seedBtn" style="padding:6px 12px;border-radius:8px;border:1px solid var(--orange);color:var(--orange);background:var(--orange-dim);font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">⬆ 기존데이터 업로드</button>
+    </div>
+  </div>
+
+  <!-- 탭 -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('all',this)">전체</button>
+    <button class="tab-btn" onclick="switchTab('평일',this)">평일</button>
+    <button class="tab-btn" onclick="switchTab('주말',this)">주말</button>
+  </div>
+
+  <!-- 툴바 -->
+  <div class="toolbar">
+    <input class="search-inp" type="text" id="searchInp" placeholder="강좌명 또는 강사명 검색..." oninput="renderTable()">
+    <select class="filter-sel" id="timeFilter" onchange="renderTable()">
+      <option value="">시간 전체</option>
+      <option>10:00</option><option>11:00</option><option>12:00</option>
+      <option>13:00</option><option>14:00</option><option>15:00</option>
+      <option>16:00</option><option>17:00</option><option>18:00</option>
+      <option>19:00</option><option>20:00</option>
+    </select>
+    <span class="count-badge" id="countBadge">0개</span>
+    <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+      <button id="bulkDelBtn" style="display:none;padding:6px 14px;border-radius:8px;border:1px solid var(--red);color:var(--red);background:var(--red-dim);font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🗑 선택 삭제</button>
+      <button id="addRowBtn" style="padding:6px 14px;border-radius:8px;border:1px dashed var(--green);color:var(--green);background:var(--green-dim);font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">+ 직접 추가</button>
+    </div>
+  </div>
+
+  <!-- 테이블 -->
+  <div class="table-wrap">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th style="width:32px;text-align:center;"><input type="checkbox" id="ttChkAll" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);"></th>
+          <th>강좌명</th>
+          <th>강사명</th>
+          <th>개강일</th>
+          <th>종강일</th>
+          <th>시간</th>
+          <th>강의실</th>
+          <th>요일</th>
+          <th>구분</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="9" class="empty"><div class="empty-icon">📋</div><div>Firebase에서 불러오는 중...</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Firebase SDK는 head의 멀티-CDN 로더가 미리 로드
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCyCtQu20qgyCT1uRvmH3bmT1Q1bsT_pUw",
+  authDomain: "sbs-academy-game.firebaseapp.com",
+  databaseURL: "https://sbs-academy-game-default-rtdb.firebaseio.com",
+  projectId: "sbs-academy-game",
+  storageBucket: "sbs-academy-game.firebasestorage.app",
+  messagingSenderId: "120735998268",
+  appId: "1:120735998268:web:9d0d5c778451f69d63fe39"
+};
+
+let _app, _db;
+// Firebase API 헬퍼 (초기화 전에는 undefined)
+let ref, onValue, set, remove, push;
+
+async function initTimetableFirebase() {
+  await new Promise((res, rej) => {
+    let t=0;
+    const iv = setInterval(() => {
+      if(window._firebaseLoaded===true){clearInterval(iv);res();}
+      if(window._firebaseLoaded===false){clearInterval(iv);rej(new Error('FB 로드 실패'));}
+      if((t+=100)>=10000){clearInterval(iv);rej(new Error('타임아웃'));}
+    },100);
+  });
+  _app = window.firebaseAppModule.initializeApp(firebaseConfig);
+  _db  = window.firebaseDatabaseModule.getDatabase(_app);
+  const m = window.firebaseDatabaseModule;
+  // 헬퍼 함수 설정 (path 문자열을 받는 방식)
+  ref     = (path) => m.ref(_db, path);
+  onValue = (ref, cb, opts) => m.onValue(ref, cb, opts);
+  set     = (ref, val) => m.set(ref, val);
+  remove  = (ref) => m.remove(ref);
+  push    = (ref, val) => m.push(ref, val);
+}
+
+// 강의실 단순화: A-1-1 → A, I-1(그래픽)-1 → I(그래픽)
+function simplifyRoom(room) {
+  if (!room) return '';
+  const m = room.match(/^([A-Z]+)-\d+(\([^)]+\))?/);
+  return m ? m[1] + (m[2] || '') : room;
+}
+
+// 요일 정규화 함수
+function normalizeDays(raw) {
+  if (!raw) return '';
+  const ORDER = '월화수목금토일';
+  // 범위 패턴 (월~금 → 월화수목금)
+  const rangeM = raw.trim().match(/^([월화수목금토일])~([월화수목금토일])$/);
+  if (rangeM) {
+    const s = ORDER.indexOf(rangeM[1]);
+    const e = ORDER.indexOf(rangeM[2]);
+    return ORDER.slice(s, e+1);
+  }
+  // 중복 제거 후 월화수목금 순서로 정렬
+  const seen = new Set([...raw].filter(c => ORDER.includes(c)));
+  return [...ORDER].filter(d => seen.has(d)).join('');
+}
+
+// 전역 상태
+let allCourses = {};
+let currentTab = 'all';
+
+// ════════ Firebase 로드 ════════
+initTimetableFirebase().then(() => {
+  const coursesRef = ref('timetable');
+  onValue(coursesRef, snap => {
+    allCourses = snap.val() || {};
+    renderTable();
+  });
+}).catch(e => {
+  console.error('Firebase 초기화 실패:', e);
+  document.getElementById('courseTable').innerHTML =
+    '<tr><td colspan="9" style="text-align:center;padding:32px;color:#e03050;">⚠ Firebase 연결 실패 — 인터넷 연결을 확인하세요</td></tr>';
+});
+
+// ════════ 탭 전환 ════════
+window.switchTab = function(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable();
+};
+
+// ════════ 테이블 렌더 ════════
+window.renderTable = function() {
+  const q = document.getElementById('searchInp').value.toLowerCase();
+  const timeF = document.getElementById('timeFilter').value;
+
+  let items = Object.entries(allCourses).map(([key, val]) => ({key, ...val}));
+
+  if (currentTab !== 'all') items = items.filter(c => c.type === currentTab);
+  if (q) items = items.filter(c => (c.name||'').toLowerCase().includes(q) || (c.teacher||'').toLowerCase().includes(q));
+  if (timeF) items = items.filter(c => c.time === timeF);
+
+  // 개강일 기준 정렬
+  items.sort((a,b) => (b.start||'').localeCompare(a.start||''));
+
+  document.getElementById('countBadge').textContent = items.length + '개';
+
+  if (items.length === 0) {
+    document.getElementById('tableBody').innerHTML = `<tr><td colspan="9" class="empty"><div class="empty-icon">🔍</div><div>해당하는 강좌가 없습니다</div></td></tr>`;
+    return;
+  }
+
+  document.getElementById('tableBody').innerHTML = items.map(c => `
+    <tr>
+      <td style="text-align:center;width:32px;"><input type="checkbox" class="tt-chk" data-key="${c.key}" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);" onchange="updateBulkDel()"></td>
+      <td><span class="editable" onclick="editCell(this,'${c.key}','name')">${c.name||'-'}</span></td>
+      <td><span class="editable" onclick="editCell(this,'${c.key}','teacher')">${c.teacher||'-'}</span></td>
+      <td><span class="editable" onclick="editCell(this,'${c.key}','start')">${c.start||'-'}</span></td>
+      <td><span class="editable" onclick="editCell(this,'${c.key}','end')">${c.end||'-'}</span></td>
+      <td><span class="editable" onclick="editCell(this,'${c.key}','time')">${c.time||'-'}</span></td>
+      <td><span class="editable" onclick="editCell(this,'${c.key}','room')">${c.room||'-'}</span></td>
+      <td><span class="editable" onclick="editCell(this,'${c.key}','days')">${c.days||'-'}</span></td>
+      <td><span class="type-badge ${c.type==='주말'?'t-weekend':'t-weekday'}">${c.type||'평일'}</span></td>
+      <td><button class="del-btn" onclick="deleteCourse('${c.key}','${(c.name||'').replace(/'/g,"\\'")}')">삭제</button></td>
+    </tr>
+  `).join('');
+};
+
+// ════════ 인라인 편집 ════════
+window.editCell = function(span, key, field) {
+  const oldVal = span.textContent === '-' ? '' : span.textContent;
+  const inp = document.createElement('input');
+  inp.className = 'edit-inp';
+  inp.value = oldVal;
+  inp.style.width = (span.offsetWidth + 40) + 'px';
+  span.replaceWith(inp);
+  inp.focus();
+
+  const save = async () => {
+    const newVal = inp.value.trim();
+    await set(ref(`timetable/${key}/${field}`), newVal);
+    showToast('✅ 저장됨');
+  };
+  inp.addEventListener('blur', save);
+  inp.addEventListener('keydown', e => { if(e.key==='Enter') inp.blur(); if(e.key==='Escape') { inp.value=oldVal; inp.blur(); } });
+};
+
+// ════════ 삭제 ════════
+window.deleteCourse = async function(key, name) {
+  if (!confirm(`"${name}" 강좌를 삭제하시겠습니까?`)) return;
+  await remove(ref(`timetable/${key}`));
+  showToast('🗑 삭제되었습니다');
+};
+
+// ════════ 직접 추가 ════════
+window.addNewRow = async function() {
+  const newRef = push(ref('timetable'));
+  await set(newRef, {
+    name: '새 강좌',
+    teacher: '',
+    start: '',
+    end: '',
+    time: '10:00',
+    room: '',
+    days: '',
+    type: currentTab === '주말' ? '주말' : '평일'
+  });
+  showToast('✅ 새 강좌가 추가되었습니다. 클릭해서 수정하세요.');
+};
+
+// ════════ XLS 업로드 파싱 ════════
+window.uploadTimetable = async function(event, scheduleType) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  showLoading(true);
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const text = e.target.result;
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, 'text/html');
+      const table = doc.querySelector('table');
+      if (!table) { showToast('❌ 시간표 테이블을 찾을 수 없습니다'); showLoading(false); return; }
+
+      const rows = table.querySelectorAll('tr');
+      // 서브 강의실 헤더 (2번째 행)
+      const subRooms = Array.from(rows[1]?.querySelectorAll('td,th') || []).map(td => td.textContent.trim());
+
+      let added = 0, skipped = 0;
+      const existing = Object.values(allCourses);
+
+      for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+        const cells = rows[rowIdx].querySelectorAll('td,th');
+        if (!cells.length) continue;
+
+        const timeText = cells[0]?.textContent.trim() || '';
+        const timeMatch = timeText.match(/^(\d{2}:\d{2})/);
+        const timeVal = timeMatch ? timeMatch[1] : '';
+
+        for (let colIdx = 1; colIdx < cells.length; colIdx++) {
+          const fullText = (cells[colIdx]?.textContent || '').replace(/\u00a0/g, ' ').trim();
+          if (!fullText || !fullText.includes('개:') || !fullText.includes('종:')) continue;
+
+          // 강좌명
+          const nameM = fullText.match(/^(.+?)전체출석율/);
+          const courseName = nameM ? nameM[1].trim() : '';
+
+          // 강사명
+          let teacher = '';
+          const t1 = fullText.match(/배정:\d+\s*([가-힣]{2,5})\s*\d+월/);
+          const t2 = fullText.match(/배정:\d+\s*([가-힣]{2,5})\s*[월화수목금]/);
+          if (t1) teacher = t1[1];
+          else if (t2) teacher = t2[1].replace(/[월화수목금토일]+$/, '').trim();
+
+          // 개강일/종강일
+          const startM = fullText.match(/개:(\d{4}-\d{2}-\d{2})/);
+          const endM = fullText.match(/종:(\d{4}-\d{2}-\d{2})/);
+          const startDate = startM ? startM[1] : '';
+          const endDate = endM ? endM[1] : '';
+
+          if (!courseName || !startDate) continue;
+
+          // 강의실
+          const room = simplifyRoom(colIdx < subRooms.length ? subRooms[colIdx] : '');
+
+          // 요일 파싱 (3가지 패턴 순서대로 시도)
+          let daysRaw = '';
+          // 패턴1: 배정:N강사명요일개: (요일이 강사명 바로 뒤에 붙음)
+          const dM1 = fullText.match(/배정:\d+[가-힣]{2,5}([월화수목금토일~]{2,})개:/);
+          // 패턴2: N월~요일개:
+          const dM2 = fullText.match(/\d+월[~\s]*([월화수목금토일~]+)개:/);
+          // 패턴3: 요일개:날짜
+          const dM3 = fullText.match(/([월화수목금토일~]{2,})개:\d{4}/);
+          daysRaw = dM1 ? dM1[1] : (dM2 ? dM2[1] : (dM3 ? dM3[1] : ''));
+          const days = normalizeDays(daysRaw);
+
+          // 중복 체크
+          const isDup = existing.some(ex => ex.name === courseName && ex.teacher === teacher && ex.start === startDate && ex.time === timeVal);
+          if (isDup) { skipped++; continue; }
+
+          const newRef = push(ref('timetable'));
+          await set(newRef, { name: courseName, teacher, start: startDate, end: endDate, time: timeVal, room, days, type: scheduleType });
+          added++;
+        }
+      }
+
+      showLoading(false);
+      event.target.value = '';
+      showToast(`✅ ${added}개 추가 (${skipped}개 중복 스킵)`);
+    } catch(err) {
+      showLoading(false);
+      showToast('❌ 파일 오류: ' + err.message);
+      console.error(err);
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+};
+
+// ════════ 유틸 ════════
+function showLoading(show) {
+  document.getElementById('loadingBar').style.display = show ? 'block' : 'none';
+}
+
+// ════════ 초기 데이터 세팅 (최초 1회) ════════
+const INITIAL_TIMETABLE = [{"id": "(국1)게임그래픽디자이너양성과정_이동수_2026-05-14_10:00", "name": "(국1)게임그래픽디자이너양성과정", "teacher": "이동수", "start": "2026-05-14", "end": "2026-06-12", "time": "10:00", "room": "D", "days": "금", "type": "평일"}, {"id": "(국5)유니티 게임프로그래머 양성과정_정우일_2026-05-04_10:00", "name": "(국5)유니티 게임프로그래머 양성과정", "teacher": "정우일", "start": "2026-05-04", "end": "2026-05-29", "time": "10:00", "room": "G", "days": "금", "type": "평일"}, {"id": "(국6)유니티 게임프로그래머 양성과정_정우일_2026-06-01_10:00", "name": "(국6)유니티 게임프로그래머 양성과정", "teacher": "정우일", "start": "2026-06-01", "end": "2026-06-30", "time": "10:00", "room": "G", "days": "금", "type": "평일"}, {"id": "언리얼3_김보성_2026-05-13_10:00", "name": "언리얼3", "teacher": "김보성", "start": "2026-05-13", "end": "2026-06-08", "time": "10:00", "room": "H", "days": "금", "type": "평일"}, {"id": "게그_김선욱_2026-05-13_10:00", "name": "게그", "teacher": "김선욱", "start": "2026-05-13", "end": "2026-06-08", "time": "10:00", "room": "I(그래픽)", "days": "월수금", "type": "평일"}, {"id": "(계2)게임기획실무자양성과정_이종주_2026-04-20_10:00", "name": "(계2)게임기획실무자양성과정", "teacher": "이종주", "start": "2026-04-20", "end": "2026-05-15", "time": "10:00", "room": "K", "days": "금", "type": "평일"}, {"id": "(계3)게임기획실무자양성과정_이종주_2026-05-18_10:00", "name": "(계3)게임기획실무자양성과정", "teacher": "이종주", "start": "2026-05-18", "end": "2026-06-17", "time": "10:00", "room": "K", "days": "금", "type": "평일"}, {"id": "웹툰데뷔_원태룡_2026-05-07_11:00", "name": "웹툰데뷔", "teacher": "원태룡", "start": "2026-05-07", "end": "2026-06-02", "time": "11:00", "room": "A", "days": "화목금", "type": "평일"}, {"id": "3D애니메이션__2026-05-13_11:00", "name": "3D애니메이션", "teacher": "", "start": "2026-05-13", "end": "2026-06-10", "time": "11:00", "room": "J", "days": "월수", "type": "평일"}, {"id": "게임원화_이승민_2026-05-13_12:00", "name": "게임원화", "teacher": "이승민", "start": "2026-05-13", "end": "2026-06-05", "time": "12:00", "room": "D", "days": "금", "type": "평일"}, {"id": "게프4_김보성_2026-05-13_12:00", "name": "게프4", "teacher": "김보성", "start": "2026-05-13", "end": "2026-06-08", "time": "12:00", "room": "G", "days": "금", "type": "평일"}, {"id": "스튜디오취업__2026-05-14_12:00", "name": "스튜디오취업", "teacher": "", "start": "2026-05-14", "end": "2026-06-09", "time": "12:00", "room": "J", "days": "목금", "type": "평일"}, {"id": "게그_이동수_2026-04-15_13:00", "name": "게그", "teacher": "이동수", "start": "2026-04-15", "end": "2026-05-13", "time": "13:00", "room": "C", "days": "월수금", "type": "평일"}, {"id": "게그_김선욱_2026-05-13_13:00", "name": "게그", "teacher": "김선욱", "start": "2026-05-13", "end": "2026-06-08", "time": "13:00", "room": "G", "days": "월수금", "type": "평일"}, {"id": "웹툰_원태룡_2026-04-17_14:00", "name": "웹툰", "teacher": "원태룡", "start": "2026-04-17", "end": "2026-05-19", "time": "14:00", "room": "A", "days": "화목금", "type": "평일"}, {"id": "웹툰_임현철_2026-05-13_14:00", "name": "웹툰", "teacher": "임현철", "start": "2026-05-13", "end": "2026-06-08", "time": "14:00", "room": "A", "days": "월수금", "type": "평일"}, {"id": "웹툰_원태룡_2026-05-21_14:00", "name": "웹툰", "teacher": "원태룡", "start": "2026-05-21", "end": "2026-06-16", "time": "14:00", "room": "A", "days": "화목금", "type": "평일"}, {"id": "아트웍1_황민주_2026-05-13_14:00", "name": "아트웍1", "teacher": "황민주", "start": "2026-05-13", "end": "2026-06-09", "time": "14:00", "room": "B", "days": "금", "type": "평일"}, {"id": "게임원화_이승민_2026-05-13_14:00", "name": "게임원화", "teacher": "이승민", "start": "2026-05-13", "end": "2026-06-05", "time": "14:00", "room": "D", "days": "금", "type": "평일"}, {"id": "팀프로젝트_이민_2026-05-13_14:00", "name": "팀프로젝트", "teacher": "이민", "start": "2026-05-13", "end": "2026-06-05", "time": "14:00", "room": "I(그래픽)", "days": "금", "type": "평일"}, {"id": "웹툰_원태룡_2026-04-17_16:00", "name": "웹툰", "teacher": "원태룡", "start": "2026-04-17", "end": "2026-05-19", "time": "16:00", "room": "A", "days": "화목금", "type": "평일"}, {"id": "웹툰_원태룡_2026-05-21_16:00", "name": "웹툰", "teacher": "원태룡", "start": "2026-05-21", "end": "2026-06-16", "time": "16:00", "room": "A", "days": "화목금", "type": "평일"}, {"id": "게임원화2H_박솔이_2026-05-13_16:00", "name": "게임원화2H", "teacher": "박솔이", "start": "2026-05-13", "end": "2026-06-15", "time": "16:00", "room": "B", "days": "", "type": "평일"}, {"id": "게임원화2H__2026-05-14_16:00", "name": "게임원화2H", "teacher": "", "start": "2026-05-14", "end": "2026-06-09", "time": "16:00", "room": "B", "days": "", "type": "평일"}, {"id": "게그_이동수_2026-04-15_16:00", "name": "게그", "teacher": "이동수", "start": "2026-04-15", "end": "2026-05-13", "time": "16:00", "room": "C", "days": "월수금", "type": "평일"}, {"id": "웹툰드로잉_최해광_2026-05-14_16:00", "name": "웹툰드로잉", "teacher": "최해광", "start": "2026-05-14", "end": "2026-06-09", "time": "16:00", "room": "C", "days": "", "type": "평일"}, {"id": "게그_이동수_2026-05-15_16:00", "name": "게그", "teacher": "이동수", "start": "2026-05-15", "end": "2026-06-10", "time": "16:00", "room": "C", "days": "월수금", "type": "평일"}, {"id": "언리얼PO_김보성_2026-04-23_16:00", "name": "언리얼PO", "teacher": "김보성", "start": "2026-04-23", "end": "2026-05-14", "time": "16:00", "room": "D", "days": "", "type": "평일"}, {"id": "언리얼PO_김보성_2026-05-21_16:00", "name": "언리얼PO", "teacher": "김보성", "start": "2026-05-21", "end": "2026-06-11", "time": "16:00", "room": "D", "days": "", "type": "평일"}, {"id": "게임기획4_지바롬_2026-05-13_16:00", "name": "게임기획4", "teacher": "지바롬", "start": "2026-05-13", "end": "2026-06-09", "time": "16:00", "room": "G", "days": "목", "type": "평일"}, {"id": "게그(배/애)_백문선_2026-04-15_16:00", "name": "게그(배/애)", "teacher": "백문선", "start": "2026-04-15", "end": "2026-05-13", "time": "16:00", "room": "H", "days": "월수금", "type": "평일"}, {"id": "게그(캐/이)_백문선_2026-04-16_16:00", "name": "게그(캐/이)", "teacher": "백문선", "start": "2026-04-16", "end": "2026-05-14", "time": "16:00", "room": "H", "days": "화목금", "type": "평일"}, {"id": "게그(배/애)_백문선_2026-05-15_16:00", "name": "게그(배/애)", "teacher": "백문선", "start": "2026-05-15", "end": "2026-06-10", "time": "16:00", "room": "I(그래픽)", "days": "월수금", "type": "평일"}, {"id": "게그(캐/이)_백문선_2026-05-19_16:00", "name": "게그(캐/이)", "teacher": "백문선", "start": "2026-05-19", "end": "2026-06-16", "time": "16:00", "room": "I(그래픽)", "days": "화목금", "type": "평일"}, {"id": "게임원화(격/3h)_조아라_2026-04-15_16:00", "name": "게임원화(격/3h)", "teacher": "조아라", "start": "2026-04-15", "end": "2026-05-13", "time": "16:00", "room": "K", "days": "월수금", "type": "평일"}, {"id": "게임원화(격/3h)__2026-04-16_16:00", "name": "게임원화(격/3h)", "teacher": "", "start": "2026-04-16", "end": "2026-05-14", "time": "16:00", "room": "K", "days": "화목금", "type": "평일"}, {"id": "게임원화(격/3h)_조아라_2026-05-15_16:00", "name": "게임원화(격/3h)", "teacher": "조아라", "start": "2026-05-15", "end": "2026-06-10", "time": "16:00", "room": "L", "days": "월수금", "type": "평일"}, {"id": "게임원화(격/3h)__2026-05-19_16:00", "name": "게임원화(격/3h)", "teacher": "", "start": "2026-05-19", "end": "2026-06-12", "time": "16:00", "room": "L", "days": "화목금", "type": "평일"}, {"id": "웹툰_원태룡_2026-04-17_18:00", "name": "웹툰", "teacher": "원태룡", "start": "2026-04-17", "end": "2026-05-19", "time": "18:00", "room": "A", "days": "화목금", "type": "평일"}, {"id": "웹툰_임현철_2026-05-13_18:00", "name": "웹툰", "teacher": "임현철", "start": "2026-05-13", "end": "2026-06-08", "time": "18:00", "room": "A", "days": "월수금", "type": "평일"}, {"id": "웹툰_원태룡_2026-05-21_18:00", "name": "웹툰", "teacher": "원태룡", "start": "2026-05-21", "end": "2026-06-16", "time": "18:00", "room": "A", "days": "화목금", "type": "평일"}, {"id": "게임원화(2H/격)__2026-05-19_18:00", "name": "게임원화(2H/격)", "teacher": "", "start": "2026-05-19", "end": "2026-06-11", "time": "18:00", "room": "B", "days": "화목금", "type": "평일"}, {"id": "유니티PO_정우일_2026-05-13_18:00", "name": "유니티PO", "teacher": "정우일", "start": "2026-05-13", "end": "2026-06-03", "time": "18:00", "room": "C", "days": "월수금", "type": "평일"}, {"id": "게임원화_나주연_2026-05-13_18:00", "name": "게임원화", "teacher": "나주연", "start": "2026-05-13", "end": "2026-06-09", "time": "18:00", "room": "C", "days": "금", "type": "평일"}, {"id": "웹소설PO__2026-04-17_18:00", "name": "웹소설PO", "teacher": "", "start": "2026-04-17", "end": "2026-05-15", "time": "18:00", "room": "D", "days": "", "type": "평일"}, {"id": "웹소설PO__2026-05-22_18:00", "name": "웹소설PO", "teacher": "", "start": "2026-05-22", "end": "2026-06-12", "time": "18:00", "room": "E", "days": "", "type": "평일"}, {"id": "게임기획PO__2026-04-17_18:00", "name": "게임기획PO", "teacher": "", "start": "2026-04-17", "end": "2026-05-15", "time": "18:00", "room": "G", "days": "", "type": "평일"}, {"id": "게임기획6_지바롬_2026-05-13_18:00", "name": "게임기획6", "teacher": "지바롬", "start": "2026-05-13", "end": "2026-06-09", "time": "18:00", "room": "G", "days": "목", "type": "평일"}, {"id": "게임기획PO__2026-05-22_18:00", "name": "게임기획PO", "teacher": "", "start": "2026-05-22", "end": "2026-06-12", "time": "18:00", "room": "G", "days": "", "type": "평일"}, {"id": "유니티2_이민_2026-05-13_18:00", "name": "유니티2", "teacher": "이민", "start": "2026-05-13", "end": "2026-06-05", "time": "18:00", "room": "H", "days": "금", "type": "평일"}, {"id": "문예창작__2026-05-11_18:00", "name": "문예창작", "teacher": "", "start": "2026-05-11", "end": "2026-06-10", "time": "18:00", "room": "I(그래픽)", "days": "", "type": "평일"}, {"id": "게그_이동수_2026-04-15_19:00", "name": "게그", "teacher": "이동수", "start": "2026-04-15", "end": "2026-05-13", "time": "19:00", "room": "A", "days": "월수금", "type": "평일"}, {"id": "게임원화(격/3h)__2026-04-16_19:00", "name": "게임원화(격/3h)", "teacher": "", "start": "2026-04-16", "end": "2026-05-14", "time": "19:00", "room": "A", "days": "화목금", "type": "평일"}, {"id": "게그_이동수_2026-05-15_19:00", "name": "게그", "teacher": "이동수", "start": "2026-05-15", "end": "2026-06-10", "time": "19:00", "room": "B", "days": "월수금", "type": "평일"}, {"id": "게그(캐/이)_백문선_2026-04-15_19:00", "name": "게그(캐/이)", "teacher": "백문선", "start": "2026-04-15", "end": "2026-05-13", "time": "19:00", "room": "F", "days": "월수금", "type": "평일"}, {"id": "게그(배/애)_백문선_2026-04-16_19:00", "name": "게그(배/애)", "teacher": "백문선", "start": "2026-04-16", "end": "2026-05-14", "time": "19:00", "room": "G", "days": "화목금", "type": "평일"}, {"id": "게그(캐/이)_백문선_2026-05-15_19:00", "name": "게그(캐/이)", "teacher": "백문선", "start": "2026-05-15", "end": "2026-06-10", "time": "19:00", "room": "G", "days": "월수금", "type": "평일"}, {"id": "게그(배/애)_백문선_2026-05-19_19:00", "name": "게그(배/애)", "teacher": "백문선", "start": "2026-05-19", "end": "2026-06-16", "time": "19:00", "room": "G", "days": "화목금", "type": "평일"}, {"id": "게임UI_노유지_2026-05-14_19:00", "name": "게임UI", "teacher": "노유지", "start": "2026-05-14", "end": "2026-06-09", "time": "19:00", "room": "G", "days": "", "type": "평일"}, {"id": "게임원화(격/3h)_조아라_2026-04-15_19:00", "name": "게임원화(격/3h)", "teacher": "조아라", "start": "2026-04-15", "end": "2026-05-13", "time": "19:00", "room": "G", "days": "월수금", "type": "평일"}, {"id": "게임원화(격/3h)_조아라_2026-05-15_19:00", "name": "게임원화(격/3h)", "teacher": "조아라", "start": "2026-05-15", "end": "2026-06-10", "time": "19:00", "room": "H", "days": "월수금", "type": "평일"}, {"id": "게임원화(격/3h)__2026-05-19_19:00", "name": "게임원화(격/3h)", "teacher": "", "start": "2026-05-19", "end": "2026-06-12", "time": "19:00", "room": "H", "days": "화목금", "type": "평일"}, {"id": "웹툰PD_강성민_2026-04-15_19:00", "name": "웹툰PD", "teacher": "강성민", "start": "2026-04-15", "end": "2026-05-13", "time": "19:00", "room": "H", "days": "월수금", "type": "평일"}, {"id": "웹툰심화_김지윤_2026-04-15_19:00", "name": "웹툰심화", "teacher": "김지윤", "start": "2026-04-15", "end": "2026-05-13", "time": "19:00", "room": "I(그래픽)", "days": "월수금", "type": "평일"}, {"id": "웹툰PD_강성민_2026-05-15_19:00", "name": "웹툰PD", "teacher": "강성민", "start": "2026-05-15", "end": "2026-06-10", "time": "19:00", "room": "I(그래픽)", "days": "월수금", "type": "평일"}, {"id": "웹툰_원태룡_2026-04-17_20:00", "name": "웹툰", "teacher": "원태룡", "start": "2026-04-17", "end": "2026-05-19", "time": "20:00", "room": "A", "days": "화목금", "type": "평일"}, {"id": "웹툰_임현철_2026-05-13_20:00", "name": "웹툰", "teacher": "임현철", "start": "2026-05-13", "end": "2026-06-08", "time": "20:00", "room": "A", "days": "월수금", "type": "평일"}, {"id": "웹툰_원태룡_2026-05-21_20:00", "name": "웹툰", "teacher": "원태룡", "start": "2026-05-21", "end": "2026-06-16", "time": "20:00", "room": "A", "days": "화목금", "type": "평일"}, {"id": "게임원화(2H/격)__2026-05-19_20:00", "name": "게임원화(2H/격)", "teacher": "", "start": "2026-05-19", "end": "2026-06-11", "time": "20:00", "room": "B", "days": "화목금", "type": "평일"}, {"id": "게임원화(프)_나주연_2026-05-13_20:00", "name": "게임원화(프)", "teacher": "나주연", "start": "2026-05-13", "end": "2026-06-09", "time": "20:00", "room": "C", "days": "금", "type": "평일"}, {"id": "아트웍2_최해광_2026-05-13_20:00", "name": "아트웍2", "teacher": "최해광", "start": "2026-05-13", "end": "2026-06-05", "time": "20:00", "room": "C", "days": "금", "type": "평일"}, {"id": "웹소설2H_김남영_2026-04-20_20:00", "name": "웹소설2H", "teacher": "김남영", "start": "2026-04-20", "end": "2026-05-13", "time": "20:00", "room": "D", "days": "", "type": "평일"}, {"id": "웹소설2H__2026-04-30_20:00", "name": "웹소설2H", "teacher": "", "start": "2026-04-30", "end": "2026-05-28", "time": "20:00", "room": "D", "days": "", "type": "평일"}, {"id": "웹소설2H_김남영_2026-05-18_20:00", "name": "웹소설2H", "teacher": "김남영", "start": "2026-05-18", "end": "2026-06-10", "time": "20:00", "room": "E", "days": "", "type": "평일"}, {"id": "웹소설2H__2026-06-02_20:00", "name": "웹소설2H", "teacher": "", "start": "2026-06-02", "end": "2026-06-25", "time": "20:00", "room": "F", "days": "", "type": "평일"}, {"id": "게임기획2_지바롬_2026-05-13_20:00", "name": "게임기획2", "teacher": "지바롬", "start": "2026-05-13", "end": "2026-06-09", "time": "20:00", "room": "G", "days": "목", "type": "평일"}, {"id": "유니티4_이민_2026-05-13_20:00", "name": "유니티4", "teacher": "이민", "start": "2026-05-13", "end": "2026-06-05", "time": "20:00", "room": "G", "days": "금", "type": "평일"}, {"id": "문예창작__2026-05-11_20:00", "name": "문예창작", "teacher": "", "start": "2026-05-11", "end": "2026-06-10", "time": "20:00", "room": "G", "days": "", "type": "평일"}, {"id": "게임이펙트(FX)__2026-05-13_20:00", "name": "게임이펙트(FX)", "teacher": "", "start": "2026-05-13", "end": "2026-06-10", "time": "20:00", "room": "H", "days": "월수", "type": "평일"}];
+
+document.getElementById('seedBtn').addEventListener('click', seedTimetable);
+
+async function seedTimetable() {
+  if (!confirm('현재 파싱된 강좌 데이터를 Firebase에 올릴까요?\n(이미 있는 항목은 스킵됩니다)')) return;
+  showLoading(true);
+  let added = 0, skipped = 0;
+  for (const course of INITIAL_TIMETABLE) {
+    const existing = Object.values(allCourses);
+    const isDup = existing.some(ex => ex.name === course.name && ex.teacher === course.teacher && ex.start === course.start && ex.time === course.time);
+    if (isDup) { skipped++; continue; }
+    const newRef = push(ref('timetable'));
+    await set(newRef, course);
+    added++;
+  }
+  showLoading(false);
+  showToast(`✅ ${added}개 추가 (${skipped}개 중복 스킵)`);
+};
+
+// ════════ 버튼 이벤트 연결 ════════
+document.getElementById('addRowBtn').addEventListener('click', () => window.addNewRow());
+document.getElementById('bulkDelBtn').addEventListener('click', bulkDelete);
+document.getElementById('ttChkAll').addEventListener('change', function() {
+  document.querySelectorAll('.tt-chk').forEach(cb => { cb.checked = this.checked; });
+  updateBulkDel();
+});
+
+function updateBulkDel() {
+  const checked = document.querySelectorAll('.tt-chk:checked').length;
+  const btn = document.getElementById('bulkDelBtn');
+  btn.style.display = checked > 0 ? 'block' : 'none';
+  btn.textContent = `🗑 ${checked}개 삭제`;
+}
+
+async function bulkDelete() {
+  const checked = document.querySelectorAll('.tt-chk:checked');
+  if (!checked.length) return;
+  if (!confirm(`선택한 ${checked.length}개 강좌를 삭제하시겠습니까?`)) return;
+  for (const cb of checked) {
+    await remove(ref(`timetable/${cb.dataset.key}`));
+  }
+  document.getElementById('ttChkAll').checked = false;
+  showToast(`🗑 ${checked.length}개 삭제 완료`);
+}
+
+window.showToast = function(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+};</script>
+</body>
+</html>
