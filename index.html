@@ -147,7 +147,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   <div class="header-right">
     <span class="login-status" id="loginStatus"></span>
     <a id="ttBtn" href="timetable.html" class="hdr-link-btn btn-timetable">📋 시간표</a>
-    <button class="hdr-link-btn" id="loginBtn" onclick="document.getElementById('loginModalBg').style.display='flex'" style="border-color:var(--accent);color:var(--accent);background:var(--accent-dim);">🔑 로그인</button>
+    <button class="hdr-link-btn" id="headerLoginBtn" onclick="openLoginModal()" style="border-color:var(--accent);color:var(--accent);background:var(--accent-dim);">🔑 로그인</button>
     <button class="hdr-link-btn btn-logout" id="logoutBtn" onclick="doLogout()">🚪 로그아웃</button>
     <button class="admin-toggle" id="adminToggle" onclick="toggleAdmin()">⚙ 관리</button>
   </div>
@@ -290,7 +290,7 @@ function updateLoginUI(){
   const ttBtn     = document.getElementById('ttBtn');
   const subText   = document.getElementById('pageSubText');
 
-  const loginBtn = document.getElementById('loginBtn');
+  const loginBtn = document.getElementById('headerLoginBtn');
   if(m){
     statusEl.textContent = `${m.name} ${m.role||'멘토'}님`;
     statusEl.style.display = 'inline';
@@ -460,8 +460,7 @@ function openLoginModal(title, sub){
   document.getElementById('loginModalSub').textContent   = sub||'';
   document.getElementById('loginPw').value='';
   document.getElementById('loginErr').style.display='none';
-  document.getElementById('loginModalBg').classList.add('open');
-  setTimeout(()=>document.getElementById('loginPw').focus(),100);
+  openLoginModal();
 }
 function closeLoginModal(){
   document.getElementById('loginModalBg').classList.remove('open');
@@ -656,16 +655,21 @@ const INITIAL_MENTORS = {
   '이은채':{ id:'이은채', name:'이은채', role:'멘토', emoji:'🌿', order:17, team:'5팀' },
   '이연재':{ id:'이연재', name:'이연재', role:'멘토', emoji:'🌿', order:18, team:'5팀' },
   '이기건':{ id:'이기건', name:'이기건', role:'팀장', emoji:'🎯', order:19, team:'6팀' },
-  '박무경':{ id:'박무경', name:'박무경', role:'멘토', emoji:'🌿', order:20, team:'원장팀' },
+  '한대희':{ id:'한대희', name:'한대희', role:'멘토', emoji:'🌿', order:20, team:'6팀' },
+  '박무경':{ id:'박무경', name:'박무경', role:'멘토', emoji:'🌿', order:21, team:'원장팀' },
 };
 
 async function seedMentors(){
-  // 이미 데이터가 있으면 스킵 (최초 1회만 세팅)
-  const snap = await fbGet('mentorList');
-  if(snap.val()) return;
-  for(const [id,mentor] of Object.entries(INITIAL_MENTORS)){
-    await fbSet(`mentorList/${id}`, mentor);
-  }
+  // 기존 멘토 유지하면서 새 멘토만 추가
+  try {
+    const snap = await fbGet('mentorList');
+    const existing = snap.val() || {};
+    for(const [id,mentor] of Object.entries(INITIAL_MENTORS)){
+      if(!existing[id]){
+        await fbSet(`mentorList/${id}`, mentor);
+      }
+    }
+  } catch(e) {}
 }
 
 // ═══════════════════════════════════════════
