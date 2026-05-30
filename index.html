@@ -95,6 +95,20 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .login-sep{height:1px;background:var(--border);margin:14px 0;}
 .err-msg{font-size:12px;color:var(--red);margin-top:-8px;margin-bottom:8px;display:none;}
 </style>
+<script>
+window.onerror = function(msg) {
+  if (!msg) return true;
+  const m = String(msg).toLowerCase();
+  if (m.includes('script error') || m.includes('unsafe') || m.includes('cross-origin')) return true;
+  return false;
+};
+window.addEventListener('unhandledrejection', function(e) {
+  const msg = (e.reason && e.reason.message) ? e.reason.message : String(e.reason || '');
+  if (!msg || msg.toLowerCase().includes('script error') || msg.toLowerCase().includes('load fail')) {
+    e.preventDefault();
+  }
+});
+</script>
 </head>
 <body>
 

@@ -642,15 +642,21 @@ table{overflow:visible!important;}
 </script>
 <script>
 // 크로스오리진 Script error 억제
+// 크로스오리진/로컬파일 Script error 완전 억제
 window.onerror = function(msg, src, line, col, err) {
-  // Script error, Unsafe URL 등 로컬/크로스오리진 에러 억제
   if (!msg) return true;
-  if (msg === 'Script error.' || msg === 'Uncaught Error: Script error.') return true;
-  if (String(msg).toLowerCase().includes('unsafe') || String(msg).toLowerCase().includes('script error')) return true;
+  const m = String(msg).toLowerCase();
+  if (m.includes('script error') || m.includes('unsafe') || m.includes('cross-origin')) return true;
   return false;
 };
-
-// SecurityError (Unsafe URL) 억제
+// Promise 에러 억제 (unhandledrejection)
+window.addEventListener('unhandledrejection', function(e) {
+  const msg = (e.reason && e.reason.message) ? e.reason.message : String(e.reason || '');
+  if (!msg || msg.toLowerCase().includes('script error') || msg.toLowerCase().includes('load fail')) {
+    e.preventDefault();
+  }
+});
+// SecurityError 억제
 window.addEventListener('securitypolicyviolation', function(e){ e.preventDefault(); }, true);
 </script>
 <script>
