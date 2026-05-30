@@ -3206,8 +3206,20 @@ window.openTimetableSearch = function(row) {
   _ttFilteredMonth = 'all';
   document.getElementById('ttSearchInp').value = '';
   document.getElementById('ttSearchBg').style.display = 'flex';
-  buildMonthTabs();
-  filterTimetable();
+
+  // _ttCourses가 비어있으면 Firebase에서 즉시 재로드
+  if (_ttCourses.length === 0 && window._fbDb && window._fbRef && window._fbOnValue) {
+    const ttRef = window._fbRef(window._fbDb, 'timetable');
+    window._fbOnValue(ttRef, snap => {
+      const data = snap.val() || {};
+      _ttCourses = Object.values(data);
+      buildMonthTabs();
+      filterTimetable();
+    }, { onlyOnce: true });
+  } else {
+    buildMonthTabs();
+    filterTimetable();
+  }
   setTimeout(() => document.getElementById('ttSearchInp').focus(), 100);
 };
 
