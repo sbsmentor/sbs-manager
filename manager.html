@@ -3190,6 +3190,26 @@ function loadTimetable() {
     window._fbOnValue(ttRef, snap => {
       const data = snap.val() || {};
       _ttCourses = Object.values(data);
+      // Firebase timetable → localStorage geo_ttClasses 동기화
+      // manager.html의 수업배정(배정표)이 DB.get('ttClasses')로 읽기 때문
+      if (_ttCourses.length > 0) {
+        const ttClassesFormatted = _ttCourses.map(c => ({
+          id: c.id || (c.name + '|' + (c.start||'') + '|' + (c.time||'')),
+          type: c.type || '평일',
+          courseName: c.name || '',
+          instructor: c.teacher || '',
+          startDate: c.start || '',
+          endDate: c.end || '',
+          startTime: c.time || '',
+          endTime: '',
+          days: c.days || '',
+          room: c.room || '',
+          roomGroup: '',
+          enrollment: 0,
+          attendance: 0,
+        }));
+        DB.set('ttClasses', ttClassesFormatted);
+      }
     });
   };
   tryLoad();
@@ -3213,6 +3233,24 @@ window.openTimetableSearch = function(row) {
     window._fbOnValue(ttRef, snap => {
       const data = snap.val() || {};
       _ttCourses = Object.values(data);
+      if (_ttCourses.length > 0) {
+        const ttClassesFormatted = _ttCourses.map(c => ({
+          id: c.id || (c.name + '|' + (c.start||'') + '|' + (c.time||'')),
+          type: c.type || '평일',
+          courseName: c.name || '',
+          instructor: c.teacher || '',
+          startDate: c.start || '',
+          endDate: c.end || '',
+          startTime: c.time || '',
+          endTime: '',
+          days: c.days || '',
+          room: c.room || '',
+          roomGroup: '',
+          enrollment: 0,
+          attendance: 0,
+        }));
+        DB.set('ttClasses', ttClassesFormatted);
+      }
       buildMonthTabs();
       filterTimetable();
     }, { onlyOnce: true });
