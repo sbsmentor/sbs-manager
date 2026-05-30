@@ -372,11 +372,18 @@ function renderMentors(){
   container.innerHTML = html;
 
   // 수강생 수 로드
+  // Firebase는 배열을 {0:item, 1:item} 형태의 객체로 저장하므로 Object.values()로 처리
+  function safeLen(arr){
+    if(!arr) return 0;
+    if(Array.isArray(arr)) return arr.filter(v=>v!=null).length;
+    if(typeof arr==='object') return Object.values(arr).filter(v=>v!=null).length;
+    return 0;
+  }
   mentors.forEach(m=>{
     fbOnValue(`mentors/${m.id}/data`, snap=>{
       const d=snap.val();
       let cnt=0;
-      if(d) cnt+=(d.WEEKDAY||[]).length+(d.WEEKEND||[]).length+(d.COD_DATA||[]).length+(d.NATL_DATA||[]).length;
+      if(d) cnt+=safeLen(d.WEEKDAY)+safeLen(d.WEEKEND)+safeLen(d.COD_DATA)+safeLen(d.NATL_DATA);
       const el=document.getElementById(`cnt-${m.id}`);
       if(el) el.textContent=cnt;
     });
