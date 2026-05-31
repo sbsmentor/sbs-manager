@@ -491,7 +491,7 @@ window.uploadTimetable = async function(event, scheduleType) {
       if (!table) { showToast('❌ 시간표 테이블 없음'); showLoading(false); return; }
 
       const rows = table.querySelectorAll('tr');
-      const subRooms = Array.from(rows[1]?.querySelectorAll('td,th')||[]).map(td=>td.textContent.trim());
+      const subRooms = Array.from(rows[0]?.querySelectorAll('td,th')||[]).map(td=>td.textContent.trim());
 
       const DAY_PATS = [
         '월수금/월수','월수/월수금','화목금/화목','화목/화목금',
@@ -576,9 +576,13 @@ window.uploadTimetable = async function(event, scheduleType) {
           const isDup = existing.some(ex => ex.name === courseName && ex.teacher === teacher && ex.start === startDate && ex.time === timeVal);
           if (isDup) { skipped++; continue; }
 
-          const newRef = push(ref('timetable'));
-          await set(newRef, { name: courseName, teacher, start: startDate, end: endDate, time: timeVal, room, days, type: scheduleType });
-          added++;
+          try {
+            const newRef = push(ref('timetable'));
+            await set(newRef, { name: courseName, teacher, start: startDate, end: endDate, time: timeVal, room, days, type: scheduleType });
+            added++;
+          } catch(pushErr) {
+            console.error('Firebase push 실패:', pushErr);
+          }
         }
       }
 
