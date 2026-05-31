@@ -598,8 +598,11 @@ function renderMentors(){
 
 // ── 멘토 로드 ──
 
-// ── 드래그앤드롭 팀 변경 ──
+// ── 드래그앤드롭 (팀 변경 + 순서 변경) ──
 let _dragMentorId = null;
+let _pendingChanges = {}; // {mentorId: {team, order}} 저장 전 임시 변경사항
+
+function hasPendingChanges() { return Object.keys(_pendingChanges).length > 0; }
 
 function dragStart(e) {
   _dragMentorId = e.currentTarget.dataset.mentorId;
@@ -607,65 +610,108 @@ function dragStart(e) {
   e.dataTransfer.effectAllowed = 'move';
 }
 
-async function dropOnTeam(e, newTeam) {
+function dropOnCard(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const targetId = e.currentTarget.dataset.mentorId;
+  if (!_dragMentorId || !targetId || _dragMentorId === targetId) return;
+
+  // mentors 배열에서 순서/팀 교환
+  const fromIdx = mentors.findIndex(m => m.id === _dragMentorId);
+  const toIdx   = mentors.findIndex(m => m.id === targetId);
+  if (fromIdx < 0 || toIdx < 0) return;
+
+  const fromM = mentors[fromIdx];
+  const toM   = mentors[toIdx];
+
+  // 팀도 이동 대상 팀으로 변경
+  const newTeam = toM.team || '기타';
+  const newOrder = toM.order ?? toIdx;
+  const oldOrder = fromM.order ?? fromIdx;
+
+  // 같은 팀이면 순서만, 다른 팀이면 팀+순서 변경
+  mentors.splice(fromIdx, 1);
+  const insertIdx = mentors.findIndex(m => m.id === targetId);
+  mentors.splice(insertIdx >= 0 ? insertIdx : toIdx, 0, fromM);
+
+  // pending에 기록
+  _pendingChanges[_dragMentorId] = {
+    team: newTeam,
+    order: newOrder,
+  };
+  // 재정렬 반영
+  mentors.forEach((m, i) => {
+    if (!_pendingChanges[m.id]) _pendingChanges[m.id] = { team: m.team, order: m.order ?? i };
+    _pendingChanges[m.id].order = i;
+  });
+
+  showPendingBar();
+  renderMentors();
+  _dragMentorId = null;
+}
+
+function dropOnTeam(e, newTeam) {
   e.preventDefault();
   e.currentTarget.style.outline = '';
   if (!_dragMentorId) return;
   const m = mentors.find(x => x.id === _dragMentorId);
-  if (!m) return;
-  if (m.team === newTeam) { _dragMentorId = null; return; }
-  await fbSet(`mentorList/${_dragMentorId}/team`, newTeam);
-  showToast(`✅ ${m.name} → ${newTeam} 이동`);
+  if (!m || m.team === newTeam) { _dragMentorId = null; return; }
+  m.team = newTeam;
+  if (!_pendingChanges[_dragMentorId]) _pendingChanges[_dragMentorId] = {};
+  _pendingChanges[_dragMentorId].team = newTeam;
   _dragMentorId = null;
+  showPendingBar();
+  renderMentors();
 }
 
-async function dropOnCard(e) {
-  e.preventDefault();
-  const targetTeam = e.currentTarget.dataset.mentorTeam;
-  if (targetTeam) await dropOnTeam(e, targetTeam);
+function showPendingBar() {
+  let bar = document.getElementById('pendingBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'pendingBar';
+    bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#1e293b;color:#fff;display:flex;align-items:center;justify-content:center;gap:12px;padding:14px 20px;font-size:14px;font-family:"Noto Sans KR",sans-serif;';
+    bar.innerHTML = '<span>⚠️ 변경사항이 있습니다</span>'
+      + '<button onclick="savePendingChanges()" style="background:#22c55e;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">💾 저장</button>'
+      + '<button onclick="cancelPendingChanges()" style="background:#64748b;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">✕ 취소</button>';
+    document.body.appendChild(bar);
+  }
+  bar.style.display = 'flex';
+}
+
+function hidePendingBar() {
+  const bar = document.getElementById('pendingBar');
+  if (bar) bar.style.display = 'none';
+}
+
+async function savePendingChanges() {
+  if (!hasPendingChanges()) return;
+  try {
+    for (const [id, changes] of Object.entries(_pendingChanges)) {
+      if (changes.team !== undefined) await fbSet(`mentorList/${id}/team`, changes.team);
+      if (changes.order !== undefined) await fbSet(`mentorList/${id}/order`, changes.order);
+    }
+    _pendingChanges = {};
+    hidePendingBar();
+    showToast('✅ 저장 완료');
+  } catch(e) {
+    showToast('❌ 저장 실패: ' + e.message);
+  }
+}
+
+function cancelPendingChanges() {
+  _pendingChanges = {};
+  hidePendingBar();
+  // Firebase에서 다시 로드
+  loadMentors();
+  showToast('취소되었습니다');
 }
 
 // 드래그 끝
-document.addEventListener('dragend', function(e) {
+document.addEventListener('dragend', function() {
   document.querySelectorAll('.mentor-card-wrap').forEach(el => el.style.opacity = '');
   document.querySelectorAll('.team-section').forEach(el => el.style.outline = '');
   _dragMentorId = null;
 });
-
-// 모바일 터치 드래그
-let _touchDragId = null;
-let _touchClone = null;
-
-function _touchStart(e, mentorId) {
-  if (!isAdmin) return;
-  _touchDragId = mentorId;
-  const card = e.currentTarget;
-  _touchClone = card.cloneNode(true);
-  _touchClone.style.cssText = 'position:fixed;opacity:0.7;pointer-events:none;z-index:9999;width:'+card.offsetWidth+'px;transform:scale(1.05);';
-  document.body.appendChild(_touchClone);
-}
-
-function _touchMove(e) {
-  if (!_touchClone) return;
-  e.preventDefault();
-  const t = e.touches[0];
-  _touchClone.style.left = (t.clientX - 60) + 'px';
-  _touchClone.style.top = (t.clientY - 60) + 'px';
-}
-
-async function _touchEnd(e) {
-  if (!_touchClone || !_touchDragId) return;
-  const t = e.changedTouches[0];
-  if (_touchClone.parentNode) _touchClone.parentNode.removeChild(_touchClone);
-  _touchClone = null;
-  // 드롭 위치의 팀 섹션 찾기
-  const el = document.elementFromPoint(t.clientX, t.clientY);
-  const section = el ? el.closest('.team-section') : null;
-  if (section && section.dataset.team) {
-    await dropOnTeam({ preventDefault:()=>{}, currentTarget:section }, section.dataset.team);
-  }
-  _touchDragId = null;
-}
 // ─────────────────────────────
 function loadMentors(){
   fbOnValue('mentorList', snap=>{
