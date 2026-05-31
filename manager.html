@@ -3209,43 +3209,42 @@ window.openTimetableSearch = function(row) {
   // Firebase REST API로 직접 읽기 (SDK 불필요)
   document.getElementById('ttResults').innerHTML = '<div style="text-align:center;padding:32px;color:var(--text3);">불러오는 중...</div>';
   
+  // REST와 SDK 동시 시도 - 먼저 오는 것 사용
+  let _ttDone = false;
+  const applyTTData = (data) => {
+    if (_ttDone) return;
+    _ttDone = true;
+    if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+      _ttCourses = Object.values(data).filter(c => c && c.name);
+      DB.set('ttClasses', _ttCourses.map(c => ({
+        id: c.name+'|'+(c.start||'')+'|'+(c.time||''),
+        type: c.type||'평일', courseName: c.name||'', instructor: c.teacher||'',
+        startDate: c.start||'', endDate: c.end||'', startTime: c.time||'',
+        endTime: '', days: c.days||'', room: c.room||'', roomGroup: '',
+        enrollment: 0, attendance: 0,
+      })));
+    }
+    filterTimetable();
+  };
+
+  // 1) REST API 시도
   fetch('https://sbs-academy-game-default-rtdb.firebaseio.com/timetable.json')
-    .then(r => r.json())
-    .then(data => {
-      if (data && typeof data === 'object') {
-        _ttCourses = Object.values(data).filter(c => c && c.name);
-        DB.set('ttClasses', _ttCourses.map(c => ({
-          id: c.name+'|'+(c.start||'')+'|'+(c.time||''),
-          type: c.type||'평일', courseName: c.name||'', instructor: c.teacher||'',
-          startDate: c.start||'', endDate: c.end||'', startTime: c.time||'',
-          endTime: '', days: c.days||'', room: c.room||'', roomGroup: '',
-          enrollment: 0, attendance: 0,
-        })));
-      }
-      filterTimetable();
-    })
-    .catch(() => {
-      // REST 실패 시 SDK로 폴백
-      if (window._fbDb && window._fbRef && window._fbOnValue) {
-        const ttRef = window._fbRef(window._fbDb, 'timetable');
-        window._fbOnValue(ttRef, snap => {
-          const data = snap.val();
-          if (data) {
-            _ttCourses = Object.values(data).filter(c => c && c.name);
-            DB.set('ttClasses', _ttCourses.map(c => ({
-              id: c.name+'|'+(c.start||'')+'|'+(c.time||''),
-              type: c.type||'평일', courseName: c.name||'', instructor: c.teacher||'',
-              startDate: c.start||'', endDate: c.end||'', startTime: c.time||'',
-              endTime: '', days: c.days||'', room: c.room||'', roomGroup: '',
-              enrollment: 0, attendance: 0,
-            })));
-          }
-          filterTimetable();
-        }, { onlyOnce: true });
-      } else {
-        filterTimetable();
-      }
-    });
+    .then(r => r.ok ? r.json() : null)
+    .then(data => applyTTData(data))
+    .catch(() => {});
+
+  // 2) SDK 동시 시도 (폴백)
+  if (window._fbDb && window._fbRef && window._fbOnValue) {
+    const ttRef = window._fbRef(window._fbDb, 'timetable');
+    window._fbOnValue(ttRef, snap => {
+      applyTTData(snap.val());
+    }, { onlyOnce: true });
+  }
+
+  // 3) 5초 후 타임아웃
+  setTimeout(() => {
+    if (!_ttDone) { _ttDone = true; filterTimetable(); }
+  }, 5000);
 };
 
 window.closeTimetableSearch = function() {
@@ -3781,7 +3780,7 @@ function renderNotiCalGrid(yearMonth, classDates, startDate, endDate){
     const finalMark=isCustomOff
     ? `<div style="font-size:9px;color:#ef4444;line-height:1;text-decoration:line-through;opacity:0.5;">${markHtml?'●':''}</div>`
     : (isCustomOn?`<div style="font-size:9px;font-weight:700;color:#16a34a;line-height:1;">●</div>`:markHtml);
-    cells+=`<div onclick="notiCalClick('${ds}')" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:3px 1px;background:${finalBg};${borderR}min-height:36px;">
+    cells+=`<div onclick="notiCalClick('${ds}')" oncontextmenu="openHolidayCtx(event,'${ds}')" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:3px 1px;background:${finalBg};${borderR}min-height:36px;">
       <div style="font-size:11px;font-weight:${isClass||isFirst||isLast?'700':'400'};color:${numColor};line-height:1.2;">${day}</div>
       ${finalMark}
     </div>`;
@@ -3863,6 +3862,125 @@ function renderNotiCalendar(yearMonth, classDates, startDate, endDate){
 // 개강안내 달력 날짜 클릭 토글
 window._notiCustomDates = new Set();  // 수동 추가
 window._notiRemovedDates = new Set(); // 수동 제거
+
+
+// ════════ 커스텀 공휴일 ════════
+// 사용자 지정 공휴일 (localStorage에 저장)
+let _customHolidays = {};
+try { _customHolidays = JSON.parse(localStorage.getItem('sbs_custom_holidays')||'{}'); } catch(e) {}
+
+let _holidayCtxDs = null; // 우클릭한 날짜
+
+function openHolidayCtx(e, ds) {
+  e.preventDefault();
+  e.stopPropagation();
+  _holidayCtxDs = ds;
+  const menu = document.getElementById('holidayCtxMenu');
+  const input = document.getElementById('holidayCtxInput');
+  const dateEl = document.getElementById('holidayCtxDate');
+
+  // 날짜 표시
+  const [y,m,d] = ds.split('-');
+  const dow = ['일','월','화','수','목','금','토'][new Date(+y,+m-1,+d).getDay()];
+  dateEl.textContent = y+'년 '+parseInt(m)+'월 '+parseInt(d)+'일 ('+dow+')';
+
+  // 기존 커스텀 공휴일 있으면 표시
+  const existing = _customHolidays[ds] || KR_HOLIDAYS_NOTI[ds] || '';
+  input.value = KR_HOLIDAYS_NOTI[ds] ? '' : (existing || '');
+  input.placeholder = KR_HOLIDAYS_NOTI[ds] ? '기본 공휴일: '+KR_HOLIDAYS_NOTI[ds] : '공휴일 이름 입력';
+
+  // 메뉴 위치 계산 (화면 밖으로 나가지 않게)
+  const x = Math.min(e.clientX, window.innerWidth - 240);
+  const y2 = Math.min(e.clientY, window.innerHeight - 180);
+  menu.style.left = x + 'px';
+  menu.style.top = y2 + 'px';
+  menu.style.display = 'block';
+
+  setTimeout(() => input.focus(), 100);
+}
+
+function closeHolidayCtx() {
+  document.getElementById('holidayCtxMenu').style.display = 'none';
+  _holidayCtxDs = null;
+}
+
+function setCustomHoliday() {
+  if (!_holidayCtxDs) return;
+  const name = document.getElementById('holidayCtxInput').value.trim();
+  if (!name) { document.getElementById('holidayCtxInput').focus(); return; }
+
+  _customHolidays[_holidayCtxDs] = name;
+  localStorage.setItem('sbs_custom_holidays', JSON.stringify(_customHolidays));
+
+  // KR_HOLIDAYS_NOTI에도 반영 (현재 세션)
+  KR_HOLIDAYS_NOTI[_holidayCtxDs] = name;
+
+  closeHolidayCtx();
+  // 달력 다시 렌더
+  _refreshNotiCard();
+  showNotiToast('🔴 ' + _holidayCtxDs + ' 공휴일 지정: ' + name);
+}
+
+function removeCustomHoliday() {
+  if (!_holidayCtxDs) return;
+  const ds = _holidayCtxDs;
+
+  delete _customHolidays[ds];
+  localStorage.setItem('sbs_custom_holidays', JSON.stringify(_customHolidays));
+
+  // 기본 공휴일이 아닌 경우 KR_HOLIDAYS_NOTI에서도 제거
+  if (!Object.keys({
+    '2026-05-24':'부처님오신날','2026-05-25':'대체공휴일','2026-06-06':'현충일'
+  }).includes(ds)) {
+    delete KR_HOLIDAYS_NOTI[ds];
+  }
+
+  closeHolidayCtx();
+  _refreshNotiCard();
+  showNotiToast('✅ ' + ds + ' 공휴일 해제');
+}
+
+function _refreshNotiCard() {
+  if (!_notiCtx) return;
+  const {arrName, si, mk} = _notiCtx;
+  openNotiCardFromBoard(arrName, si, mk);
+}
+
+function showNotiToast(msg) {
+  if (typeof showToast === 'function') showToast(msg);
+}
+
+// 페이지 로드 시 커스텀 공휴일 KR_HOLIDAYS_NOTI에 병합
+Object.assign(KR_HOLIDAYS_NOTI, _customHolidays);
+
+// 클릭 시 컨텍스트 메뉴 닫기
+document.addEventListener('click', function(e) {
+  const menu = document.getElementById('holidayCtxMenu');
+  if (menu && !menu.contains(e.target)) closeHolidayCtx();
+});
+// ════════════════════════════════
+
+// 모바일 롱프레스로 컨텍스트 메뉴 열기
+(function(){
+  let _lpTimer = null;
+  document.addEventListener('touchstart', function(e) {
+    const cell = e.target.closest('[oncontextmenu]');
+    if (!cell) return;
+    _lpTimer = setTimeout(() => {
+      const om = cell.getAttribute('oncontextmenu');
+      if (om) {
+        const ds = om.match(/'(\d{4}-\d{2}-\d{2})'/)?.[1];
+        if (ds) openHolidayCtx(e.touches[0], ds);
+      }
+    }, 600);
+  }, {passive:true});
+  document.addEventListener('touchend', function() {
+    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+  }, {passive:true});
+  document.addEventListener('touchmove', function() {
+    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+  }, {passive:true});
+})();
 
 function notiCalClick(ds) {
   if (!_notiCtx) return;
@@ -4725,6 +4843,19 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
       <button onclick="saveTTEditModal()" style="padding:9px 20px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">✅ 저장</button>
     </div>
   </div>
+</div>
+
+<!-- 공휴일 지정 컨텍스트 메뉴 -->
+<div id="holidayCtxMenu" style="display:none;position:fixed;z-index:9999;background:#fff;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,0.18);padding:14px;min-width:220px;border:1px solid #e2e8f0;">
+  <div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:8px;" id="holidayCtxDate"></div>
+  <input id="holidayCtxInput" placeholder="공휴일 이름 입력 (예: 지방선거)" maxlength="20"
+    style="width:100%;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px;font-family:'Noto Sans KR',sans-serif;box-sizing:border-box;margin-bottom:8px;outline:none;"
+    onkeydown="if(event.key==='Enter') setCustomHoliday()">
+  <div style="display:flex;gap:6px;">
+    <button onclick="setCustomHoliday()" style="flex:1;padding:7px;border:none;border-radius:7px;background:#ef4444;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔴 공휴일 지정</button>
+    <button onclick="removeCustomHoliday()" style="flex:1;padding:7px;border:1px solid #e2e8f0;border-radius:7px;background:#fff;color:#64748b;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">❌ 공휴일 해제</button>
+  </div>
+  <button onclick="closeHolidayCtx()" style="width:100%;margin-top:6px;padding:5px;border:none;background:none;color:#94a3b8;font-size:11px;cursor:pointer;">닫기</button>
 </div>
 </body>
 </html>

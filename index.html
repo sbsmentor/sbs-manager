@@ -530,7 +530,7 @@ function openLoginModal(title, sub){
   document.getElementById('loginPw').value='';
   document.getElementById('loginErr').style.display='none';
   document.getElementById('loginModalBg').classList.add('open');
-  setTimeout(()=>{ document.getElementById('loginPw').focus(); }, 150);
+  setTimeout(()=>{ const n=document.getElementById('loginName'); if(n&&!n.readOnly&&!n.value) n.focus(); else document.getElementById('loginPw').focus(); }, 150);
 }
 function closeLoginModal(){
   document.getElementById('loginModalBg').classList.remove('open');
@@ -715,13 +715,52 @@ window.deleteMentor = async function(id){
 // 멘토 목록 로드 (실시간)
 // ═══════════════════════════════════════════
 
+
+// ── 직책 수정 ──
+let _roleEditId = null;
+function openRoleEdit(mentorId) {
+  _roleEditId = mentorId;
+  const m = mentors.find(x=>x.id===mentorId);
+  if (!m) return;
+  const sel = document.getElementById('roleEditSelect');
+  const opts = ['멘토','선임','책임','수석','팀장','부장','원장'];
+  if (opts.includes(m.role)) {
+    sel.value = m.role;
+    document.getElementById('roleEditCustom').value = '';
+  } else {
+    sel.value = '멘토';
+    document.getElementById('roleEditCustom').value = m.role || '';
+  }
+  document.getElementById('roleEditModalBg').classList.add('open');
+  setTimeout(()=>document.getElementById('roleEditSelect').focus(), 100);
+}
+function closeRoleEdit() {
+  document.getElementById('roleEditModalBg').classList.remove('open');
+  _roleEditId = null;
+}
+async function saveRoleEdit() {
+  if (!_roleEditId) return;
+  const custom = document.getElementById('roleEditCustom').value.trim();
+  const sel = document.getElementById('roleEditSelect').value;
+  const newRole = custom || sel;
+  const emojiMap={'원장':'👑','부장':'🏆','수석':'💎','책임':'⭐','선임':'🌟','팀장':'🎯','멘토':'🌿'};
+  await fbSet(`mentorList/${_roleEditId}/role`, newRole);
+  if(emojiMap[newRole]) await fbSet(`mentorList/${_roleEditId}/emoji`, emojiMap[newRole]);
+  const m = mentors.find(x=>x.id===_roleEditId);
+  if(m){ m.role=newRole; if(emojiMap[newRole]) m.emoji=emojiMap[newRole]; }
+  closeRoleEdit();
+  renderMentors();
+  showToast('✅ ' + _roleEditId + ' 직책 변경: ' + newRole);
+}
+// ──────────────
+
 function loadMentors(){
   fbOnValue('mentorList', snap=>{
     const data=snap.val();
-    const ROLE_ORDER={'원장':0,'부장':1,'수석':2,'책임':3,'선임':4,'팀장':5,'멘토':6};
+    const ROLE_ORDER={'멘토':0,'선임':1,'책임':2,'수석':3,'팀장':4,'부장':5,'원장':6};
     mentors=data ? Object.values(data).sort((a,b)=>{
-      // 1차: 직책 우선순위, 2차: order
-      const ro=(ROLE_ORDER[a.role]??7)-(ROLE_ORDER[b.role]??7);
+      // 1차: 직책 우선순위 내림차순 (원장이 앞), 2차: order
+      const ro=(ROLE_ORDER[b.role]??-1)-(ROLE_ORDER[a.role]??-1);
       if(ro!==0) return ro;
       return (a.order??99)-(b.order??99);
     }) : [];
