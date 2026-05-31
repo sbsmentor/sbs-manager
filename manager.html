@@ -3064,9 +3064,6 @@ saveToLocal = function() {
 };
 
 
-window.addEventListener('beforeunload', function() {
-  localStorage.removeItem('sbs_logged_in');
-});
 
 // DOM 완전 로드 후 Firebase 초기화
 if (document.readyState === 'loading') {

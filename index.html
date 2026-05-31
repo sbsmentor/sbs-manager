@@ -404,7 +404,7 @@ let _ttX=0, _ttY=0;
 
 // ── 직급 순서 (높을수록 앞에 배치) ──
 const ROLE_ORDER = {'멘토':0,'선임':1,'책임':2,'수석':3,'팀장':4,'부장':5,'원장':6};
-const SUPER_ADMINS = ['한대희','백정민'];
+const SUPER_ADMINS = ['한대희','이기건']; // 관리모드 권한
 function isSuperAdmin(id){ return SUPER_ADMINS.includes(id); }
 
 // ── 이모지 자동 세팅 ──
@@ -518,8 +518,7 @@ function openChangePwModal(){ document.getElementById('changePwModalBg').classLi
 function toggleAdmin(){
   const id=getLoggedInId();
   if(!id){ openLoginModal('관리자 로그인'); _loginForAdmin=true; return; }
-  const m=mentors.find(x=>x.id===id);
-  if(!m||!['원장','부장'].includes(m.role)){ showToast('⚠ 관리자 권한이 필요합니다'); return; }
+  if(!isSuperAdmin(id)){ showToast('⚠ 이기건, 한대희만 관리모드를 사용할 수 있습니다'); return; }
   isAdmin=!isAdmin;
   document.getElementById('adminToggle').textContent=isAdmin?'⚙ 관리 ON':'⚙ 관리';
   renderMentors();
@@ -564,7 +563,8 @@ function renderMentors(){
   const renderTeam=(team)=>{
     const ms=groups[team]||[]; if(!ms.length) return;
     const tc=teamColors[team]||'#333', tb=teamBgs[team]||'rgba(0,0,0,.04)';
-    html+=`<div class="team-section" style="border-left:3px solid ${tc};padding:10px 14px 14px;margin-bottom:10px;border-radius:0 8px 8px 0;">`;
+    const isDropTarget = isSuperAdmin(loggedId) && isAdmin;
+    html+=`<div class="team-section" data-team="${team}" style="border-left:3px solid ${tc};padding:10px 14px 14px;margin-bottom:10px;border-radius:0 8px 8px 0;" ${isDropTarget?`ondragover="event.preventDefault();this.style.outline='2px dashed '+\'${tc}\'" ondragleave="this.style.outline=''" ondrop="dropOnTeam(event,'${team}')"`:''}>`;
     html+=`<div class="team-label" style="font-size:12px;font-weight:700;color:${tc};margin-bottom:10px;">● ${team} <span style="font-weight:400;opacity:.7">${ms.length}명</span></div>`;
     html+=`<div class="mentor-grid">`;
     ms.forEach(m=>{
@@ -573,16 +573,18 @@ function renderMentors(){
       const rm=ROLE_MAP[m.role]||{color:'#64748b',bg:'#f1f5f9',icon:'👤'};
       const {color:roleColor,bg:roleBg,icon:roleIcon}=rm;
       const cardBorder=isMe?`border:2px solid ${tc};`:'';
-      html+=`<div class="mentor-card-wrap">
-        <div class="mentor-card" onclick="handleCardClick('${m.id}')" ontouchstart="_ttX=event.touches[0].clientX;_ttY=event.touches[0].clientY" ontouchend="if(Math.abs(event.changedTouches[0].clientX-_ttX)<10&&Math.abs(event.changedTouches[0].clientY-_ttY)<10){event.preventDefault();handleCardClick('${m.id}')}" style="${cardBorder}${isMe?'background:'+tb+';':''}">
+      const isDraggable = isSuperAdmin(loggedId) && isAdmin;
+      html+=`<div class="mentor-card-wrap" ${isDraggable?`draggable="true" data-mentor-id="${m.id}" data-mentor-team="${m.team||'기타'}" ondragstart="dragStart(event)" ondragover="event.preventDefault()" ondrop="dropOnCard(event)"`:''}>
+        <div class="mentor-card" onclick="handleCardClick('${m.id}')" ontouchstart="_ttX=event.touches[0].clientX;_ttY=event.touches[0].clientY" ontouchend="if(Math.abs(event.changedTouches[0].clientX-_ttX)<10&&Math.abs(event.changedTouches[0].clientY-_ttY)<10){event.preventDefault();handleCardClick('${m.id}')}" style="${cardBorder}${isMe?'background:'+tb+';':''}${isDraggable?'cursor:grab;':''}">
+          ${isDraggable?'<div style="font-size:10px;color:#94a3b8;text-align:center;margin-bottom:2px;">⠿ 드래그</div>':''}
           <div class="mentor-avatar" style="font-size:34px;margin:0 auto 10px auto;">${m.emoji||'🌿'}</div>
           <div class="mentor-name" style="font-size:15px;font-weight:800;margin-top:8px;">${m.name} ${isMe?`<span style="font-size:11px;color:${tc};">● 나</span>`:''}</div>
           <div style="margin-top:3px;">
             <span style="display:inline-flex;align-items:center;gap:3px;color:${roleColor};font-size:12px;font-weight:800;background:${roleBg};padding:4px 10px;border-radius:20px;">${roleIcon} ${m.role||'멘토'}</span>
-            ${isSuperAdmin(loggedId)||loggedId==='이기건'?`<button onclick="event.stopPropagation();openRoleEdit('${m.id}')" ontouchend="event.stopPropagation();event.preventDefault();openRoleEdit('${m.id}')" style="margin-left:4px;padding:3px 7px;font-size:10px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc;color:#64748b;cursor:pointer;">✏️</button>`:''}
+            ${isSuperAdmin(loggedId)?`<button onclick="event.stopPropagation();openRoleEdit('${m.id}')" ontouchend="event.stopPropagation();event.preventDefault();openRoleEdit('${m.id}')" style="margin-left:4px;padding:3px 7px;font-size:10px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc;color:#64748b;cursor:pointer;">✏️</button>`:''}
           </div>
         </div>
-        ${isAdmin?`<button class="mentor-del-btn" onclick="deleteMentor('${m.id}')">✕</button>`:''}
+        ${isSuperAdmin(loggedId)&&isAdmin?`<button class="mentor-del-btn" onclick="deleteMentor('${m.id}')">✕</button>`:''}
       </div>`;
     });
     html+=`</div>`;
@@ -595,6 +597,76 @@ function renderMentors(){
 }
 
 // ── 멘토 로드 ──
+
+// ── 드래그앤드롭 팀 변경 ──
+let _dragMentorId = null;
+
+function dragStart(e) {
+  _dragMentorId = e.currentTarget.dataset.mentorId;
+  e.currentTarget.style.opacity = '0.5';
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+async function dropOnTeam(e, newTeam) {
+  e.preventDefault();
+  e.currentTarget.style.outline = '';
+  if (!_dragMentorId) return;
+  const m = mentors.find(x => x.id === _dragMentorId);
+  if (!m) return;
+  if (m.team === newTeam) { _dragMentorId = null; return; }
+  await fbSet(`mentorList/${_dragMentorId}/team`, newTeam);
+  showToast(`✅ ${m.name} → ${newTeam} 이동`);
+  _dragMentorId = null;
+}
+
+async function dropOnCard(e) {
+  e.preventDefault();
+  const targetTeam = e.currentTarget.dataset.mentorTeam;
+  if (targetTeam) await dropOnTeam(e, targetTeam);
+}
+
+// 드래그 끝
+document.addEventListener('dragend', function(e) {
+  document.querySelectorAll('.mentor-card-wrap').forEach(el => el.style.opacity = '');
+  document.querySelectorAll('.team-section').forEach(el => el.style.outline = '');
+  _dragMentorId = null;
+});
+
+// 모바일 터치 드래그
+let _touchDragId = null;
+let _touchClone = null;
+
+function _touchStart(e, mentorId) {
+  if (!isAdmin) return;
+  _touchDragId = mentorId;
+  const card = e.currentTarget;
+  _touchClone = card.cloneNode(true);
+  _touchClone.style.cssText = 'position:fixed;opacity:0.7;pointer-events:none;z-index:9999;width:'+card.offsetWidth+'px;transform:scale(1.05);';
+  document.body.appendChild(_touchClone);
+}
+
+function _touchMove(e) {
+  if (!_touchClone) return;
+  e.preventDefault();
+  const t = e.touches[0];
+  _touchClone.style.left = (t.clientX - 60) + 'px';
+  _touchClone.style.top = (t.clientY - 60) + 'px';
+}
+
+async function _touchEnd(e) {
+  if (!_touchClone || !_touchDragId) return;
+  const t = e.changedTouches[0];
+  if (_touchClone.parentNode) _touchClone.parentNode.removeChild(_touchClone);
+  _touchClone = null;
+  // 드롭 위치의 팀 섹션 찾기
+  const el = document.elementFromPoint(t.clientX, t.clientY);
+  const section = el ? el.closest('.team-section') : null;
+  if (section && section.dataset.team) {
+    await dropOnTeam({ preventDefault:()=>{}, currentTarget:section }, section.dataset.team);
+  }
+  _touchDragId = null;
+}
+// ─────────────────────────────
 function loadMentors(){
   fbOnValue('mentorList', snap=>{
     const data=snap.val();
@@ -729,10 +801,6 @@ async function init(){
 }
 init();
 
-// 창 닫으면 로그아웃
-window.addEventListener('beforeunload', function() {
-  clearAuthenticated();
-});
 
 // ── 뒤로가기 시 재로드 ──
 window.addEventListener('pageshow', function(e){ if(e.persisted) loadMentors(); });
