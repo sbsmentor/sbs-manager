@@ -61,8 +61,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .mentor-avatar{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.10);}
 .mentor-name{font-size:14px;font-weight:700;margin-bottom:3px;}
 .mentor-role{font-size:11px;font-family:var(--mono);}
-.mentor-count{margin-top:8px;font-size:11px;color:var(--text2);font-family:var(--mono);}
-.mentor-count span{font-weight:700;}
+
+
 .mentor-card-wrap{position:relative;}
 .mentor-del{position:absolute;top:8px;right:8px;width:22px;height:22px;border:none;background:var(--red-dim);color:var(--red);border-radius:5px;cursor:pointer;font-size:11px;display:none;align-items:center;justify-content:center;}
 .mentor-card-wrap:hover .mentor-del{display:flex;}
@@ -458,7 +458,7 @@ function renderMentors(){
             </span>
             ${isSuperAdmin(loggedId)||loggedId==='이기건'?`<button onclick="event.stopPropagation();openRoleEdit('${m.id}')" ontouchend="event.stopPropagation();event.preventDefault();openRoleEdit('${m.id}')" style="margin-left:4px;padding:3px 7px;font-size:10px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc;color:#64748b;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">✏️</button>`:''}
           </div>
-          <div class="mentor-count" style="font-size:13px;margin-top:6px;">수강생 <span id="cnt-${m.id}" style="color:${tc};font-weight:800;font-size:15px;">-</span>명</div>
+
         </div>
         ${isAdmin?`<button class="mentor-del" onclick="event.stopPropagation();deleteMentor('${m.id}')">✕</button>`:''}
       </div>`;
@@ -475,8 +475,6 @@ function renderMentors(){
 
   container.innerHTML = html;
 
-  // 카드 렌더 완료 후 카운팅 업데이트 (별도 함수로 분리)
-  setTimeout(updateAllCounts, 200);
 }
 
 // ═══════════════════════════════════════════
@@ -716,89 +714,6 @@ window.deleteMentor = async function(id){
 // ═══════════════════════════════════════════
 // 멘토 목록 로드 (실시간)
 // ═══════════════════════════════════════════
-
-// ═══════════════════════════════════════════
-// 수강생 카운팅 (전역)
-// ═══════════════════════════════════════════
-function countArr(arr){
-  if(!arr) return 0;
-  const vals = Array.isArray(arr) ? arr : Object.values(arr);
-  return vals.filter(v=>{
-    if(!v || typeof v!=='object') return false;
-    const name = v['이름'] || v['name'] || '';
-    return typeof name==='string' && name.trim().length > 0;
-  }).length;
-}
-
-function getStudentCount(d){
-  if(!d) return 0;
-  return countArr(d.WEEKDAY||d.weekday||null)
-       + countArr(d.WEEKEND||d.weekend||null)
-       + countArr(d.COD_DATA||null)
-       + countArr(d.NATL_DATA||null);
-}
-
-// 모든 멘토 카운트 업데이트 (실시간 리스너)
-const _cntUnsubMap = {}; // 기존 리스너 해제용
-function updateAllCounts(){
-  mentors.forEach(m=>{
-    // 기존 리스너 해제
-    if(_cntUnsubMap[m.id]){
-      try{ _cntUnsubMap[m.id](); }catch(e){}
-    }
-    // 새 리스너 등록
-    const ref = _db.ref(`mentors/${m.id}/data`);
-    const handler = snap=>{
-      const cnt = getStudentCount(snap.val());
-      const el = document.getElementById(`cnt-${m.id}`);
-      if(el) el.textContent = cnt;
-    };
-    ref.on('value', handler);
-    _cntUnsubMap[m.id] = ()=> ref.off('value', handler);
-  });
-}
-
-
-// ── 직책 수정 (이기건 전용) ──
-let _roleEditId = null;
-function openRoleEdit(id) {
-  _roleEditId = id;
-  const m = mentors.find(x=>x.id===id);
-  if (!m) return;
-  const sel = document.getElementById('roleEditSelect');
-  const opts = ['부장','원장','수석','책임','선임','팀장','멘토'];
-  if (opts.includes(m.role)) {
-    sel.value = m.role;
-    document.getElementById('roleEditCustom').value = '';
-  } else {
-    document.getElementById('roleEditCustom').value = m.role || '';
-  }
-  document.getElementById('roleEditModalBg').classList.add('open');
-}
-function closeRoleEdit() {
-  document.getElementById('roleEditModalBg').classList.remove('open');
-  _roleEditId = null;
-}
-async function saveRoleEdit() {
-  if (!_roleEditId) return;
-  const custom = document.getElementById('roleEditCustom').value.trim();
-  const sel = document.getElementById('roleEditSelect').value;
-  const newRole = custom || sel;
-  // Firebase 저장
-  await fbSet(`mentorList/${_roleEditId}/role`, newRole);
-  // 직책에 맞는 이모지도 업데이트
-  const emojiMap={'원장':'👑','부장':'🏆','수석':'💎','책임':'⭐','선임':'🌟','팀장':'🎯','멘토':'🌿'};
-  if(emojiMap[newRole]){
-    await fbSet(`mentorList/${_roleEditId}/emoji`, emojiMap[newRole]);
-  }
-  // mentors 배열 즉시 업데이트 (로컬)
-  const m = mentors.find(x=>x.id===_roleEditId);
-  if(m){ m.role=newRole; if(emojiMap[newRole]) m.emoji=emojiMap[newRole]; }
-  closeRoleEdit();
-  renderMentors(); // 즉시 재렌더
-  showToast('✅ ' + _roleEditId + ' 직책 변경: ' + newRole);
-}
-// ──────────────────────────────
 
 function loadMentors(){
   fbOnValue('mentorList', snap=>{
