@@ -449,7 +449,7 @@ function renderMentors(){
       const cardBorder = isMe ? `border-top:3px solid ${tc};outline:2px solid ${tc}40;` : `border-top:3px solid ${tc};`;
 
       html+=`<div class="mentor-card-wrap">
-        <div class="mentor-card" onclick="handleCardClick('${m.id}')" ontouchend="event.preventDefault();handleCardClick('${m.id}')" style="${cardBorder}${isMe?'background:'+tb+';':''}">
+        <div class="mentor-card" onclick="handleCardClick('${m.id}')" ontouchstart="_ttX=event.touches[0].clientX;_ttY=event.touches[0].clientY" ontouchend="if(Math.abs(event.changedTouches[0].clientX-_ttX)<10&&Math.abs(event.changedTouches[0].clientY-_ttY)<10){event.preventDefault();handleCardClick('${m.id}')}" style="${cardBorder}${isMe?'background:'+tb+';':''}">
           <div class="mentor-avatar" style="background:${tb};font-size:40px;">${m.emoji||'👨‍🏫'}</div>
           <div class="mentor-name" style="font-size:16px;font-weight:800;margin-top:6px;">${m.name} ${isMe?'<span style="font-size:11px;color:'+tc+';">● 나</span>':''}</div>
           <div style="margin-top:5px;">
@@ -518,6 +518,8 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 });
 // 터치로닫기
+let _ttX=0,_ttY=0; // 터치 스크롤 감지용
+
 function openLoginModal(title, sub){
   if(title) { 
     const t=document.getElementById('loginModalTitle'); 
@@ -870,8 +872,8 @@ window.addEventListener('pageshow', function(e){
     <div class="field">
       <label>직책 선택</label>
       <select id="roleEditSelect" style="font-size:16px;padding:8px;border-radius:8px;border:1px solid #e2e8f0;width:100%;font-family:'Noto Sans KR',sans-serif;">
-        <option value="부장">🏆 부장</option>
         <option value="원장">👑 원장</option>
+        <option value="부장">🏆 부장</option>
         <option value="수석">💎 수석</option>
         <option value="책임">⭐ 책임</option>
         <option value="선임">🌟 선임</option>

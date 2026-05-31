@@ -378,8 +378,8 @@ window.renderTable = function() {
     })();
     const cnt = groups[mo].length;
 
-    html += '<tr class="month-header-row" onclick="window.toggleMonth(\'' + mo + '\')" style="cursor:pointer;background:#f1f5f9;">'
-      + '<td colspan="10" style="padding:12px 16px;font-size:14px;font-weight:800;color:#334155;user-select:none;-webkit-user-select:none;">'
+    html += '<tr class="month-header-row" style="background:#f1f5f9;">'
+      + '<td colspan="10" onclick="window.toggleMonth(\'' + mo + '\')" style="padding:12px 16px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;">'
       + '<span style="margin-right:8px;font-size:16px;">' + (collapsed ? '▶' : '▼') + '</span>'
       + label
       + '<span style="font-size:12px;font-weight:500;margin-left:10px;color:#64748b;">' + cnt + '개 강좌</span>'
