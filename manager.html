@@ -2999,19 +2999,11 @@ async function loadFirebase() {
 
   // ② Firebase SDK 비동기 로드 (멀티-CDN 폴백 — head 로더가 먼저 처리)
   try {
-    // head의 멀티-CDN 로더 완료 대기 (최대 10초)
-    await new Promise((resolve) => {
-      let t = 0;
-      const iv = setInterval(() => {
-        if (window._firebaseLoaded === true || window._firebaseLoaded === false) {
-          clearInterval(iv); resolve();
-        }
-        if ((t += 100) >= 10000) { clearInterval(iv); resolve(); }
-      }, 100);
-    });
-    if (!window._firebaseLoaded) throw new Error('Firebase SDK 로드 실패');
-    const m = window.firebaseAppModule;
-    const d = window.firebaseDatabaseModule;
+    // Firebase SDK 로드 확인 (직접 script 태그로 로드되므로 즉시 사용 가능)
+    if (typeof firebase === 'undefined' || !firebase.database) {
+      throw new Error('Firebase SDK 로드 실패');
+    }
+    // firebase compat SDK 직접 사용
     const firebaseConfig = {
       apiKey: "AIzaSyCyCtQu20qgyCT1uRvmH3bmT1Q1bsT_pUw",
       authDomain: "sbs-academy-game.firebaseapp.com",
@@ -3025,11 +3017,14 @@ async function loadFirebase() {
     // 중복 초기화 방지
     const fbApp = (firebase.apps && firebase.apps.length)
       ? firebase.apps[0]
-      : m.initializeApp(firebaseConfig);
-    const db    = d.getDatabase(fbApp);
-    const ref     = (path) => d.ref(db, path);
-    const onValue = (r, cb, opts) => d.onValue(r, cb, opts);
-    const set     = (r, val) => d.set(r, val);
+      : firebase.initializeApp(firebaseConfig);
+    const db    = firebase.database(fbApp);
+    const ref     = (path) => db.ref(path);
+    const onValue = (r, cb, opts) => {
+      if (opts && opts.onlyOnce) { r.once('value').then(snap => cb(snap)); }
+      else { r.on('value', cb); }
+    };
+    const set     = (r, val) => r.set(val);
     window._fbDb = db;
     window._fbRef = ref;
     window._fbOnValue = onValue;
