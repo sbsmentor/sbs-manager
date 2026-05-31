@@ -58,7 +58,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:28px;}
 .mentor-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:16px 14px;cursor:pointer;transition:all .15s;text-decoration:none;display:block;-webkit-tap-highlight-color:rgba(0,0,0,0.05);touch-action:manipulation;text-align:center;}
 .mentor-card:hover{border-color:var(--accent);box-shadow:0 6px 24px rgba(91,79,255,.15);transform:translateY(-3px);}
-.mentor-avatar{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.10);}
+.mentor-avatar{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 8px auto;box-shadow:0 2px 8px rgba(0,0,0,0.10);}
 .mentor-name{font-size:14px;font-weight:700;margin-bottom:3px;}
 .mentor-role{font-size:11px;font-family:var(--mono);}
 
@@ -824,8 +824,17 @@ async function seedMentors(){
   try {
     const snap = await fbGet('mentorList');
     const existing = snap.val() || {};
-    // 이미 데이터가 있으면 아무것도 하지 않음 (삭제/수정 보존)
+    // 이미 데이터가 있으면 role/emoji만 동기화 (삭제 보존)
     if (Object.keys(existing).length > 0) {
+      for(const [id,mentor] of Object.entries(INITIAL_MENTORS)){
+        if(!existing[id]) continue; // 삭제된 멘토는 복구 안함
+        if(existing[id].role !== mentor.role){
+          await fbSet(`mentorList/${id}/role`, mentor.role);
+        }
+        if(existing[id].emoji !== mentor.emoji){
+          await fbSet(`mentorList/${id}/emoji`, mentor.emoji);
+        }
+      }
       return;
     }
     // 완전히 비어있을 때만 초기 데이터 추가 (최초 세팅)

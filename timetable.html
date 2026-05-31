@@ -341,14 +341,13 @@ window.switchTab = function(tab, btn) {
 const _monthCollapsed = {};
 
 window.renderTable = function() {
-  const q = document.getElementById('searchInp').value.toLowerCase();
-  const timeF = document.getElementById('timeFilter').value;
-
-  let items = Object.entries(allCourses).map(([key, val]) => ({key, ...val}));
-  if (currentTab !== 'all') items = items.filter(c => c.type === currentTab);
-  if (q) items = items.filter(c => (c.name||'').toLowerCase().includes(q) || (c.teacher||'').toLowerCase().includes(q));
-  if (timeF) items = items.filter(c => c.time === timeF);
-  items.sort((a,b) => (a.start||'9999').localeCompare(b.start||'9999'));
+  var q = (document.getElementById('searchInp').value||'').toLowerCase();
+  var timeF = document.getElementById('timeFilter').value;
+  var items = Object.entries(allCourses).map(function(e){ return Object.assign({key:e[0]},e[1]); });
+  if (currentTab !== 'all') items = items.filter(function(c){ return c.type===currentTab; });
+  if (q) items = items.filter(function(c){ return (c.name||'').toLowerCase().indexOf(q)>=0 || (c.teacher||'').toLowerCase().indexOf(q)>=0; });
+  if (timeF) items = items.filter(function(c){ return c.time===timeF; });
+  items.sort(function(a,b){ return (a.start||'9999').localeCompare(b.start||'9999'); });
 
   document.getElementById('countBadge').textContent = items.length + '개';
 
@@ -357,71 +356,63 @@ window.renderTable = function() {
     return;
   }
 
-  // 월별 그룹 (개강일 기준)
-  const groups = {};
-  items.forEach(c => {
-    const mo = (c.start||'').slice(0,7) || '날짜미정';
+  // 월별 그룹
+  var groups = {};
+  items.forEach(function(c) {
+    var mo = (c.start||'').slice(0,7) || '날짜미정';
     if (!groups[mo]) groups[mo] = [];
     groups[mo].push(c);
   });
 
-  const sortedMonths = Object.keys(groups).sort();
+  var sortedMonths = Object.keys(groups).sort();
+  var html = '';
 
-  let html = '';
-  for (const mo of sortedMonths) {
-    // 기본 모두 접힘 (_monthCollapsed[mo]가 false일 때만 펼침)
-    const collapsed = (_monthCollapsed[mo] !== false);
+  sortedMonths.forEach(function(mo) {
+    var collapsed = (_monthCollapsed[mo] !== false);
+    var label = mo === '날짜미정' ? '날짜 미정' : (function(){ var p=mo.split('-'); return p[0]+'년 '+parseInt(p[1])+'월'; })();
+    var cnt = groups[mo].length;
+    var arrow = collapsed ? '▶' : '▼';
 
-    const label = mo === '날짜미정' ? '날짜 미정' : (() => {
-      const [y,m] = mo.split('-');
-      return y + '년 ' + parseInt(m) + '월';
-    })();
-    const cnt = groups[mo].length;
-
-    html += '<tr class="month-header-row" style="background:#f1f5f9;">'
-      + '<td colspan="10" onclick="window.toggleMonth(\'' + mo + '\')" style="padding:12px 16px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;">'
-      + '<span style="margin-right:8px;font-size:16px;">' + (collapsed ? '▶' : '▼') + '</span>'
-      + label
-      + '<span style="font-size:12px;font-weight:500;margin-left:10px;color:#64748b;">' + cnt + '개 강좌</span>'
-      + '</td></tr>';
+    html += '<tr style="background:#f1f5f9;">';
+    html += '<td colspan="10" style="padding:12px 16px;font-size:14px;font-weight:800;color:#334155;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;" id="mo-td-' + mo + '">';
+    html += '<span style="margin-right:8px;">' + arrow + '</span>' + label;
+    html += '<span style="font-size:12px;font-weight:500;margin-left:10px;color:#64748b;">' + cnt + '개 강좌</span>';
+    html += '</td></tr>';
 
     if (!collapsed) {
-      html += groups[mo].map(c =>
-        '<tr class="course-row">'
-        + '<td style="text-align:center;width:36px;padding:8px 4px;"><input type="checkbox" class="tt-chk" data-key="' + c.key + '" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);" onchange="updateBulkDel()"></td>'
-        + '<td><span class="editable" onclick="editCell(this,\'' + c.key + '\',\'name\')">' + (c.name||'-') + '</span></td>'
-        + '<td><span class="editable" onclick="editCell(this,\'' + c.key + '\',\'teacher\')">' + (c.teacher||'-') + '</span></td>'
-        + '<td><span class="editable" onclick="editCell(this,\'' + c.key + '\',\'start\')">' + (c.start||'-') + '</span></td>'
-        + '<td><span class="editable" onclick="editCell(this,\'' + c.key + '\',\'end\')">' + (c.end||'-') + '</span></td>'
-        + '<td><span class="editable" onclick="editCell(this,\'' + c.key + '\',\'time\')">' + (c.time||'-') + '</span></td>'
-        + '<td><span class="editable" onclick="editCell(this,\'' + c.key + '\',\'room\')">' + (c.room||'-') + '</span></td>'
-        + '<td><span class="editable" onclick="editCell(this,\'' + c.key + '\',\'days\')">' + (c.days||'-') + '</span></td>'
-        + '<td><span class="type-badge ' + (c.type==='주말'?'t-weekend':'t-weekday') + '">' + (c.type||'평일') + '</span></td>'
-        + '<td><button class="del-btn" onclick="deleteCourse(\'' + c.key + '\',\'' + (c.name||'').replace(/'/g,"\\'") + '\')">삭제</button></td>'
-        + '</tr>'
-      ).join('');
+      groups[mo].forEach(function(c) {
+        html += '<tr class="course-row">';
+        html += '<td style="text-align:center;width:36px;padding:8px 4px;"><input type="checkbox" class="tt-chk" data-key="' + c.key + '" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);" onchange="updateBulkDel()"></td>';
+        html += '<td><span class="editable" onclick="editCell(this,'' + c.key + '','name')">' + (c.name||'-') + '</span></td>';
+        html += '<td><span class="editable" onclick="editCell(this,'' + c.key + '','teacher')">' + (c.teacher||'-') + '</span></td>';
+        html += '<td><span class="editable" onclick="editCell(this,'' + c.key + '','start')">' + (c.start||'-') + '</span></td>';
+        html += '<td><span class="editable" onclick="editCell(this,'' + c.key + '','end')">' + (c.end||'-') + '</span></td>';
+        html += '<td><span class="editable" onclick="editCell(this,'' + c.key + '','time')">' + (c.time||'-') + '</span></td>';
+        html += '<td><span class="editable" onclick="editCell(this,'' + c.key + '','room')">' + (c.room||'-') + '</span></td>';
+        html += '<td><span class="editable" onclick="editCell(this,'' + c.key + '','days')">' + (c.days||'-') + '</span></td>';
+        html += '<td><span class="type-badge ' + (c.type==='주말'?'t-weekend':'t-weekday') + '">' + (c.type||'평일') + '</span></td>';
+        html += '<td><button class="del-btn" onclick="deleteCourse('' + c.key + '','' + (c.name||'').replace(/'/g,"\'") + '')">삭제</button></td>';
+        html += '</tr>';
+      });
     }
-  }
+  });
+
   document.getElementById('tableBody').innerHTML = html;
+
+  // 이벤트 리스너 등록 (onclick 이스케이프 문제 완전 회피)
+  sortedMonths.forEach(function(mo) {
+    var td = document.getElementById('mo-td-' + mo);
+    if (td) {
+      td.onclick = function() { window.toggleMonth(mo); };
+      td.ontouchend = function(e) { e.preventDefault(); window.toggleMonth(mo); };
+    }
+  });
 };
 
 window.toggleMonth = function(mo) {
-  // false(펼침) ↔ true(접힘) 토글
   _monthCollapsed[mo] = (_monthCollapsed[mo] !== false);
-  // renderTable 재호출
-  if (Object.keys(allCourses).length > 0) {
-    window.renderTable();
-  } else {
-    // allCourses 비어있으면 Firebase에서 다시 로드
-    try {
-      const coursesRef = ref('timetable');
-      ref('timetable').once('value').then(snap => {
-        allCourses = snap.val() || {};
-        window.renderTable();
-      });
-    } catch(e) { window.renderTable(); }
-  }
-};
+  window.renderTable();
+};;
 ;
 
 ;
