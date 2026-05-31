@@ -56,9 +56,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 
 /* 강사 카드 그리드 */
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:28px;}
-.mentor-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:18px;cursor:pointer;transition:all .15s;text-decoration:none;display:block;-webkit-tap-highlight-color:rgba(0,0,0,0.1);touch-action:manipulation;}
-.mentor-card:hover{border-color:var(--accent);box-shadow:0 4px 20px rgba(91,79,255,.12);transform:translateY(-2px);}
-.mentor-avatar{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:10px;}
+.mentor-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:16px 14px;cursor:pointer;transition:all .15s;text-decoration:none;display:block;-webkit-tap-highlight-color:rgba(0,0,0,0.05);touch-action:manipulation;text-align:center;}
+.mentor-card:hover{border-color:var(--accent);box-shadow:0 6px 24px rgba(91,79,255,.15);transform:translateY(-3px);}
+.mentor-avatar{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.10);}
 .mentor-name{font-size:14px;font-weight:700;margin-bottom:3px;}
 .mentor-role{font-size:11px;font-family:var(--mono);}
 .mentor-count{margin-top:8px;font-size:11px;color:var(--text2);font-family:var(--mono);}
@@ -242,11 +242,14 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
       </select>
     </div>
     <div class="field"><label>이모지 아이콘</label>
-      <select id="newEmoji">
-        <option value="👨‍🏫">👨‍🏫 남자 강사</option><option value="👩‍🏫">👩‍🏫 여자 강사</option>
-        <option value="🎨">🎨 아트</option><option value="🎮">🎮 게임</option>
-        <option value="✏️">✏️ 웹툰</option><option value="📖">📖 웹소설</option>
-        <option value="💻">💻 프로그래밍</option><option value="🏛">🏛 국비</option>
+      <select id="newEmoji" style="font-size:16px;padding:8px;border-radius:8px;border:1px solid #e2e8f0;width:100%;font-family:'Noto Sans KR',sans-serif;">
+        <option value="👑">👑 원장</option>
+        <option value="🏆">🏆 부장</option>
+        <option value="💎">💎 수석</option>
+        <option value="⭐">⭐ 책임</option>
+        <option value="🌟">🌟 선임</option>
+        <option value="🎯">🎯 팀장</option>
+        <option value="🌿" selected>🌿 멘토</option>
       </select>
     </div>
     <div class="modal-footer">
@@ -781,16 +784,32 @@ async function saveRoleEdit() {
   const custom = document.getElementById('roleEditCustom').value.trim();
   const sel = document.getElementById('roleEditSelect').value;
   const newRole = custom || sel;
+  // Firebase 저장
   await fbSet(`mentorList/${_roleEditId}/role`, newRole);
+  // 직책에 맞는 이모지도 업데이트
+  const emojiMap={'원장':'👑','부장':'🏆','수석':'💎','책임':'⭐','선임':'🌟','팀장':'🎯','멘토':'🌿'};
+  if(emojiMap[newRole]){
+    await fbSet(`mentorList/${_roleEditId}/emoji`, emojiMap[newRole]);
+  }
+  // mentors 배열 즉시 업데이트 (로컬)
+  const m = mentors.find(x=>x.id===_roleEditId);
+  if(m){ m.role=newRole; if(emojiMap[newRole]) m.emoji=emojiMap[newRole]; }
   closeRoleEdit();
-  showToast('✅ 직책이 변경되었습니다: ' + newRole);
+  renderMentors(); // 즉시 재렌더
+  showToast('✅ ' + _roleEditId + ' 직책 변경: ' + newRole);
 }
 // ──────────────────────────────
 
 function loadMentors(){
   fbOnValue('mentorList', snap=>{
     const data=snap.val();
-    mentors=data ? Object.values(data).sort((a,b)=>(a.order??99)-(b.order??99)) : [];
+    const ROLE_ORDER={'원장':0,'부장':1,'수석':2,'책임':3,'선임':4,'팀장':5,'멘토':6};
+    mentors=data ? Object.values(data).sort((a,b)=>{
+      // 1차: 직책 우선순위, 2차: order
+      const ro=(ROLE_ORDER[a.role]??7)-(ROLE_ORDER[b.role]??7);
+      if(ro!==0) return ro;
+      return (a.order??99)-(b.order??99);
+    }) : [];
     updateLoginUI();
     renderMentors();
   });
@@ -800,20 +819,20 @@ function loadMentors(){
 // 초기 멘토 데이터 (최초 세팅)
 // ═══════════════════════════════════════════
 const INITIAL_MENTORS = {
-  '백정민':{ id:'백정민', name:'백정민', role:'부장', emoji:'👑', order:0,  team:'1팀' },
+  '백정민':{ id:'백정민', name:'백정민', role:'부장', emoji:'🏆', order:0,  team:'1팀' },
   '이민희':{ id:'이민희', name:'이민희', role:'멘토', emoji:'🌿', order:1,  team:'1팀' },
   '김기은':{ id:'김기은', name:'김기은', role:'멘토', emoji:'🌿', order:2,  team:'1팀' },
   '조영승':{ id:'조영승', name:'조영승', role:'멘토', emoji:'🌿', order:3,  team:'1팀' },
   '황유진':{ id:'황유진', name:'황유진', role:'멘토', emoji:'🌿', order:4,  team:'1팀' },
   '제갈배준':{ id:'제갈배준', name:'제갈배준', role:'팀장', emoji:'🎯', order:5,  team:'2팀' },
-  '이종혁':{ id:'이종혁', name:'이종혁', role:'선임', emoji:'🌿', order:6,  team:'2팀' },
+  '이종혁':{ id:'이종혁', name:'이종혁', role:'선임', emoji:'🌟', order:6,  team:'2팀' },
   '이지오':{ id:'이지오', name:'이지오', role:'멘토', emoji:'🌿', order:7,  team:'2팀' },
   '손병운':{ id:'손병운', name:'손병운', role:'팀장', emoji:'🎯', order:8,  team:'3팀' },
   '이안심':{ id:'이안심', name:'이안심', role:'멘토', emoji:'🌿', order:9,  team:'3팀' },
   '조건희':{ id:'조건희', name:'조건희', role:'멘토', emoji:'🌿', order:10, team:'3팀' },
   '황규선':{ id:'황규선', name:'황규선', role:'멘토', emoji:'🌿', order:11, team:'3팀' },
   '최인규':{ id:'최인규', name:'최인규', role:'팀장', emoji:'🎯', order:12, team:'4팀' },
-  '윤초롱':{ id:'윤초롱', name:'윤초롱', role:'책임', emoji:'🌿', order:13, team:'4팀' },
+  '윤초롱':{ id:'윤초롱', name:'윤초롱', role:'책임', emoji:'⭐', order:13, team:'4팀' },
   '박지용':{ id:'박지용', name:'박지용', role:'멘토', emoji:'🌿', order:14, team:'4팀' },
   '유진':  { id:'유진',   name:'유진',   role:'멘토', emoji:'🌿', order:15, team:'4팀' },
   '안소현':{ id:'안소현', name:'안소현', role:'팀장', emoji:'🎯', order:16, team:'5팀' },
@@ -881,6 +900,13 @@ async function init(){
 }
 
 init();
+
+// 뒤로가기 시 최신 데이터 강제 로드
+window.addEventListener('pageshow', function(e){
+  if(e.persisted){ // bfcache에서 복원된 경우
+    loadMentors();
+  }
+});
 </script>
 
 <!-- 직책 수정 모달 -->
