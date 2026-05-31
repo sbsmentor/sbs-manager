@@ -252,6 +252,18 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
         <option value="🌿" selected>🌿 멘토</option>
       </select>
     </div>
+        <div class="field"><label>팀</label>
+      <select id="newTeam" style="font-size:16px;padding:8px;border-radius:8px;border:1px solid #e2e8f0;width:100%;font-family:'Noto Sans KR',sans-serif;">
+        <option value="1팀">1팀</option>
+        <option value="2팀">2팀</option>
+        <option value="3팀">3팀</option>
+        <option value="4팀">4팀</option>
+        <option value="5팀">5팀</option>
+        <option value="6팀">6팀</option>
+        <option value="원장팀">원장팀</option>
+        <option value="기타">기타</option>
+      </select>
+    </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeAddModal()">취소</button>
       <button class="btn-save" onclick="addMentor()">추가하기</button>
@@ -695,13 +707,21 @@ const SUPER_ADMINS = ['한대희','백정민'];
 function isSuperAdmin(id) { return SUPER_ADMINS.includes(id); }
 
 window.addMentor = async function(){
-  const name=document.getElementById('newName').value.trim();
-  const role=document.getElementById('newRole').value.trim();
-  const emoji=document.getElementById('newEmoji').value;
+  const name = document.getElementById('newName').value.trim();
+  const roleSel = document.getElementById('newRole');
+  const role = roleSel ? roleSel.value : '멘토';
+  const emoji = document.getElementById('newEmoji').value;
+  const teamEl = document.getElementById('newTeam');
+  const team = teamEl ? teamEl.value : '기타';
   if(!name){ showToast('⚠ 이름을 입력하세요'); return; }
-  const id=name.replace(/[^가-힣a-zA-Z0-9]/g,'_')+'_'+Date.now();
-  const mentor={id,name,role:role||'멘토',emoji,team:'기타',order:999};
-  await fbSet(`mentorList/${id}`,mentor);
+  const id = name; // 이름을 ID로 사용
+  // 이미 존재하는 이름이면 경고
+  if(mentors.find(m=>m.name===name)){
+    showToast('⚠ 이미 존재하는 이름입니다'); return;
+  }
+  const maxOrder = mentors.length > 0 ? Math.max(...mentors.map(m=>m.order||0)) + 1 : 1;
+  const mentor = {id, name, role, emoji, team, order: maxOrder};
+  await fbSet(`mentorList/${id}`, mentor);
   closeAddModal();
   showToast(`✅ ${name} 멘토가 추가되었습니다`);
 };
@@ -804,14 +824,8 @@ async function seedMentors(){
   try {
     const snap = await fbGet('mentorList');
     const existing = snap.val() || {};
-    // 이미 데이터가 있으면 role 동기화만 (신규 추가 없음)
+    // 이미 데이터가 있으면 아무것도 하지 않음 (삭제/수정 보존)
     if (Object.keys(existing).length > 0) {
-      for(const [id,mentor] of Object.entries(INITIAL_MENTORS)){
-        if(existing[id] && existing[id].role !== mentor.role){
-          await fbSet(`mentorList/${id}/role`, mentor.role);
-        }
-        // 삭제된 멘토는 다시 추가하지 않음
-      }
       return;
     }
     // 완전히 비어있을 때만 초기 데이터 추가 (최초 세팅)

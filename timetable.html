@@ -408,7 +408,19 @@ window.renderTable = function() {
 window.toggleMonth = function(mo) {
   // false(펼침) ↔ true(접힘) 토글
   _monthCollapsed[mo] = (_monthCollapsed[mo] !== false);
-  window.renderTable();
+  // renderTable 재호출
+  if (Object.keys(allCourses).length > 0) {
+    window.renderTable();
+  } else {
+    // allCourses 비어있으면 Firebase에서 다시 로드
+    try {
+      const coursesRef = ref('timetable');
+      ref('timetable').once('value').then(snap => {
+        allCourses = snap.val() || {};
+        window.renderTable();
+      });
+    } catch(e) { window.renderTable(); }
+  }
 };
 ;
 
