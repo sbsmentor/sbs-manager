@@ -3245,74 +3245,43 @@ window.setTtMonth = function(month, btn) {
 };
 
 window.filterTimetable = function() {
-  const q = document.getElementById('ttSearchInp').value.toLowerCase();
-  let results = _ttCourses;
-  if (_ttFilteredMonth !== 'all') results = results.filter(c => (c.start||'').startsWith(_ttFilteredMonth));
-  if (q) results = results.filter(c => (c.name||'').toLowerCase().includes(q) || (c.teacher||'').toLowerCase().includes(q));
+  var q = (document.getElementById('ttSearchInp').value||'').toLowerCase();
+  var results = (_ttCourses||[]).filter(function(c) {
+    if (!q) return true;
+    return (c.name||'').toLowerCase().indexOf(q)>=0 || (c.teacher||'').toLowerCase().indexOf(q)>=0;
+  });
 
   updateSelCount();
-  const container = document.getElementById('ttResults');
+  var container = document.getElementById('ttResults');
 
-  if (results.length === 0) {
+  if (!results.length) {
     container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text3);">해당하는 강좌가 없습니다</div>';
     return;
   }
 
-  // 월별 그룹화 (개강일 기준)
-  const groups = {};
-  results.forEach((c, i) => {
-    const mo = (c.start||'').slice(0,7) || '날짜미정';
-    if (!groups[mo]) groups[mo] = [];
-    groups[mo].push({c, i});
-  });
-
-  const sortedMonths = Object.keys(groups).sort();
-
-  let html = '';
-  for (const mo of sortedMonths) {
-    const collapsed = (_ttMonthCollapsed[mo] !== false);
-    const label = mo === '날짜미정' ? '날짜 미정' : (() => {
-      const [y,m] = mo.split('-');
-      return y + '년 ' + parseInt(m) + '월';
-    })();
-    const cnt = groups[mo].length;
-
-    html += '<div onclick="window.toggleTtMonth(\'' + mo + '\')" style="padding:10px 14px;background:#f1f5f9;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;">'
-      + '<span style="font-size:15px;">' + (collapsed ? '▶' : '▼') + '</span>'
-      + '<span style="font-size:13px;font-weight:800;color:#334155;">' + label + '</span>'
-      + '<span style="font-size:11px;color:#64748b;margin-left:4px;">' + cnt + '개</span>'
+  var html = '<div style="display:flex;flex-direction:column;gap:6px;">';
+  results.forEach(function(c, i) {
+    var key = (c.name||'')+'|'+(c.start||'')+'|'+(c.time||'');
+    var checked = _ttSelected.has(key);
+    var typeBg = c.type==='주말' ? 'var(--orange-dim)' : 'var(--blue-dim)';
+    var typeColor = c.type==='주말' ? 'var(--orange)' : 'var(--blue)';
+    html += '<div onclick="toggleTtItem(this,''+key.replace(/'/g,"\'")+'','+i+')"'
+      + ' style="padding:9px 13px;border:1.5px solid '+(checked?'var(--accent)':'var(--border)')+';border-radius:9px;cursor:pointer;display:flex;gap:10px;align-items:center;background:'+(checked?'var(--accent-dim)':'#fff')+';touch-action:manipulation;">'
+      + '<input type="checkbox" '+(checked?'checked':'')+' onclick="event.stopPropagation()" onchange="toggleTtItem(this.closest('[onclick]'),''+key.replace(/'/g,"\'")+'','+i+')" style="width:15px;height:15px;accent-color:var(--accent);flex-shrink:0;">'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="font-size:12px;font-weight:700;">'+(c.name||'-')+'</div>'
+      + '<div style="font-size:11px;color:var(--text2);margin-top:1px;">👤 '+(c.teacher||'-')+' &nbsp;·&nbsp; 📅 '+(c.start||'-')+' ~ '+(c.end||'-')+' &nbsp;·&nbsp; '+(c.days||'-')+'</div>'
+      + '</div>'
+      + '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:'+typeBg+';color:'+typeColor+';flex-shrink:0;">'+(c.type||'평일')+'</span>'
       + '</div>';
-
-    if (!collapsed) {
-      html += '<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0;">';
-      groups[mo].forEach(({c, i}) => {
-        const key = c.name+'|'+c.start+'|'+(c.time||'');
-        const checked = _ttSelected.has(key);
-        const typeBg = c.type==='주말'?'var(--orange-dim)':'var(--blue-dim)';
-        const typeColor = c.type==='주말'?'var(--orange)':'var(--blue)';
-        html += '<div onclick="toggleTtItem(this,\'' + key.replace(/'/g,"\\'") + '\',' + i + ')"'
-          + ' data-key="' + key.replace(/"/g,'&quot;') + '"'
-          + ' style="padding:9px 13px;border:1.5px solid ' + (checked?'var(--accent)':'var(--border)') + ';border-radius:9px;cursor:pointer;display:flex;gap:10px;align-items:center;background:' + (checked?'var(--accent-dim)':'#fff') + ';transition:all .1s;touch-action:manipulation;">'
-          + '<input type="checkbox" ' + (checked?'checked':'') + ' onclick="event.stopPropagation()" onchange="toggleTtItem(this.closest(\'div\'),\'' + key.replace(/'/g,"\\'") + '\',' + i + ')" style="width:15px;height:15px;accent-color:var(--accent);flex-shrink:0;">'
-          + '<div style="flex:1;min-width:0;">'
-          + '<div style="font-size:12px;font-weight:700;">' + (c.name||'-') + '</div>'
-          + '<div style="font-size:11px;color:var(--text2);margin-top:1px;">👤 ' + (c.teacher||'-') + ' &nbsp;·&nbsp; ⏰ ' + (c.time||'-') + ' &nbsp;·&nbsp; 🏫 ' + (c.room||'-') + ' &nbsp;·&nbsp; ' + (c.days||'-') + '</div>'
-          + '<div style="font-size:10px;color:var(--text3);margin-top:1px;">📅 ' + (c.start||'-') + ' ~ ' + (c.end||'-') + '</div>'
-          + '</div>'
-          + '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:' + typeBg + ';color:' + typeColor + ';flex-shrink:0;">' + (c.type||'평일') + '</span>'
-          + '</div>';
-      });
-      html += '</div>';
-    }
-  }
-
-  container.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;">' + html + '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
 };
 
-window.toggleTtMonth = function(mo) {
-  _ttMonthCollapsed[mo] = (_ttMonthCollapsed[mo] !== false);
-  window.filterTimetable();
-};
+;
+
+;
 ;
 
 window.toggleTtItem = function(el, key) {

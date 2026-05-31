@@ -322,66 +322,27 @@ window.renderTable = function() {
     return;
   }
 
-  var groups = {};
-  items.forEach(function(c) {
-    var mo = (c.start||'').slice(0,7) || '날짜미정';
-    if (!groups[mo]) groups[mo] = [];
-    groups[mo].push(c);
-  });
-
-  var months = Object.keys(groups).sort();
-  var html = '';
-
-  months.forEach(function(mo) {
-    var collapsed = (_monthCollapsed[mo] !== false);
-    var label = mo === '날짜미정' ? '날짜 미정' : (function(){ var p=mo.split('-'); return p[0]+'년 '+parseInt(p[1])+'월'; })();
-    var cnt = groups[mo].length;
-
-    html += '<tr style="background:#f1f5f9;cursor:pointer;" id="month-tr-'+mo+'">';
-    html += '<td id="month-td-'+mo+'" colspan="10" style="padding:12px 16px;font-size:14px;font-weight:800;color:#334155;user-select:none;-webkit-user-select:none;touch-action:manipulation;">';
-    html += (collapsed?'▶':'▼')+' '+label;
-    html += ' <span style="font-size:12px;font-weight:500;color:#64748b;">'+cnt+'개 강좌</span>';
-    html += '</td></tr>';
-
-    if (!collapsed) {
-      groups[mo].forEach(function(c) {
-        var k = c.key;
-        html += '<tr class="course-row">';
-        html += '<td style="text-align:center;width:36px;"><input type="checkbox" class="tt-chk" data-key="'+k+'" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);" onchange="updateBulkDel()"></td>';
-        html += '<td><span class="editable" data-key="'+k+'" data-field="name" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.name||'-')+'</span></td>';
-        html += '<td><span class="editable" data-key="'+k+'" data-field="teacher" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.teacher||'-')+'</span></td>';
-        html += '<td><span class="editable" data-key="'+k+'" data-field="start" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.start||'-')+'</span></td>';
-        html += '<td><span class="editable" data-key="'+k+'" data-field="end" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.end||'-')+'</span></td>';
-        html += '<td><span class="editable" data-key="'+k+'" data-field="time" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.time||'-')+'</span></td>';
-        html += '<td><span class="editable" data-key="'+k+'" data-field="room" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.room||'-')+'</span></td>';
-        html += '<td><span class="editable" data-key="'+k+'" data-field="days" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.days||'-')+'</span></td>';
-        html += '<td><span class="type-badge '+(c.type==='주말'?'t-weekend':'t-weekday')+'">'+(c.type||'평일')+'</span></td>';
-        html += '<td><button class="del-btn" data-key="'+k+'" data-name="'+(c.name||'').replace(/"/g,'&quot;')+'" onclick="deleteCourse(this.dataset.key,this.dataset.name)">삭제</button></td>';
-        html += '</tr>';
-      });
-    }
-  });
+  var html = items.map(function(c) {
+    var k = c.key;
+    return '<tr class="course-row">'
+      + '<td style="text-align:center;width:36px;"><input type="checkbox" class="tt-chk" data-key="'+k+'" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);" onchange="updateBulkDel()"></td>'
+      + '<td><span class="editable" data-key="'+k+'" data-field="name" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.name||'-')+'</span></td>'
+      + '<td><span class="editable" data-key="'+k+'" data-field="teacher" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.teacher||'-')+'</span></td>'
+      + '<td><span class="editable" data-key="'+k+'" data-field="start" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.start||'-')+'</span></td>'
+      + '<td><span class="editable" data-key="'+k+'" data-field="end" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.end||'-')+'</span></td>'
+      + '<td><span class="editable" data-key="'+k+'" data-field="time" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.time||'-')+'</span></td>'
+      + '<td><span class="editable" data-key="'+k+'" data-field="room" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.room||'-')+'</span></td>'
+      + '<td><span class="editable" data-key="'+k+'" data-field="days" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.days||'-')+'</span></td>'
+      + '<td><span class="type-badge '+(c.type==='주말'?'t-weekend':'t-weekday')+'">'+(c.type||'평일')+'</span></td>'
+      + '<td><button class="del-btn" data-key="'+k+'" data-name="'+(c.name||'').replace(/"/g,'&quot;')+'" onclick="deleteCourse(this.dataset.key,this.dataset.name)">삭제</button></td>'
+      + '</tr>';
+  }).join('');
 
   document.getElementById('tableBody').innerHTML = html;
-
-  // 이벤트 등록 (이스케이프 문제 완전 회피)
-  months.forEach(function(mo) {
-    var td = document.getElementById('month-td-'+mo);
-    if (!td) return;
-    td.onclick = function(e) { e.stopPropagation(); window.toggleMonth(mo); };
-    td.ontouchend = function(e) { e.preventDefault(); e.stopPropagation(); window.toggleMonth(mo); };
-    var tr = document.getElementById('month-tr-'+mo);
-    if (tr) {
-      tr.onclick = function() { window.toggleMonth(mo); };
-      tr.ontouchend = function(e) { e.preventDefault(); window.toggleMonth(mo); };
-    }
-  });
 };
 
-window.toggleMonth = function(mo) {
-  _monthCollapsed[mo] = (_monthCollapsed[mo] !== false);
-  window.renderTable();
-};;;
+window.toggleMonth = function(mo) {};
+;;;
 ;
 
 ;
