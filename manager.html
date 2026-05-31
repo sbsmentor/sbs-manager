@@ -3200,51 +3200,50 @@ window.openTimetableSearch = function(row) {
   document.getElementById('ttSearchBg').style.display = 'flex';
   setTimeout(() => document.getElementById('ttSearchInp').focus(), 100);
 
-  // 이미 로드된 데이터 있으면 바로 표시
+  // 이미 데이터 있으면 바로 표시
   if (_ttCourses.length > 0) {
     filterTimetable();
     return;
   }
 
-  // Firebase REST API로 직접 읽기 (SDK 불필요)
-  document.getElementById('ttResults').innerHTML = '<div style="text-align:center;padding:32px;color:var(--text3);">불러오는 중...</div>';
-  
-  // REST와 SDK 동시 시도 - 먼저 오는 것 사용
-  let _ttDone = false;
-  const applyTTData = (data) => {
-    if (_ttDone) return;
-    _ttDone = true;
-    if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-      _ttCourses = Object.values(data).filter(c => c && c.name);
-      DB.set('ttClasses', _ttCourses.map(c => ({
-        id: c.name+'|'+(c.start||'')+'|'+(c.time||''),
-        type: c.type||'평일', courseName: c.name||'', instructor: c.teacher||'',
-        startDate: c.start||'', endDate: c.end||'', startTime: c.time||'',
-        endTime: '', days: c.days||'', room: c.room||'', roomGroup: '',
-        enrollment: 0, attendance: 0,
-      })));
+  document.getElementById('ttResults').innerHTML =
+    '<div style="text-align:center;padding:32px;color:var(--text3);">불러오는 중...</div>';
+
+  // loadTimetable이 이미 구독 중 - 최대 8초 대기
+  let waited = 0;
+  const waitForData = setInterval(() => {
+    waited += 200;
+    if (_ttCourses.length > 0) {
+      clearInterval(waitForData);
+      filterTimetable();
+      return;
     }
-    filterTimetable();
-  };
-
-  // 1) REST API 시도
-  fetch('https://sbs-academy-game-default-rtdb.firebaseio.com/timetable.json')
-    .then(r => r.ok ? r.json() : null)
-    .then(data => applyTTData(data))
-    .catch(() => {});
-
-  // 2) SDK 동시 시도 (폴백)
-  if (window._fbDb && window._fbRef && window._fbOnValue) {
-    const ttRef = window._fbRef(window._fbDb, 'timetable');
-    window._fbOnValue(ttRef, snap => {
-      applyTTData(snap.val());
-    }, { onlyOnce: true });
-  }
-
-  // 3) 5초 후 타임아웃
-  setTimeout(() => {
-    if (!_ttDone) { _ttDone = true; filterTimetable(); }
-  }, 5000);
+    // 데이터 없이 3초 지나면 Firebase 직접 강제 조회
+    if (waited === 3000) {
+      if (window._fbDb && window._fbRef) {
+        window._fbRef(window._fbDb, 'timetable').once('value').then(snap => {
+          const data = snap.val();
+          if (data && typeof data === 'object') {
+            _ttCourses = Object.values(data).filter(c => c && c.name);
+            DB.set('ttClasses', _ttCourses.map(c => ({
+              id: c.name+'|'+(c.start||'')+'|'+(c.time||''),
+              type: c.type||'평일', courseName: c.name||'', instructor: c.teacher||'',
+              startDate: c.start||'', endDate: c.end||'', startTime: c.time||'',
+              endTime: '', days: c.days||'', room: c.room||'', roomGroup: '',
+              enrollment: 0, attendance: 0,
+            })));
+          }
+          clearInterval(waitForData);
+          filterTimetable();
+        }).catch(() => {});
+      }
+    }
+    // 8초 타임아웃
+    if (waited >= 8000) {
+      clearInterval(waitForData);
+      filterTimetable();
+    }
+  }, 200);
 };
 
 window.closeTimetableSearch = function() {
@@ -4053,7 +4052,7 @@ function openNotiCardFromBoard(arrName, si, mk){
 
   // 수업 정보 (편집 가능)
   const labelStyle = 'display:inline-block;width:52px;font-weight:700;';
-  const valStyle = 'border:none;background:transparent;font-size:11px;font-family:inherit;color:inherit;cursor:text;outline:none;border-bottom:1px dashed #94a3b8;min-width:80px;';
+  const valStyle = 'border:none;border-bottom:none;background:transparent;font-size:11px;font-family:inherit;color:inherit;cursor:text;outline:none;min-width:80px;text-decoration:none;';
   const infoRows=[
     `<div><b style="${labelStyle}">과 목 :</b> <input value="${p.cls||''}" style="${valStyle}" onchange="_notiEditField('cls',this.value)" /></div>`,
     `<div><b style="${labelStyle}">강 사 :</b> <input value="${(p.teacher||'').replace(' 강사','')}" style="${valStyle}" onchange="_notiEditField('teacher',this.value)" /> 강사</div>`,

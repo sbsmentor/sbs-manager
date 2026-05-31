@@ -800,19 +800,23 @@ const INITIAL_MENTORS = {
 };
 
 async function seedMentors(){
-  // 기존 멘토 유지하면서 새 멘토만 추가
+  // mentorList에 데이터가 하나라도 있으면 스킵 (삭제된 멘토 복구 방지)
   try {
     const snap = await fbGet('mentorList');
     const existing = snap.val() || {};
-    for(const [id,mentor] of Object.entries(INITIAL_MENTORS)){
-      if(!existing[id]){
-        await fbSet(`mentorList/${id}`, mentor);
-      } else {
-        // role 변경사항 반영
-        if(existing[id].role !== mentor.role){
+    // 이미 데이터가 있으면 role 동기화만 (신규 추가 없음)
+    if (Object.keys(existing).length > 0) {
+      for(const [id,mentor] of Object.entries(INITIAL_MENTORS)){
+        if(existing[id] && existing[id].role !== mentor.role){
           await fbSet(`mentorList/${id}/role`, mentor.role);
         }
+        // 삭제된 멘토는 다시 추가하지 않음
       }
+      return;
+    }
+    // 완전히 비어있을 때만 초기 데이터 추가 (최초 세팅)
+    for(const [id,mentor] of Object.entries(INITIAL_MENTORS)){
+      await fbSet(`mentorList/${id}`, mentor);
     }
   } catch(e) {}
 }
