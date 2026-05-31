@@ -458,7 +458,10 @@ window.uploadTimetable = async function(event, scheduleType) {
       if (!table) { showToast('❌ 시간표 테이블 없음'); showLoading(false); return; }
 
       const rows = table.querySelectorAll('tr');
-      const subRooms = Array.from(rows[0]?.querySelectorAll('td,th')||[]).map(td=>td.textContent.trim());
+
+      // rows[0]에서 강의실명 수집
+      const subRooms = Array.from(rows[0]?.querySelectorAll('td,th') || [])
+        .map(td => td.textContent.replace(/\u00a0/g,' ').trim());
 
       const DAY_PATS = [
         '월수금/월수','월수/월수금','화목금/화목','화목/화목금',
@@ -475,45 +478,40 @@ window.uploadTimetable = async function(event, scheduleType) {
         if (!cellEl) return [];
         const lis = cellEl.querySelectorAll('li');
         if (lis.length > 0) {
-          return Array.from(lis).map(li => li.textContent.trim()).filter(Boolean);
+          return Array.from(lis).map(li => li.textContent.replace(/\u00a0/g,' ').trim()).filter(Boolean);
         }
-        return [cellEl.textContent.trim()].filter(Boolean);
+        return [];
       }
 
       let added = 0, skipped = 0;
-      const existing = Object.values(allCourses);
+      const seen = new Set();
 
       for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
-        const cells = rows[rowIdx].querySelectorAll('td,th');
-        if (!cells.length) continue;
-        const timeText = cells[0]?.textContent.trim() || '';
-        const timeMatch = timeText.match(/^(\d{2}:\d{2})/);
-        const timeVal = timeMatch ? timeMatch[1] : '';
+        const tds = rows[rowIdx].querySelectorAll('td');
 
-        for (let colIdx = 1; colIdx < cells.length; colIdx++) {
-          const lines = extractLines(cells[colIdx]);
+        for (let colIdx = 0; colIdx < tds.length; colIdx++) {
+          const lines = extractLines(tds[colIdx]);
           if (!lines.length) continue;
-          const fullFlat = lines.join('');
-          if (!fullFlat.includes('개:') || !fullFlat.includes('종:')) continue;
+          const flat = lines.join('');
+          if (!flat.includes('개:') || !flat.includes('종:')) continue;
 
-          // 강좌명: 첫 번째 li
           const courseName = lines[0].trim();
           if (!courseName || courseName.length < 2) continue;
 
-          // 개강일/종강일
-          const startM = fullFlat.match(/개:(\d{4}-\d{2}-\d{2})/);
-          const endM   = fullFlat.match(/종:(\d{4}-\d{2}-\d{2})/);
-          const startDate = startM ? startM[1] : '';
-          const endDate   = endM   ? endM[1]   : '';
-          if (!startDate) continue;
+          const startM = flat.match(/개:(\d{4}-\d{2}-\d{2})/);
+          const endM   = flat.match(/종:(\d{4}-\d{2}-\d{2})/);
+          if (!startM) continue;
+          const startDate = startM[1];
+          const endDate   = endM ? endM[1] : '';
 
-          // 강의실
-          const room = simplifyRoom(colIdx < subRooms.length ? subRooms[colIdx] : '');
+          // 중복 체크
+          const key = courseName + '|' + startDate;
+          if (seen.has(key)) { skipped++; continue; }
+          seen.add(key);
 
-          // 배정: 이후에서 요일/강사 추출
+          // 강사/요일 파싱
           const baejungIdx = lines.findIndex(l => /^배정\s*:/.test(l));
-          let teacher = '', daysRaw = '';
-
+          let teacher = '', days = '';
           if (baejungIdx >= 0) {
             const afterLines = lines.slice(baejungIdx + 1);
             const beforeEnd = [];
@@ -522,47 +520,41 @@ window.uploadTimetable = async function(event, scheduleType) {
               beforeEnd.push(line);
             }
             for (const line of beforeEnd) {
-              if (DAY_PATS.includes(line)) { daysRaw = line; break; }
+              if (DAY_PATS.includes(line)) { days = line; break; }
             }
-            const dayIdx = beforeEnd.findIndex(l => l === daysRaw);
+            const dayIdx = beforeEnd.findIndex(l => l === days);
             const beforeDay = dayIdx >= 0 ? beforeEnd.slice(0, dayIdx) : beforeEnd;
             for (let i = beforeDay.length - 1; i >= 0; i--) {
-              const cleaned = beforeDay[i].replace(/\d+$/, '').replace(/\s*T\s*$/, '').trim();
+              const cleaned = beforeDay[i].replace(/\d+$/, '').trim();
               if (/^[가-힣]{2,5}$/.test(cleaned)) { teacher = cleaned; break; }
             }
           }
 
-          // 폴백: 평문에서 요일 검색
-          if (!daysRaw) {
-            for (const dp of DAY_PATS) {
-              if (fullFlat.includes(dp)) { daysRaw = dp; break; }
-            }
-          }
-
-          const days = normalizeDays(daysRaw);
-          const isDup = existing.some(ex => ex.name === courseName && ex.teacher === teacher && ex.start === startDate && ex.time === timeVal);
-          if (isDup) { skipped++; continue; }
+          // 강의실
+          const room = colIdx < subRooms.length ? subRooms[colIdx] : '';
 
           try {
             const newRef = push(ref('timetable'));
-            await set(newRef, { name: courseName, teacher, start: startDate, end: endDate, time: timeVal, room, days, type: scheduleType });
+            await set(newRef, { name: courseName, teacher, start: startDate, end: endDate,
+              time: '', room, days, type: scheduleType });
             added++;
           } catch(pushErr) {
-            console.error('Firebase push 실패:', pushErr);
+            console.error('push 실패:', pushErr);
           }
         }
       }
 
       showLoading(false);
       event.target.value = '';
-      showToast(`✅ ${added}개 추가 (${skipped}개 중복 스킵)`);
+      showToast('✅ ' + added + '개 추가 (' + skipped + '개 중복 스킵)');
     } catch(err) {
       showLoading(false);
       showToast('❌ 오류: ' + err.message);
+      console.error(err);
     }
   };
   reader.readAsText(file, 'utf-8');
-};;
+};;;
 
 // ════════ 유틸 ════════
 function showLoading(show) {

@@ -3154,8 +3154,8 @@ window.openTimetableSearch = function(row) {
   document.getElementById('ttSearchBg').style.display = 'flex';
   setTimeout(() => document.getElementById('ttSearchInp').focus(), 100);
 
-  // 데이터 있으면 즉시 표시
-  if (_ttCourses.length > 0) {
+  // 이미 로드된 데이터 있으면 바로 표시
+  if (_ttCourses && _ttCourses.length > 0) {
     filterTimetable();
     return;
   }
@@ -3163,30 +3163,29 @@ window.openTimetableSearch = function(row) {
   document.getElementById('ttResults').innerHTML =
     '<div style="text-align:center;padding:32px;color:var(--text3);">불러오는 중...</div>';
 
-  // Firebase 직접 one-time 조회 (가장 확실한 방법)
-  const tryFetch = () => {
+  // Firebase SDK 준비될 때까지 기다렸다가 once 조회
+  const tryFetch = function() {
     if (window._fbDb && window._fbRef) {
       window._fbRef(window._fbDb, 'timetable').once('value')
-        .then(snap => {
+        .then(function(snap) {
           const data = snap.val();
           if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-            _ttCourses = Object.values(data).filter(c => c && c.name);
+            _ttCourses = Object.values(data).filter(function(c) { return c && c.name; });
           }
           filterTimetable();
         })
-        .catch(() => filterTimetable());
+        .catch(function() { filterTimetable(); });
     } else {
-      // Firebase 아직 준비 안 됨 - 500ms 후 재시도 (최대 10초)
-      if (!tryFetch._count) tryFetch._count = 0;
-      tryFetch._count++;
-      if (tryFetch._count < 20) {
+      if (!tryFetch._n) tryFetch._n = 0;
+      tryFetch._n++;
+      if (tryFetch._n < 20) {
         setTimeout(tryFetch, 500);
       } else {
         filterTimetable();
       }
     }
   };
-  tryFetch._count = 0;
+  tryFetch._n = 0;
   tryFetch();
 };
 
