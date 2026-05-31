@@ -2985,7 +2985,7 @@ function editMentorName(){
 // Firebase 연동
 // ════════════════════════════════════════════
 // IP 제한 없음 (비밀번호 로그인으로 보호)
-const MENTOR_ID = new URLSearchParams(location.search).get('mentor') || 'default';
+const MENTOR_ID = new URLSearchParams(location.search).get('id') || new URLSearchParams(location.search).get('mentor') || 'default';
 
 // Firebase SDK (ESM CDN)
 async function loadFirebase() {
@@ -3078,6 +3078,10 @@ saveToLocal = function() {
   if (window._fbSave) window._fbSave();
 };
 
+
+window.addEventListener('beforeunload', function() {
+  localStorage.removeItem('sbs_logged_in');
+});
 loadFirebase();
 
 // renderContent 후 superRole 링크 표시 보장

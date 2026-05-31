@@ -730,6 +730,11 @@ async function init(){
 }
 init();
 
+// 창 닫으면 로그아웃
+window.addEventListener('beforeunload', function() {
+  clearAuthenticated();
+});
+
 // ── 뒤로가기 시 재로드 ──
 window.addEventListener('pageshow', function(e){ if(e.persisted) loadMentors(); });
 </script>
