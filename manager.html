@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
 // 크로스오리진/로컬파일 Script error 완전 억제
 window.onerror = function(msg, src, line, col, err) {
@@ -624,24 +626,7 @@ button, a, [onclick] { touch-action: manipulation; -webkit-tap-highlight-color: 
   .ef-sched-row { grid-template-columns: repeat(2, 1fr); }
 }
 </style>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script>
-window.firebaseAppModule = { initializeApp: firebase.initializeApp.bind(firebase) };
-window.firebaseDatabaseModule = {
-  getDatabase: (app) => firebase.database(app || undefined),
-  ref:     (db, path) => db.ref(path),
-  onValue: (ref, cb, opts) => {
-    if (opts && opts.onlyOnce) { ref.once('value').then(snap => cb(snap)); }
-    else { ref.on('value', cb); }
-  },
-  set:    (ref, val) => ref.set(val),
-  get:    (ref) => ref.once('value'),
-  remove: (ref) => ref.remove(),
-  push:   (ref, val) => ref.push(val)
-};
-window._firebaseLoaded = true;
-</script>
+
 
 <script>
 window.onerror = function(msg) {
@@ -3270,19 +3255,45 @@ window.filterTimetable = function() {
     var checked = _ttSelected.has(key);
     var typeBg = c.type==='주말' ? 'var(--orange-dim)' : 'var(--blue-dim)';
     var typeColor = c.type==='주말' ? 'var(--orange)' : 'var(--blue)';
-    html += '<div onclick="toggleTtItem(this,''+key.replace(/'/g,"\'")+'','+i+')"'
+    var safeKey = key.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    html += '<div class="tt-item" data-idx="'+i+'" data-key="'+safeKey+'"'
       + ' style="padding:9px 13px;border:1.5px solid '+(checked?'var(--accent)':'var(--border)')+';border-radius:9px;cursor:pointer;display:flex;gap:10px;align-items:center;background:'+(checked?'var(--accent-dim)':'#fff')+';touch-action:manipulation;">'
-      + '<input type="checkbox" '+(checked?'checked':'')+' onclick="event.stopPropagation()" onchange="toggleTtItem(this.closest('[onclick]'),''+key.replace(/'/g,"\'")+'','+i+')" style="width:15px;height:15px;accent-color:var(--accent);flex-shrink:0;">'
+      + '<input type="checkbox" class="tt-item-chk" '+(checked?'checked':'')+' style="width:15px;height:15px;accent-color:var(--accent);flex-shrink:0;">'
       + '<div style="flex:1;min-width:0;">'
       + '<div style="font-size:12px;font-weight:700;">'+(c.name||'-')+'</div>'
-      + '<div style="font-size:11px;color:var(--text2);margin-top:1px;">👤 '+(c.teacher||'-')+' &nbsp;·&nbsp; 📅 '+(c.start||'-')+' ~ '+(c.end||'-')+' &nbsp;·&nbsp; '+(c.days||'-')+'</div>'
+      + '<div style="font-size:11px;color:var(--text2);margin-top:1px;">👤 '+(c.teacher||'-')+' · 📅 '+(c.start||'-')+' ~ '+(c.end||'-')+' · '+(c.days||'-')+'</div>'
       + '</div>'
       + '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:'+typeBg+';color:'+typeColor+';flex-shrink:0;">'+(c.type||'평일')+'</span>'
       + '</div>';
   });
   html += '</div>';
   container.innerHTML = html;
+
+  // 클릭 이벤트 등록 (따옴표 충돌 완전 방지)
+  container.querySelectorAll('.tt-item').forEach(function(el) {
+    el.addEventListener('click', function() {
+      var idx = parseInt(el.dataset.idx);
+      var key = el.dataset.key;
+      toggleTtItem(el, key, idx);
+    });
+    el.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      var idx = parseInt(el.dataset.idx);
+      var key = el.dataset.key;
+      toggleTtItem(el, key, idx);
+    });
+    var chk = el.querySelector('.tt-item-chk');
+    if (chk) {
+      chk.addEventListener('click', function(e) { e.stopPropagation(); });
+      chk.addEventListener('change', function() {
+        var idx = parseInt(el.dataset.idx);
+        var key = el.dataset.key;
+        toggleTtItem(el, key, idx);
+      });
+    }
+  });
 };
+;
 
 ;
 
