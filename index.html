@@ -230,7 +230,17 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
   <div class="modal">
     <h3>➕ 멘토 추가</h3>
     <div class="field"><label>이름 *</label><input type="text" id="newName" placeholder="예: 이기건" maxlength="10"></div>
-    <div class="field"><label>직책</label><input type="text" id="newRole" placeholder="예: 팀장, 멘토" maxlength="20"></div>
+    <div class="field"><label>직책</label>
+      <select id="newRole" onchange="autoSetEmoji(this.value)" style="font-size:16px;padding:8px;border-radius:8px;border:1px solid #e2e8f0;width:100%;font-family:'Noto Sans KR',sans-serif;">
+        <option value="원장">👑 원장</option>
+        <option value="부장">🏆 부장</option>
+        <option value="수석">💎 수석</option>
+        <option value="책임">⭐ 책임</option>
+        <option value="선임">🌟 선임</option>
+        <option value="팀장" selected>🎯 팀장</option>
+        <option value="멘토">🌿 멘토</option>
+      </select>
+    </div>
     <div class="field"><label>이모지 아이콘</label>
       <select id="newEmoji">
         <option value="👨‍🏫">👨‍🏫 남자 강사</option><option value="👩‍🏫">👩‍🏫 여자 강사</option>
@@ -443,7 +453,7 @@ function renderMentors(){
             <span style="display:inline-flex;align-items:center;gap:3px;color:${roleColor};font-size:12px;font-weight:800;background:${roleBg};padding:4px 10px;border-radius:20px;letter-spacing:0.3px;">
               ${roleIcon} ${m.role||'멘토'}
             </span>
-            ${loggedId==='이기건'?`<button onclick="event.stopPropagation();openRoleEdit('${m.id}')" ontouchend="event.stopPropagation();event.preventDefault();openRoleEdit('${m.id}')" style="margin-left:4px;padding:3px 7px;font-size:10px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc;color:#64748b;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">✏️</button>`:''}
+            ${isSuperAdmin(loggedId)||loggedId==='이기건'?`<button onclick="event.stopPropagation();openRoleEdit('${m.id}')" ontouchend="event.stopPropagation();event.preventDefault();openRoleEdit('${m.id}')" style="margin-left:4px;padding:3px 7px;font-size:10px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc;color:#64748b;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">✏️</button>`:''}
           </div>
           <div class="mentor-count" style="font-size:13px;margin-top:6px;">수강생 <span id="cnt-${m.id}" style="color:${tc};font-weight:800;font-size:15px;">-</span>명</div>
         </div>
@@ -475,8 +485,8 @@ function handleCardClick(id){
   // 이미 내가 로그인된 경우 → 바로 이동
   if(loggedId && isAuthenticated(loggedId)){
     const loggedM = mentors.find(m=>m.id===loggedId);
-    // 슈퍼롤이면 다른 카드도 바로 이동
-    if(loggedId===id || (loggedM && ['부장','팀장','원장'].includes(loggedM.role))){
+    // 원장/부장은 모든 카드 바로 이동
+    if(loggedId===id || isSuperAdmin(loggedId) || (loggedM && ['부장','팀장','원장'].includes(loggedM.role))){
       location.href=`manager.html?mentor=${encodeURIComponent(id)}`;
       return;
     }
@@ -565,7 +575,8 @@ async function doLogin(){
   closeLoginModal();
   updateLoginUI();
   renderMentors();
-  showToast(`✅ ${target.name}님 로그인 완료!`);
+  const welcomeRole = target.role || '멘토';
+  showToast(`✅ ${target.name} ${welcomeRole}님 환영합니다!`);
 
   if(_loginForAdmin){
     isAdmin=true;
@@ -659,6 +670,27 @@ window.closeAddModal = function(){
   document.getElementById('newName').value='';
   document.getElementById('newRole').value='';
 };
+
+// 직책별 이모지 자동 세팅
+function autoSetEmoji(role) {
+  const emojiMap = {
+    '원장':'👑','부장':'🏆','수석':'💎','책임':'⭐','선임':'🌟','팀장':'🎯','멘토':'🌿'
+  };
+  const sel = document.getElementById('newEmoji');
+  if (sel && emojiMap[role]) {
+    for (let i=0; i<sel.options.length; i++) {
+      if (sel.options[i].value === emojiMap[role]) {
+        sel.selectedIndex = i;
+        break;
+      }
+    }
+  }
+}
+
+// 한대희(원장) 전체 관리 권한 체크
+const SUPER_ADMINS = ['한대희','백정민'];
+function isSuperAdmin(id) { return SUPER_ADMINS.includes(id); }
+
 window.addMentor = async function(){
   const name=document.getElementById('newName').value.trim();
   const role=document.getElementById('newRole').value.trim();
@@ -788,7 +820,7 @@ const INITIAL_MENTORS = {
   '이은채':{ id:'이은채', name:'이은채', role:'멘토', emoji:'🌿', order:17, team:'5팀' },
   '이연재':{ id:'이연재', name:'이연재', role:'멘토', emoji:'🌿', order:18, team:'5팀' },
   '이기건':{ id:'이기건', name:'이기건', role:'팀장', emoji:'🎯', order:19, team:'6팀' },
-  '한대희':{ id:'한대희', name:'한대희', role:'멘토', emoji:'🌿', order:20, team:'6팀' },
+  '한대희':{ id:'한대희', name:'한대희', role:'원장', emoji:'👑', order:20, team:'6팀' },
   '박무경':{ id:'박무경', name:'박무경', role:'멘토', emoji:'🌿', order:21, team:'원장팀' },
 };
 
