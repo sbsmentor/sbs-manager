@@ -774,14 +774,14 @@ const INITIAL_MENTORS = {
   '조영승':{ id:'조영승', name:'조영승', role:'멘토', emoji:'🌿', order:3,  team:'1팀' },
   '황유진':{ id:'황유진', name:'황유진', role:'멘토', emoji:'🌿', order:4,  team:'1팀' },
   '제갈배준':{ id:'제갈배준', name:'제갈배준', role:'팀장', emoji:'🎯', order:5,  team:'2팀' },
-  '이종혁':{ id:'이종혁', name:'이종혁', role:'멘토', emoji:'🌿', order:6,  team:'2팀' },
+  '이종혁':{ id:'이종혁', name:'이종혁', role:'선임', emoji:'🌿', order:6,  team:'2팀' },
   '이지오':{ id:'이지오', name:'이지오', role:'멘토', emoji:'🌿', order:7,  team:'2팀' },
   '손병운':{ id:'손병운', name:'손병운', role:'팀장', emoji:'🎯', order:8,  team:'3팀' },
   '이안심':{ id:'이안심', name:'이안심', role:'멘토', emoji:'🌿', order:9,  team:'3팀' },
   '조건희':{ id:'조건희', name:'조건희', role:'멘토', emoji:'🌿', order:10, team:'3팀' },
   '황규선':{ id:'황규선', name:'황규선', role:'멘토', emoji:'🌿', order:11, team:'3팀' },
   '최인규':{ id:'최인규', name:'최인규', role:'팀장', emoji:'🎯', order:12, team:'4팀' },
-  '윤초롱':{ id:'윤초롱', name:'윤초롱', role:'멘토', emoji:'🌿', order:13, team:'4팀' },
+  '윤초롱':{ id:'윤초롱', name:'윤초롱', role:'책임', emoji:'🌿', order:13, team:'4팀' },
   '박지용':{ id:'박지용', name:'박지용', role:'멘토', emoji:'🌿', order:14, team:'4팀' },
   '유진':  { id:'유진',   name:'유진',   role:'멘토', emoji:'🌿', order:15, team:'4팀' },
   '안소현':{ id:'안소현', name:'안소현', role:'팀장', emoji:'🎯', order:16, team:'5팀' },
@@ -800,6 +800,11 @@ async function seedMentors(){
     for(const [id,mentor] of Object.entries(INITIAL_MENTORS)){
       if(!existing[id]){
         await fbSet(`mentorList/${id}`, mentor);
+      } else {
+        // role 변경사항 반영
+        if(existing[id].role !== mentor.role){
+          await fbSet(`mentorList/${id}/role`, mentor.role);
+        }
       }
     }
   } catch(e) {}
