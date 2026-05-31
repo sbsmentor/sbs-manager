@@ -107,55 +107,21 @@ tbody td{padding:8px 12px;vertical-align:middle;font-size:12px;}
 
 button, .month-header-row, [onclick] { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
-// ── Firebase SDK 멀티-CDN 로더 ──
-(function() {
-  const CDNS = [
-    {
-      app: 'https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-app-compat.min.js',
-      db:  'https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-database-compat.min.js'
-    },
-    {
-      app: 'https://unpkg.com/firebase@10.12.0/firebase-app-compat.js',
-      db:  'https://unpkg.com/firebase@10.12.0/firebase-database-compat.js'
-    },
-    {
-      app: 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
-      db:  'https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js'
-    }
-  ];
-  function loadScript(src) {
-    return new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = src; s.onload = resolve; s.onerror = resolve;
-      document.head.appendChild(s);
-    });
-  }
-  async function tryLoad(i) {
-    if (i >= CDNS.length) { window._firebaseLoaded = false; return; }
-    try {
-      await loadScript(CDNS[i].app);
-      await loadScript(CDNS[i].db);
-      window.firebaseAppModule = { initializeApp: (cfg) => firebase.initializeApp(cfg) };
-      window.firebaseDatabaseModule = {
-        getDatabase: (app) => firebase.database(app || undefined),
-        ref:    (db, path) => db.ref(path),
-        onValue:(ref, cb, opts) => opts && opts.onlyOnce ? ref.once('value').then(snap=>cb(snap)) : ref.on('value', cb),
-        set:    (ref, val) => ref.set(val),
-        get:    (ref) => ref.once('value'),
-        remove: (ref) => ref.remove(),
-        push:   (ref, val) => ref.push(val)
-      };
-      // firebase 객체 실제 존재 확인
-      if (typeof firebase === 'undefined' || !firebase.database) throw new Error('firebase not loaded');
-      window._firebaseLoaded = true;
-    } catch(e) {
-      tryLoad(i + 1);
-    }
-  }
-  window._firebaseLoaded = null;
-  tryLoad(0);
-})();
+// Firebase 모듈 래퍼
+window.firebaseAppModule = { initializeApp: (cfg) => firebase.initializeApp(cfg) };
+window.firebaseDatabaseModule = {
+  getDatabase: (app) => firebase.database(app || undefined),
+  ref:    (db, path) => db.ref(path),
+  onValue:(ref, cb, opts) => opts && opts.onlyOnce ? ref.once('value').then(snap=>cb(snap)) : ref.on('value', cb),
+  set:    (ref, val) => ref.set(val),
+  get:    (ref) => ref.once('value'),
+  remove: (ref) => ref.remove(),
+  push:   (ref, val) => ref.push(val)
+};
+window._firebaseLoaded = true;
 </script>
 <script>
 window.onerror = function(msg) {
@@ -381,17 +347,18 @@ window.renderTable = function() {
 
     if (!collapsed) {
       groups[mo].forEach(function(c) {
+        var k = c.key;
         html += '<tr class="course-row">';
-        html += '<td style="text-align:center;width:36px;padding:8px 4px;"><input type="checkbox" class="tt-chk" data-key="' + c.key + '" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);" onchange="updateBulkDel()"></td>';
-        html += '<td><span class="editable" onclick="editCell(this,'' + c.key + '','name')">' + (c.name||'-') + '</span></td>';
-        html += '<td><span class="editable" onclick="editCell(this,'' + c.key + '','teacher')">' + (c.teacher||'-') + '</span></td>';
-        html += '<td><span class="editable" onclick="editCell(this,'' + c.key + '','start')">' + (c.start||'-') + '</span></td>';
-        html += '<td><span class="editable" onclick="editCell(this,'' + c.key + '','end')">' + (c.end||'-') + '</span></td>';
-        html += '<td><span class="editable" onclick="editCell(this,'' + c.key + '','time')">' + (c.time||'-') + '</span></td>';
-        html += '<td><span class="editable" onclick="editCell(this,'' + c.key + '','room')">' + (c.room||'-') + '</span></td>';
-        html += '<td><span class="editable" onclick="editCell(this,'' + c.key + '','days')">' + (c.days||'-') + '</span></td>';
+        html += '<td style="text-align:center;width:36px;padding:8px 4px;"><input type="checkbox" class="tt-chk" data-key="' + k + '" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);" onchange="updateBulkDel()"></td>';
+        html += '<td><span class="editable" data-key="' + k + '" data-field="name" onclick="editCell(this,this.dataset.key,this.dataset.field)">' + (c.name||'-') + '</span></td>';
+        html += '<td><span class="editable" data-key="' + k + '" data-field="teacher" onclick="editCell(this,this.dataset.key,this.dataset.field)">' + (c.teacher||'-') + '</span></td>';
+        html += '<td><span class="editable" data-key="' + k + '" data-field="start" onclick="editCell(this,this.dataset.key,this.dataset.field)">' + (c.start||'-') + '</span></td>';
+        html += '<td><span class="editable" data-key="' + k + '" data-field="end" onclick="editCell(this,this.dataset.key,this.dataset.field)">' + (c.end||'-') + '</span></td>';
+        html += '<td><span class="editable" data-key="' + k + '" data-field="time" onclick="editCell(this,this.dataset.key,this.dataset.field)">' + (c.time||'-') + '</span></td>';
+        html += '<td><span class="editable" data-key="' + k + '" data-field="room" onclick="editCell(this,this.dataset.key,this.dataset.field)">' + (c.room||'-') + '</span></td>';
+        html += '<td><span class="editable" data-key="' + k + '" data-field="days" onclick="editCell(this,this.dataset.key,this.dataset.field)">' + (c.days||'-') + '</span></td>';
         html += '<td><span class="type-badge ' + (c.type==='주말'?'t-weekend':'t-weekday') + '">' + (c.type||'평일') + '</span></td>';
-        html += '<td><button class="del-btn" onclick="deleteCourse('' + c.key + '','' + (c.name||'').replace(/'/g,"\'") + '')">삭제</button></td>';
+        html += '<td><button class="del-btn" data-key="' + k + '" data-name="' + (c.name||'').replace(/"/g,'&quot;') + '" onclick="deleteCourse(this.dataset.key,this.dataset.name)">삭제</button></td>';
         html += '</tr>';
       });
     }

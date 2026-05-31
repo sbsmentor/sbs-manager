@@ -309,587 +309,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 
 <div class="toast" id="toast"></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
-// ═══════════════════════════════════════════
-// Firebase 설정
-// ═══════════════════════════════════════════
-const FB_CONFIG = {
-  apiKey: "AIzaSyCyCtQu20qgyCT1uRvmH3bmT1Q1bsT_pUw",
-  authDomain: "sbs-academy-game.firebaseapp.com",
-  databaseURL: "https://sbs-academy-game-default-rtdb.firebaseio.com",
-  projectId: "sbs-academy-game",
-  storageBucket: "sbs-academy-game.firebasestorage.app",
-  messagingSenderId: "120735998268",
-  appId: "1:120735998268:web:9d0d5c778451f69d63fe39"
-};
-
-// Firebase 인스턴스 (init 후 사용)
-let _db = null;
-function fbRef(path){ return _db.ref(path); }
-function fbGet(path){ return _db.ref(path).once('value'); }
-function fbSet(path, val){ return _db.ref(path).set(val); }
-function fbRemove(path){ return _db.ref(path).remove(); }
-function fbPush(path, val){ return _db.ref(path).push(val); }
-function fbOnValue(path, cb){ return _db.ref(path).on('value', cb); }
-
-// ═══════════════════════════════════════════
-// 상태
-// ═══════════════════════════════════════════
-let mentors = [];
-let isAdmin = false;
-let _loginTarget = null; // { id, name, role } — 로그인 진행 중인 멘토
-let _loginForAdmin = false;
-let _loginForCardId = null; // 카드 클릭으로 로그인 시 목적지
-
-// ═══════════════════════════════════════════
-// 유틸
-// ═══════════════════════════════════════════
-function showToast(msg){
-  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2500);
-}
-
-function getLoggedInId(){ return sessionStorage.getItem('sbsLoggedIn')||null; }
-function getLoggedInMentor(){ const id=getLoggedInId(); return id?mentors.find(m=>m.id===id):null; }
-
-function isAuthenticated(id){
-  const auth=JSON.parse(sessionStorage.getItem('sbsAuth')||'{}');
-  return !!auth[id];
-}
-function setAuthenticated(id){
-  const auth=JSON.parse(sessionStorage.getItem('sbsAuth')||'{}');
-  auth[id]=true;
-  sessionStorage.setItem('sbsAuth',JSON.stringify(auth));
-  sessionStorage.setItem('sbsLoggedIn',id);
-}
-
-// ═══════════════════════════════════════════
-// 로그인 상태 UI 업데이트
-// ═══════════════════════════════════════════
-function updateLoginUI(){
-  const id = getLoggedInId();
-  const m  = id ? mentors.find(x=>x.id===id) : null;
-  const statusEl  = document.getElementById('loginStatus');
-  const logoutBtn = document.getElementById('logoutBtn');
-  const ttBtn     = document.getElementById('ttBtn');
-  const subText   = document.getElementById('pageSubText');
-
-  const loginBtn = document.getElementById('headerLoginBtn');
-  if(m){
-    statusEl.textContent = `${m.name} ${m.role||'멘토'}님`;
-    statusEl.style.display = 'inline';
-    logoutBtn.style.display = 'inline';
-    if(loginBtn) loginBtn.style.display = 'none';
-    // 팀장/부장/원장이면 시간표 버튼
-    if(['팀장','부장','원장'].includes(m.role)) ttBtn.style.display='inline';
-    else ttBtn.style.display='none';
-    if(subText) subText.textContent='본인 이름 카드를 클릭하면 수강생 관리 페이지로 이동합니다.';
-  } else {
-    statusEl.style.display='none';
-    logoutBtn.style.display='none';
-    if(loginBtn) loginBtn.style.display = 'inline';
-    ttBtn.style.display='none';
-    if(subText) subText.textContent='이름 카드를 클릭하면 비밀번호 입력 후 수강생 관리 페이지로 이동합니다.';
-  }
-}
-
-// ═══════════════════════════════════════════
-// 로그아웃
-// ═══════════════════════════════════════════
-function doLogout(){
-  if(!confirm('로그아웃 하시겠습니까?')) return;
-  const name = getLoggedInMentor()?.name || '';
-  sessionStorage.removeItem('sbsLoggedIn');
-  sessionStorage.removeItem('sbsAuth');
-  isAdmin=false;
-  document.getElementById('adminToggle').classList.remove('on');
-  document.getElementById('adminToggle').textContent='⚙ 관리';
-  updateLoginUI();
-  renderMentors();
-  showToast(`👋 ${name}님 로그아웃되었습니다`);
-}
-
-// ═══════════════════════════════════════════
-// 카드 렌더
-// ═══════════════════════════════════════════
-function renderMentors(){
-  const container = document.getElementById('mentorGrid');
-  const loggedId  = getLoggedInId();
-  const loggedM   = loggedId ? mentors.find(m=>m.id===loggedId) : null;
-  const isSuperRole = loggedM && ['부장','팀장','원장'].includes(loggedM.role);
-
-  const teamColors={
-    '1팀':'#e03050','2팀':'#5b4fff','3팀':'#2563eb',
-    '4팀':'#d97706','5팀':'#18a963','6팀':'#7c3aed','원장팀':'#1a1a2e'
-  };
-  const teamBgs={
-    '1팀':'rgba(224,48,80,.08)','2팀':'rgba(91,79,255,.08)','3팀':'rgba(37,99,235,.08)',
-    '4팀':'rgba(217,119,6,.08)','5팀':'rgba(24,169,99,.08)','6팀':'rgba(124,58,237,.08)','원장팀':'rgba(26,26,46,.06)'
-  };
-  const teamOrder=['1팀','2팀','3팀','4팀','5팀','6팀','원장팀'];
-
-  const groups={};
-  mentors.forEach(m=>{ const t=m.team||'기타'; if(!groups[t]) groups[t]=[]; groups[t].push(m); });
-
-  let html='';
-  teamOrder.forEach(teamName=>{
-    const members=groups[teamName];
-    if(!members||!members.length) return;
-    const tc=teamColors[teamName]||'#18a963';
-    const tb=teamBgs[teamName]||'rgba(24,169,99,.08)';
-
-    html+=`<div style="margin-bottom:22px;">
-      <div style="font-size:11px;font-weight:800;color:${tc};letter-spacing:1px;font-family:var(--mono);margin-bottom:8px;display:flex;align-items:center;gap:7px;">
-        <span style="width:9px;height:9px;border-radius:50%;background:${tc};display:inline-block;"></span>
-        ${teamName} <span style="font-weight:400;color:var(--text3);font-size:11px;">${members.length}명</span>
-      </div>
-      <div class="card-grid" style="margin-bottom:0;">`;
-
-    members.forEach(m=>{
-      const ROLE_MAP={
-        '부장':  {color:'#7c3aed',bg:'#ede9fe',icon:'🏆'},
-        '원장':  {color:'#dc2626',bg:'#fee2e2',icon:'👑'},
-        '수석':  {color:'#0369a1',bg:'#e0f2fe',icon:'💎'},
-        '책임':  {color:'#0891b2',bg:'#cffafe',icon:'⭐'},
-        '선임':  {color:'#0d9488',bg:'#ccfbf1',icon:'🌟'},
-        '팀장':  {color:tc,      bg:tb,        icon:'🎯'},
-        '멘토':  {color:'#16a34a',bg:'#dcfce7',icon:'🌿'},
-      };
-      const rm=ROLE_MAP[m.role]||{color:'#64748b',bg:'#f1f5f9',icon:'👤'};
-      const roleColor=rm.color, roleBg=rm.bg, roleIcon=rm.icon;
-      const isMe = loggedId===m.id;
-      const cardBorder = isMe ? `border-top:3px solid ${tc};outline:2px solid ${tc}40;` : `border-top:3px solid ${tc};`;
-
-      html+=`<div class="mentor-card-wrap">
-        <div class="mentor-card" onclick="handleCardClick('${m.id}')" ontouchstart="_ttX=event.touches[0].clientX;_ttY=event.touches[0].clientY" ontouchend="if(Math.abs(event.changedTouches[0].clientX-_ttX)<10&&Math.abs(event.changedTouches[0].clientY-_ttY)<10){event.preventDefault();handleCardClick('${m.id}')}" style="${cardBorder}${isMe?'background:'+tb+';':''}">
-          <div class="mentor-avatar" style="background:${tb};font-size:40px;">${m.emoji||'👨‍🏫'}</div>
-          <div class="mentor-name" style="font-size:16px;font-weight:800;margin-top:6px;">${m.name} ${isMe?'<span style="font-size:11px;color:'+tc+';">● 나</span>':''}</div>
-          <div style="margin-top:5px;">
-            <span style="display:inline-flex;align-items:center;gap:3px;color:${roleColor};font-size:12px;font-weight:800;background:${roleBg};padding:4px 10px;border-radius:20px;letter-spacing:0.3px;">
-              ${roleIcon} ${m.role||'멘토'}
-            </span>
-            ${isSuperAdmin(loggedId)||loggedId==='이기건'?`<button onclick="event.stopPropagation();openRoleEdit('${m.id}')" ontouchend="event.stopPropagation();event.preventDefault();openRoleEdit('${m.id}')" style="margin-left:4px;padding:3px 7px;font-size:10px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc;color:#64748b;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">✏️</button>`:''}
-          </div>
-
-        </div>
-        ${isAdmin?`<button class="mentor-del" onclick="event.stopPropagation();deleteMentor('${m.id}')">✕</button>`:''}
-      </div>`;
-    });
-
-    if(isAdmin){
-      html+=`<div class="add-card" onclick="openAddModal()">
-        <div class="add-card-icon">➕</div>
-        <div class="add-card-text">${teamName} 추가</div>
-      </div>`;
-    }
-    html+=`</div></div>`;
-  });
-
-  container.innerHTML = html;
-
-}
-
-// ═══════════════════════════════════════════
-// 카드 클릭 핸들러
-// ═══════════════════════════════════════════
-function handleCardClick(id){
-  const loggedId = getLoggedInId();
-
-  // 이미 내가 로그인된 경우 → 바로 이동
-  if(loggedId && isAuthenticated(loggedId)){
-    const loggedM = mentors.find(m=>m.id===loggedId);
-    // 원장/부장은 모든 카드 바로 이동
-    if(loggedId===id || isSuperAdmin(loggedId) || (loggedM && ['부장','팀장','원장'].includes(loggedM.role))){
-      location.href=`manager.html?mentor=${encodeURIComponent(id)}`;
-      return;
-    }
-  }
-
-  // 로그인 필요 → 로그인 모달
-  const m = mentors.find(x=>x.id===id);
-  _loginTarget = m || { id };
-  _loginForCardId = id;
-  _loginForAdmin = false;
-  openLoginModal(`${m?.name||''} 계정으로 로그인`, '비밀번호를 입력하면 수강생 관리 페이지로 이동합니다.');
-  // 이름 자동 입력
-  const nameEl=document.getElementById('loginName');
-  if(nameEl){ nameEl.value=m?.name||''; nameEl.readOnly=true; nameEl.style.background='var(--surface2)'; }
-}
-
-// ═══════════════════════════════════════════
-// 로그인 모달
-// ═══════════════════════════════════════════
-
-// 모달 배경 터치로 닫기 (모바일)
-document.addEventListener('DOMContentLoaded', function(){
-  ['loginModalBg','addModalBg','changePwModalBg'].forEach(id => {
-    const el = document.getElementById(id);
-    if(el) el.addEventListener('touchend', function(e){
-      if(e.target===el) { el.classList.remove('open'); }
-    }, {passive:true});
-  });
-});
-// 터치로닫기
-let _ttX=0,_ttY=0; // 터치 스크롤 감지용
-
-function openLoginModal(title, sub){
-  if(title) { 
-    const t=document.getElementById('loginModalTitle'); 
-    if(t) t.textContent=title; 
-  }
-  if(sub) { 
-    const s=document.getElementById('loginModalSub'); 
-    if(s) s.textContent=sub; 
-  }
-  document.getElementById('loginPw').value='';
-  document.getElementById('loginErr').style.display='none';
-  document.getElementById('loginModalBg').classList.add('open');
-  setTimeout(()=>{ const n=document.getElementById('loginName'); if(n&&!n.readOnly&&!n.value) n.focus(); else document.getElementById('loginPw').focus(); }, 150);
-}
-function closeLoginModal(){
-  document.getElementById('loginModalBg').classList.remove('open');
-  _loginTarget=null; _loginForCardId=null; _loginForAdmin=false;
-  const nameEl=document.getElementById('loginName');
-  if(nameEl){ nameEl.value=''; nameEl.readOnly=false; nameEl.style.background=''; }
-}
-
-// 이름 입력 시 자동으로 mentors에서 찾기
-function loginNameInput(el){
-  const v = el.value.trim();
-  const m = mentors.find(x=>x.name===v);
-  _loginTarget = m || null;
-}
-
-async function doLogin(){
-  const nameVal = document.getElementById('loginName').value.trim();
-  const pwVal   = document.getElementById('loginPw').value;
-  const errEl   = document.getElementById('loginErr');
-  errEl.style.display='none';
-
-  // 대상 결정
-  let target = _loginTarget;
-  if(!target || target.name !== nameVal){
-    target = mentors.find(m=>m.name===nameVal);
-  }
-  if(!target){
-    errEl.textContent='❌ 이름을 찾을 수 없습니다.'; errEl.style.display='block'; return;
-  }
-
-  // 비밀번호 확인
-  const snap = await fbGet(`mentors/${target.id}/password`);
-  const savedPw = snap.val() || '1234';
-
-  if(pwVal !== savedPw){
-    errEl.textContent='❌ 비밀번호가 올바르지 않습니다.'; errEl.style.display='block';
-    document.getElementById('loginPw').value=''; document.getElementById('loginPw').focus();
-    return;
-  }
-
-  // 로그인 성공
-  setAuthenticated(target.id);
-  closeLoginModal();
-  updateLoginUI();
-  renderMentors();
-  const welcomeRole = target.role || '멘토';
-  showToast(`✅ ${target.name} ${welcomeRole}님 환영합니다!`);
-
-  if(_loginForAdmin){
-    isAdmin=true;
-    document.getElementById('adminToggle').classList.add('on');
-    document.getElementById('adminToggle').textContent='⚙ 관리 ON';
-    renderMentors();
-    _loginForAdmin=false;
-    return;
-  }
-
-  // 카드 클릭으로 온 경우 → 해당 페이지 이동
-  if(_loginForCardId){
-    const dest = _loginForCardId;
-    _loginForCardId=null;
-    location.href=`manager.html?mentor=${encodeURIComponent(dest)}`;
-  }
-}
-
-// ═══════════════════════════════════════════
-// 비밀번호 변경
-// ═══════════════════════════════════════════
-function showChangePwFromLogin(){
-  document.getElementById('loginModalBg').classList.remove('open');
-  document.getElementById('oldPwInput').value='';
-  document.getElementById('newPwInput').value='';
-  document.getElementById('newPwInput2').value='';
-  document.getElementById('changePwErr').style.display='none';
-  document.getElementById('changePwModalBg').classList.add('open');
-  setTimeout(()=>document.getElementById('oldPwInput').focus(),100);
-}
-function closeChangePwModal(){
-  document.getElementById('changePwModalBg').classList.remove('open');
-  if(_loginTarget) document.getElementById('loginModalBg').classList.add('open');
-}
-async function doChangePw(){
-  const errEl=document.getElementById('changePwErr');
-  errEl.style.display='none';
-  const target=_loginTarget;
-  if(!target){ errEl.textContent='❌ 로그인 대상을 알 수 없습니다.'; errEl.style.display='block'; return; }
-  const oldPw=document.getElementById('oldPwInput').value;
-  const newPw=document.getElementById('newPwInput').value;
-  const newPw2=document.getElementById('newPwInput2').value;
-  const snap=await fbGet(`mentors/${target.id}/password`);
-  const savedPw=snap.val()||'1234';
-  if(oldPw!==savedPw){ errEl.textContent='❌ 현재 비밀번호가 틀렸습니다.'; errEl.style.display='block'; return; }
-  if(newPw.length<4){ errEl.textContent='❌ 새 비밀번호는 4자리 이상이어야 합니다.'; errEl.style.display='block'; return; }
-  if(newPw!==newPw2){ errEl.textContent='❌ 새 비밀번호가 일치하지 않습니다.'; errEl.style.display='block'; return; }
-  await fbSet(`mentors/${target.id}/password`, newPw);
-  closeChangePwModal();
-  showToast('✅ 비밀번호가 변경되었습니다!');
-}
-
-// ═══════════════════════════════════════════
-// 관리자 모드
-// ═══════════════════════════════════════════
-function toggleAdmin(){
-  if(!isAdmin){
-    const loggedId=getLoggedInId();
-    if(loggedId && isAuthenticated(loggedId)){
-      const m=mentors.find(x=>x.id===loggedId);
-      if(m && ['팀장','부장','원장'].includes(m.role)){
-        isAdmin=true;
-        document.getElementById('adminToggle').classList.add('on');
-        document.getElementById('adminToggle').textContent='⚙ 관리 ON';
-        renderMentors(); return;
-      }
-    }
-    // 관리자 로그인 필요
-    _loginForAdmin=true;
-    _loginTarget=null; _loginForCardId=null;
-    const nameEl=document.getElementById('loginName');
-    if(nameEl){ nameEl.value=''; nameEl.readOnly=false; nameEl.style.background=''; }
-    openLoginModal('⚙ 관리자 로그인','팀장/부장 계정으로 로그인하세요.');
-  } else {
-    isAdmin=false;
-    document.getElementById('adminToggle').classList.remove('on');
-    document.getElementById('adminToggle').textContent='⚙ 관리';
-    renderMentors();
-  }
-}
-
-// ═══════════════════════════════════════════
-// 강사 추가/삭제
-// ═══════════════════════════════════════════
-window.openAddModal = function(team){
-  document.getElementById('addModalBg').classList.add('open');
-  setTimeout(()=>document.getElementById('newName').focus(),100);
-};
-window.closeAddModal = function(){
-  document.getElementById('addModalBg').classList.remove('open');
-  document.getElementById('newName').value='';
-  document.getElementById('newRole').value='';
-};
-
-// 직책별 이모지 자동 세팅
-function autoSetEmoji(role) {
-  const emojiMap = {
-    '원장':'👑','부장':'🏆','수석':'💎','책임':'⭐','선임':'🌟','팀장':'🎯','멘토':'🌿'
-  };
-  const sel = document.getElementById('newEmoji');
-  if (sel && emojiMap[role]) {
-    for (let i=0; i<sel.options.length; i++) {
-      if (sel.options[i].value === emojiMap[role]) {
-        sel.selectedIndex = i;
-        break;
-      }
-    }
-  }
-}
-
-// 한대희(원장) 전체 관리 권한 체크
-const SUPER_ADMINS = ['한대희','백정민'];
-function isSuperAdmin(id) { return SUPER_ADMINS.includes(id); }
-
-window.addMentor = async function(){
-  const name = document.getElementById('newName').value.trim();
-  const roleSel = document.getElementById('newRole');
-  const role = roleSel ? roleSel.value : '멘토';
-  const emoji = document.getElementById('newEmoji').value;
-  const teamEl = document.getElementById('newTeam');
-  const team = teamEl ? teamEl.value : '기타';
-  if(!name){ showToast('⚠ 이름을 입력하세요'); return; }
-  const id = name; // 이름을 ID로 사용
-  // 이미 존재하는 이름이면 경고
-  if(mentors.find(m=>m.name===name)){
-    showToast('⚠ 이미 존재하는 이름입니다'); return;
-  }
-  const maxOrder = mentors.length > 0 ? Math.max(...mentors.map(m=>m.order||0)) + 1 : 1;
-  const mentor = {id, name, role, emoji, team, order: maxOrder};
-  await fbSet(`mentorList/${id}`, mentor);
-  closeAddModal();
-  showToast(`✅ ${name} 멘토가 추가되었습니다`);
-};
-window.deleteMentor = async function(id){
-  const m=mentors.find(x=>x.id===id);
-  if(!confirm(`"${m?.name}" 강사를 삭제하시겠습니까?\n수강생 데이터도 모두 삭제됩니다!`)) return;
-  await fbRemove(`mentorList/${id}`);
-  await fbRemove(`mentors/${id}`);
-  showToast('삭제되었습니다');
-};
-
-// ═══════════════════════════════════════════
-// 멘토 목록 로드 (실시간)
-// ═══════════════════════════════════════════
-
-
-// ── 직책 수정 ──
-let _roleEditId = null;
-function openRoleEdit(mentorId) {
-  _roleEditId = mentorId;
-  const m = mentors.find(x=>x.id===mentorId);
-  if (!m) return;
-  const sel = document.getElementById('roleEditSelect');
-  const opts = ['멘토','선임','책임','수석','팀장','부장','원장'];
-  if (opts.includes(m.role)) {
-    sel.value = m.role;
-    document.getElementById('roleEditCustom').value = '';
-  } else {
-    sel.value = '멘토';
-    document.getElementById('roleEditCustom').value = m.role || '';
-  }
-  document.getElementById('roleEditModalBg').classList.add('open');
-  setTimeout(()=>document.getElementById('roleEditSelect').focus(), 100);
-}
-function closeRoleEdit() {
-  document.getElementById('roleEditModalBg').classList.remove('open');
-  _roleEditId = null;
-}
-async function saveRoleEdit() {
-  if (!_roleEditId) return;
-  const custom = document.getElementById('roleEditCustom').value.trim();
-  const sel = document.getElementById('roleEditSelect').value;
-  const newRole = custom || sel;
-  const emojiMap={'원장':'👑','부장':'🏆','수석':'💎','책임':'⭐','선임':'🌟','팀장':'🎯','멘토':'🌿'};
-  await fbSet(`mentorList/${_roleEditId}/role`, newRole);
-  if(emojiMap[newRole]) await fbSet(`mentorList/${_roleEditId}/emoji`, emojiMap[newRole]);
-  const m = mentors.find(x=>x.id===_roleEditId);
-  if(m){ m.role=newRole; if(emojiMap[newRole]) m.emoji=emojiMap[newRole]; }
-  closeRoleEdit();
-  renderMentors();
-  showToast('✅ ' + _roleEditId + ' 직책 변경: ' + newRole);
-}
-// ──────────────
-
-function loadMentors(){
-  fbOnValue('mentorList', snap=>{
-    const data=snap.val();
-    const ROLE_ORDER={'멘토':0,'선임':1,'책임':2,'수석':3,'팀장':4,'부장':5,'원장':6};
-    mentors=data ? Object.values(data).sort((a,b)=>{
-      // 1차: 직책 우선순위 내림차순 (원장이 앞), 2차: order
-      const ro=(ROLE_ORDER[b.role]??-1)-(ROLE_ORDER[a.role]??-1);
-      if(ro!==0) return ro;
-      return (a.order??99)-(b.order??99);
-    }) : [];
-    updateLoginUI();
-    renderMentors();
-  });
-}
-
-// ═══════════════════════════════════════════
-// 초기 멘토 데이터 (최초 세팅)
-// ═══════════════════════════════════════════
-const INITIAL_MENTORS = {
-  '백정민':{ id:'백정민', name:'백정민', role:'부장', emoji:'🏆', order:0,  team:'1팀' },
-  '이민희':{ id:'이민희', name:'이민희', role:'멘토', emoji:'🌿', order:1,  team:'1팀' },
-  '김기은':{ id:'김기은', name:'김기은', role:'멘토', emoji:'🌿', order:2,  team:'1팀' },
-  '조영승':{ id:'조영승', name:'조영승', role:'멘토', emoji:'🌿', order:3,  team:'1팀' },
-  '황유진':{ id:'황유진', name:'황유진', role:'멘토', emoji:'🌿', order:4,  team:'1팀' },
-  '제갈배준':{ id:'제갈배준', name:'제갈배준', role:'팀장', emoji:'🎯', order:5,  team:'2팀' },
-  '이종혁':{ id:'이종혁', name:'이종혁', role:'선임', emoji:'🌟', order:6,  team:'2팀' },
-  '이지오':{ id:'이지오', name:'이지오', role:'멘토', emoji:'🌿', order:7,  team:'2팀' },
-  '손병운':{ id:'손병운', name:'손병운', role:'팀장', emoji:'🎯', order:8,  team:'3팀' },
-  '이안심':{ id:'이안심', name:'이안심', role:'멘토', emoji:'🌿', order:9,  team:'3팀' },
-  '조건희':{ id:'조건희', name:'조건희', role:'멘토', emoji:'🌿', order:10, team:'3팀' },
-  '황규선':{ id:'황규선', name:'황규선', role:'멘토', emoji:'🌿', order:11, team:'3팀' },
-  '최인규':{ id:'최인규', name:'최인규', role:'팀장', emoji:'🎯', order:12, team:'4팀' },
-  '윤초롱':{ id:'윤초롱', name:'윤초롱', role:'책임', emoji:'⭐', order:13, team:'4팀' },
-  '박지용':{ id:'박지용', name:'박지용', role:'멘토', emoji:'🌿', order:14, team:'4팀' },
-  '유진':  { id:'유진',   name:'유진',   role:'멘토', emoji:'🌿', order:15, team:'4팀' },
-  '안소현':{ id:'안소현', name:'안소현', role:'팀장', emoji:'🎯', order:16, team:'5팀' },
-  '이은채':{ id:'이은채', name:'이은채', role:'멘토', emoji:'🌿', order:17, team:'5팀' },
-  '이연재':{ id:'이연재', name:'이연재', role:'멘토', emoji:'🌿', order:18, team:'5팀' },
-  '이기건':{ id:'이기건', name:'이기건', role:'팀장', emoji:'🎯', order:19, team:'6팀' },
-  '한대희':{ id:'한대희', name:'한대희', role:'원장', emoji:'👑', order:20, team:'6팀' },
-  '박무경':{ id:'박무경', name:'박무경', role:'멘토', emoji:'🌿', order:21, team:'원장팀' },
-};
-
-async function seedMentors(){
-  // mentorList에 데이터가 하나라도 있으면 스킵 (삭제된 멘토 복구 방지)
-  try {
-    const snap = await fbGet('mentorList');
-    const existing = snap.val() || {};
-    // 이미 데이터가 있으면 role/emoji만 동기화 (삭제 보존)
-    if (Object.keys(existing).length > 0) {
-      for(const [id,mentor] of Object.entries(INITIAL_MENTORS)){
-        if(!existing[id]) continue; // 삭제된 멘토는 복구 안함
-        if(existing[id].role !== mentor.role){
-          await fbSet(`mentorList/${id}/role`, mentor.role);
-        }
-        if(existing[id].emoji !== mentor.emoji){
-          await fbSet(`mentorList/${id}/emoji`, mentor.emoji);
-        }
-      }
-      return;
-    }
-    // 완전히 비어있을 때만 초기 데이터 추가 (최초 세팅)
-    for(const [id,mentor] of Object.entries(INITIAL_MENTORS)){
-      await fbSet(`mentorList/${id}`, mentor);
-    }
-  } catch(e) {}
-}
-
-// ═══════════════════════════════════════════
-// 초기화
-// ═══════════════════════════════════════════
-async function init(){
-  // Firebase SDK 로드 대기 (최대 10초)
-  await new Promise(resolve=>{
-    let t=0;
-    const iv=setInterval(()=>{
-      if(window._fbLoaded===true||window._fbLoaded===false){ clearInterval(iv); resolve(); }
-      if((t+=100)>=10000){ clearInterval(iv); resolve(); }
-    },100);
-  });
-
-  if(window._fbLoaded===true){
-    try {
-      const fbApp = (firebase.apps && firebase.apps.length)
-        ? firebase.apps[0]
-        : firebase.initializeApp(FB_CONFIG);
-      _db = firebase.database(fbApp);
-    } catch(e) {
-      window._fbLoaded = false;
-    }
-  }
-  if(window._fbLoaded!==true){
-    document.getElementById('loadingScreen').style.display='none';
-    document.getElementById('mainScreen').style.display='block';
-    document.getElementById('mentorGrid').innerHTML=
-      '<div style="padding:48px;text-align:center;color:var(--red);"><div style="font-size:40px;margin-bottom:12px;">⚠️</div><div style="font-size:15px;font-weight:700;">Firebase 연결 실패</div><div style="font-size:12px;color:var(--text2);margin-top:6px;">인터넷 연결을 확인하고 새로고침해주세요.</div></div>';
-    return;
-  }
-
-  document.getElementById('loadingScreen').style.display='none';
-  document.getElementById('mainScreen').style.display='block';
-
-  await seedMentors();
-  loadMentors();
-}
-
-init();
-
-// 뒤로가기 시 최신 데이터 강제 로드
-window.addEventListener('pageshow', function(e){
-  if(e.persisted){ // bfcache에서 복원된 경우
-    loadMentors();
-  }
-});
+window._firebaseLoaded = true;
 </script>
 
 <!-- 직책 수정 모달 -->
@@ -918,5 +341,360 @@ window.addEventListener('pageshow', function(e){
     </div>
   </div>
 </div>
+
+<script>
+// ── Firebase 설정 ──
+const FB_CONFIG = {
+  apiKey: "AIzaSyCyCtQu20qgyCT1uRvmH3bmT1Q1bsT_pUw",
+  authDomain: "sbs-academy-game.firebaseapp.com",
+  databaseURL: "https://sbs-academy-game-default-rtdb.firebaseio.com",
+  projectId: "sbs-academy-game",
+  storageBucket: "sbs-academy-game.firebasestorage.app",
+  messagingSenderId: "120735998268",
+  appId: "1:120735998268:web:9d0d5c778451f69d63fe39"
+};
+
+// ── Firebase helpers ──
+let _fbApp, _db;
+function _initFb(){
+  if(_db) return;
+  _fbApp = (firebase.apps&&firebase.apps.length)?firebase.apps[0]:firebase.initializeApp(FB_CONFIG);
+  _db = firebase.database(_fbApp);
+}
+function fbSet(path, val){ _initFb(); return _db.ref(path).set(val); }
+function fbGet(path){ _initFb(); return _db.ref(path).once('value'); }
+function fbRemove(path){ _initFb(); return _db.ref(path).remove(); }
+function fbOnValue(path, cb){ _initFb(); return _db.ref(path).on('value', cb); }
+function fbPush(path, val){ _initFb(); return _db.ref(path).push(val); }
+
+// ── 상태 ──
+let mentors = [];
+let isAdmin = false;
+let _loginTarget = null;
+let _loginForAdmin = false;
+let _loginForCardId = null;
+let _ttX=0, _ttY=0;
+
+// ── 직급 순서 (높을수록 앞에 배치) ──
+const ROLE_ORDER = {'멘토':0,'선임':1,'책임':2,'수석':3,'팀장':4,'부장':5,'원장':6};
+const SUPER_ADMINS = ['한대희','백정민'];
+function isSuperAdmin(id){ return SUPER_ADMINS.includes(id); }
+
+// ── 이모지 자동 세팅 ──
+function autoSetEmoji(role){
+  const map={'원장':'👑','부장':'🏆','수석':'💎','책임':'⭐','선임':'🌟','팀장':'🎯','멘토':'🌿'};
+  const sel=document.getElementById('newEmoji');
+  if(sel&&map[role]) for(let i=0;i<sel.options.length;i++) if(sel.options[i].value===map[role]){sel.selectedIndex=i;break;}
+}
+
+// ── 유틸 ──
+function showToast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+function getLoggedInId(){ return localStorage.getItem('sbs_logged_in'); }
+function setAuthenticated(id){ localStorage.setItem('sbs_logged_in',id); }
+function clearAuthenticated(){ localStorage.removeItem('sbs_logged_in'); }
+
+// ── 로그인 UI ──
+function updateLoginUI(){
+  const id=getLoggedInId();
+  const m=id?mentors.find(x=>x.id===id):null;
+  const statusEl=document.getElementById('loginStatus');
+  const logoutBtn=document.getElementById('logoutBtn');
+  const ttBtn=document.getElementById('ttBtn');
+  const loginBtn=document.getElementById('headerLoginBtn');
+  if(m){
+    statusEl.textContent=`${m.name} ${m.role||'멘토'}님`;
+    statusEl.style.display='inline';
+    logoutBtn.style.display='inline';
+    if(loginBtn) loginBtn.style.display='none';
+  } else {
+    statusEl.style.display='none';
+    logoutBtn.style.display='none';
+    if(loginBtn) loginBtn.style.display='inline';
+  }
+  isAdmin = m && ['원장','부장'].includes(m.role);
+  document.getElementById('adminToggle').textContent = isAdmin ? '⚙ 관리 ON' : '⚙ 관리';
+}
+
+function openLoginModal(title, sub){
+  if(title){ const t=document.getElementById('loginModalTitle'); if(t) t.textContent=title; }
+  document.getElementById('loginPw').value='';
+  document.getElementById('loginErr').style.display='none';
+  document.getElementById('loginModalBg').classList.add('open');
+  setTimeout(()=>{
+    const n=document.getElementById('loginName');
+    if(n&&!n.readOnly&&!n.value) n.focus();
+    else document.getElementById('loginPw').focus();
+  }, 150);
+}
+function closeLoginModal(){
+  document.getElementById('loginModalBg').classList.remove('open');
+  _loginTarget=null; _loginForCardId=null; _loginForAdmin=false;
+}
+function doLogout(){
+  clearAuthenticated(); updateLoginUI(); renderMentors();
+  showToast('로그아웃되었습니다');
+}
+
+// ── 로그인 처리 ──
+async function doLogin(){
+  const nameVal=document.getElementById('loginName').value.trim();
+  const pwVal=document.getElementById('loginPw').value;
+  const errEl=document.getElementById('loginErr');
+  errEl.style.display='none';
+  let target=_loginTarget;
+  if(!target||target.name!==nameVal) target=mentors.find(m=>m.name===nameVal);
+  if(!target){ errEl.textContent='❌ 이름을 찾을 수 없습니다.'; errEl.style.display='block'; return; }
+  const snap=await fbGet(`mentorList/${target.id}/password`);
+  const savedPw=snap.val()||'1234';
+  if(pwVal!==savedPw){
+    errEl.textContent='❌ 비밀번호가 올바르지 않습니다.'; errEl.style.display='block';
+    document.getElementById('loginPw').value=''; document.getElementById('loginPw').focus(); return;
+  }
+  setAuthenticated(target.id);
+  const welcomeRole=target.role||'멘토';
+  closeLoginModal(); updateLoginUI(); renderMentors();
+  showToast(`✅ ${target.name} ${welcomeRole}님 환영합니다!`);
+  if(_loginForCardId){ const cid=_loginForCardId; _loginForCardId=null; goToManager(cid); }
+}
+
+async function doChangePw(){
+  const id=getLoggedInId(); if(!id) return;
+  const oldPw=document.getElementById('oldPwInput').value;
+  const newPw=document.getElementById('newPwInput').value;
+  const newPw2=document.getElementById('newPwInput2').value;
+  const errEl=document.getElementById('changePwErr');
+  errEl.style.display='none';
+  if(newPw!==newPw2){ errEl.textContent='새 비밀번호가 일치하지 않습니다.'; errEl.style.display='block'; return; }
+  if(newPw.length<4){ errEl.textContent='비밀번호는 4자리 이상이어야 합니다.'; errEl.style.display='block'; return; }
+  const snap=await fbGet(`mentorList/${id}/password`);
+  const savedPw=snap.val()||'1234';
+  if(oldPw!==savedPw){ errEl.textContent='현재 비밀번호가 틀렸습니다.'; errEl.style.display='block'; return; }
+  await fbSet(`mentorList/${id}/password`, newPw);
+  document.getElementById('changePwModalBg').classList.remove('open');
+  showToast('✅ 비밀번호가 변경되었습니다');
+}
+function closeChangePwModal(){ document.getElementById('changePwModalBg').classList.remove('open'); }
+function openChangePwModal(){ document.getElementById('changePwModalBg').classList.add('open'); }
+
+// ── 관리 토글 ──
+function toggleAdmin(){
+  const id=getLoggedInId();
+  if(!id){ openLoginModal('관리자 로그인'); _loginForAdmin=true; return; }
+  const m=mentors.find(x=>x.id===id);
+  if(!m||!['원장','부장'].includes(m.role)){ showToast('⚠ 관리자 권한이 필요합니다'); return; }
+  isAdmin=!isAdmin;
+  document.getElementById('adminToggle').textContent=isAdmin?'⚙ 관리 ON':'⚙ 관리';
+  renderMentors();
+}
+
+// ── 카드 클릭 ──
+function handleCardClick(id){
+  const loggedId=getLoggedInId();
+  if(!loggedId){
+    _loginForCardId=id;
+    const m=mentors.find(x=>x.id===id);
+    _loginTarget=m||null;
+    const nameEl=document.getElementById('loginName');
+    if(nameEl){ nameEl.value=m?m.name:''; nameEl.readOnly=!!m; nameEl.style.background=m?'#f8fafc':''; }
+    openLoginModal('로그인');
+    return;
+  }
+  const loggedM=mentors.find(x=>x.id===loggedId);
+  if(loggedId===id||isSuperAdmin(loggedId)||(loggedM&&['원장','부장','팀장'].includes(loggedM.role))){
+    goToManager(id); return;
+  }
+  _loginForCardId=id;
+  const m=mentors.find(x=>x.id===id);
+  _loginTarget=m||null;
+  const nameEl=document.getElementById('loginName');
+  if(nameEl){ nameEl.value=m?m.name:''; nameEl.readOnly=!!m; nameEl.style.background=m?'#f8fafc':''; }
+  openLoginModal('로그인');
+}
+function goToManager(id){ window.location.href=`manager.html?id=${encodeURIComponent(id)}`; }
+
+// ── 멘토 렌더링 ──
+function renderMentors(){
+  const container=document.getElementById('mentorGrid');
+  const loggedId=getLoggedInId();
+  const loggedM=loggedId?mentors.find(m=>m.id===loggedId):null;
+  const teamColors={'1팀':'#e03050','2팀':'#5b4fff','3팀':'#2563eb','4팀':'#d97706','5팀':'#18a963','6팀':'#7c3aed','원장팀':'#1a1a2e'};
+  const teamBgs={'1팀':'rgba(224,48,80,.08)','2팀':'rgba(91,79,255,.08)','3팀':'rgba(37,99,235,.08)','4팀':'rgba(217,119,6,.08)','5팀':'rgba(24,169,99,.08)','6팀':'rgba(124,58,237,.08)','원장팀':'rgba(26,26,46,.06)'};
+  const teamOrder=['1팀','2팀','3팀','4팀','5팀','6팀','원장팀'];
+  const groups={};
+  mentors.forEach(m=>{ const t=m.team||'기타'; if(!groups[t]) groups[t]=[]; groups[t].push(m); });
+  let html='';
+  const renderTeam=(team)=>{
+    const ms=groups[team]||[]; if(!ms.length) return;
+    const tc=teamColors[team]||'#333', tb=teamBgs[team]||'rgba(0,0,0,.04)';
+    html+=`<div class="team-section" style="border-left:3px solid ${tc};padding:12px 16px 16px;margin-bottom:16px;border-radius:0 8px 8px 0;background:${tb}">`;
+    html+=`<div class="team-label" style="font-size:12px;font-weight:700;color:${tc};margin-bottom:10px;">● ${team} <span style="font-weight:400;opacity:.7">${ms.length}명</span></div>`;
+    html+=`<div class="mentor-grid">`;
+    ms.forEach(m=>{
+      const isMe=loggedId===m.id;
+      const ROLE_MAP={'부장':{color:'#7c3aed',bg:'#ede9fe',icon:'🏆'},'원장':{color:'#dc2626',bg:'#fee2e2',icon:'👑'},'수석':{color:'#0369a1',bg:'#e0f2fe',icon:'💎'},'책임':{color:'#0891b2',bg:'#cffafe',icon:'⭐'},'선임':{color:'#0d9488',bg:'#ccfbf1',icon:'🌟'},'팀장':{color:tc,bg:tb,icon:'🎯'},'멘토':{color:'#16a34a',bg:'#dcfce7',icon:'🌿'}};
+      const rm=ROLE_MAP[m.role]||{color:'#64748b',bg:'#f1f5f9',icon:'👤'};
+      const {color:roleColor,bg:roleBg,icon:roleIcon}=rm;
+      const cardBorder=isMe?`border:2px solid ${tc};`:'';
+      html+=`<div class="mentor-card-wrap">
+        <div class="mentor-card" onclick="handleCardClick('${m.id}')" ontouchstart="_ttX=event.touches[0].clientX;_ttY=event.touches[0].clientY" ontouchend="if(Math.abs(event.changedTouches[0].clientX-_ttX)<10&&Math.abs(event.changedTouches[0].clientY-_ttY)<10){event.preventDefault();handleCardClick('${m.id}')}" style="${cardBorder}${isMe?'background:'+tb+';':''}">
+          <div class="mentor-avatar" style="background:${tb};font-size:32px;margin:0 auto 8px auto;">${m.emoji||'🌿'}</div>
+          <div class="mentor-name" style="font-size:16px;font-weight:800;margin-top:6px;">${m.name} ${isMe?`<span style="font-size:11px;color:${tc};">● 나</span>`:''}</div>
+          <div style="margin-top:5px;">
+            <span style="display:inline-flex;align-items:center;gap:3px;color:${roleColor};font-size:12px;font-weight:800;background:${roleBg};padding:4px 10px;border-radius:20px;">${roleIcon} ${m.role||'멘토'}</span>
+            ${isSuperAdmin(loggedId)||loggedId==='이기건'?`<button onclick="event.stopPropagation();openRoleEdit('${m.id}')" ontouchend="event.stopPropagation();event.preventDefault();openRoleEdit('${m.id}')" style="margin-left:4px;padding:3px 7px;font-size:10px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc;color:#64748b;cursor:pointer;">✏️</button>`:''}
+          </div>
+        </div>
+        ${isAdmin?`<button class="mentor-del-btn" onclick="deleteMentor('${m.id}')">✕</button>`:''}
+      </div>`;
+    });
+    html+=`</div>`;
+    if(isAdmin) html+=`<div class="add-card" onclick="openAddModal('${team}')"><div class="add-card-icon">➕</div><div class="add-card-label">${team} 추가</div></div>`;
+    html+=`</div>`;
+  };
+  teamOrder.forEach(renderTeam);
+  Object.keys(groups).filter(t=>!teamOrder.includes(t)).forEach(renderTeam);
+  container.innerHTML=html;
+}
+
+// ── 멘토 로드 ──
+function loadMentors(){
+  fbOnValue('mentorList', snap=>{
+    const data=snap.val();
+    const ROLE_ORDER2={'멘토':0,'선임':1,'책임':2,'수석':3,'팀장':4,'부장':5,'원장':6};
+    mentors=data?Object.values(data).sort((a,b)=>{
+      const ro=(ROLE_ORDER2[b.role]??-1)-(ROLE_ORDER2[a.role]??-1);
+      if(ro!==0) return ro;
+      return (a.order??99)-(b.order??99);
+    }):[];
+    updateLoginUI(); renderMentors();
+  });
+}
+
+// ── 멘토 추가/삭제 ──
+function openAddModal(team){
+  document.getElementById('newName').value='';
+  const teamSel=document.getElementById('newTeam');
+  if(teamSel&&team) teamSel.value=team;
+  document.getElementById('addModalBg').classList.add('open');
+  setTimeout(()=>document.getElementById('newName').focus(),100);
+}
+function closeAddModal(){ document.getElementById('addModalBg').classList.remove('open'); }
+
+window.addMentor = async function(){
+  const name=document.getElementById('newName').value.trim();
+  const roleSel=document.getElementById('newRole'); const role=roleSel?roleSel.value:'멘토';
+  const emoji=document.getElementById('newEmoji').value;
+  const teamEl=document.getElementById('newTeam'); const team=teamEl?teamEl.value:'기타';
+  if(!name){ showToast('⚠ 이름을 입력하세요'); return; }
+  if(mentors.find(m=>m.name===name)){ showToast('⚠ 이미 존재하는 이름입니다'); return; }
+  const maxOrder=mentors.length>0?Math.max(...mentors.map(m=>m.order||0))+1:1;
+  const mentor={id:name,name,role,emoji,team,order:maxOrder};
+  await fbSet(`mentorList/${name}`,mentor);
+  closeAddModal(); showToast(`✅ ${name} 멘토가 추가되었습니다`);
+};
+
+window.deleteMentor = async function(id){
+  const m=mentors.find(x=>x.id===id); if(!m) return;
+  if(!confirm(`"${m.name}" 멘토를 삭제하시겠습니까?`)) return;
+  await fbRemove(`mentorList/${id}`);
+  await fbRemove(`mentors/${id}`);
+  showToast(`✅ ${m.name} 삭제 완료`);
+};
+
+// ── 직책 수정 ──
+let _roleEditId=null;
+function openRoleEdit(mentorId){
+  _roleEditId=mentorId;
+  const m=mentors.find(x=>x.id===mentorId); if(!m) return;
+  const sel=document.getElementById('roleEditSelect');
+  const opts=['원장','부장','수석','책임','선임','팀장','멘토'];
+  if(opts.includes(m.role)) sel.value=m.role;
+  else { sel.value='멘토'; document.getElementById('roleEditCustom').value=m.role||''; }
+  document.getElementById('roleEditModalBg').classList.add('open');
+}
+function closeRoleEdit(){ document.getElementById('roleEditModalBg').classList.remove('open'); _roleEditId=null; }
+async function saveRoleEdit(){
+  if(!_roleEditId) return;
+  const custom=document.getElementById('roleEditCustom').value.trim();
+  const sel=document.getElementById('roleEditSelect').value;
+  const newRole=custom||sel;
+  const emojiMap={'원장':'👑','부장':'🏆','수석':'💎','책임':'⭐','선임':'🌟','팀장':'🎯','멘토':'🌿'};
+  await fbSet(`mentorList/${_roleEditId}/role`,newRole);
+  if(emojiMap[newRole]) await fbSet(`mentorList/${_roleEditId}/emoji`,emojiMap[newRole]);
+  const m=mentors.find(x=>x.id===_roleEditId);
+  if(m){ m.role=newRole; if(emojiMap[newRole]) m.emoji=emojiMap[newRole]; }
+  closeRoleEdit(); renderMentors();
+  showToast(`✅ ${_roleEditId} 직책 변경: ${newRole}`);
+}
+
+// ── seedMentors (최초 1회) ──
+const INITIAL_MENTORS = {
+  '백정민':{ id:'백정민', name:'백정민', role:'부장', emoji:'🏆', order:0,  team:'1팀' },
+  '이민희':{ id:'이민희', name:'이민희', role:'멘토', emoji:'🌿', order:1,  team:'1팀' },
+  '김기은':{ id:'김기은', name:'김기은', role:'멘토', emoji:'🌿', order:2,  team:'1팀' },
+  '조영승':{ id:'조영승', name:'조영승', role:'멘토', emoji:'🌿', order:3,  team:'1팀' },
+  '황유진':{ id:'황유진', name:'황유진', role:'멘토', emoji:'🌿', order:4,  team:'1팀' },
+  '제갈배준':{ id:'제갈배준', name:'제갈배준', role:'팀장', emoji:'🎯', order:5,  team:'2팀' },
+  '이종혁':{ id:'이종혁', name:'이종혁', role:'선임', emoji:'🌟', order:6,  team:'2팀' },
+  '이지오':{ id:'이지오', name:'이지오', role:'멘토', emoji:'🌿', order:7,  team:'2팀' },
+  '손병운':{ id:'손병운', name:'손병운', role:'팀장', emoji:'🎯', order:8,  team:'3팀' },
+  '이안심':{ id:'이안심', name:'이안심', role:'멘토', emoji:'🌿', order:9,  team:'3팀' },
+  '조건희':{ id:'조건희', name:'조건희', role:'멘토', emoji:'🌿', order:10, team:'3팀' },
+  '황규선':{ id:'황규선', name:'황규선', role:'멘토', emoji:'🌿', order:11, team:'3팀' },
+  '최인규':{ id:'최인규', name:'최인규', role:'팀장', emoji:'🎯', order:12, team:'4팀' },
+  '윤초롱':{ id:'윤초롱', name:'윤초롱', role:'책임', emoji:'⭐', order:13, team:'4팀' },
+  '박지용':{ id:'박지용', name:'박지용', role:'멘토', emoji:'🌿', order:14, team:'4팀' },
+  '유진':  { id:'유진',   name:'유진',   role:'멘토', emoji:'🌿', order:15, team:'4팀' },
+  '안소현':{ id:'안소현', name:'안소현', role:'팀장', emoji:'🎯', order:16, team:'5팀' },
+  '이은채':{ id:'이은채', name:'이은채', role:'멘토', emoji:'🌿', order:17, team:'5팀' },
+  '이연재':{ id:'이연재', name:'이연재', role:'멘토', emoji:'🌿', order:18, team:'5팀' },
+  '이기건':{ id:'이기건', name:'이기건', role:'팀장', emoji:'🎯', order:19, team:'6팀' },
+  '한대희':{ id:'한대희', name:'한대희', role:'원장', emoji:'👑', order:20, team:'6팀' },
+  '박무경':{ id:'박무경', name:'박무경', role:'멘토', emoji:'🌿', order:21, team:'원장팀' },
+};
+
+async function seedMentors(){
+  try {
+    const snap=await fbGet('mentorList');
+    const existing=snap.val()||{};
+    if(Object.keys(existing).length>0){
+      // 삭제된 멘토 복구 안함, role/emoji만 동기화
+      for(const [id,mentor] of Object.entries(INITIAL_MENTORS)){
+        if(!existing[id]) continue;
+        if(existing[id].role!==mentor.role) await fbSet(`mentorList/${id}/role`,mentor.role);
+        if(existing[id].emoji!==mentor.emoji) await fbSet(`mentorList/${id}/emoji`,mentor.emoji);
+      }
+      return;
+    }
+    for(const [id,mentor] of Object.entries(INITIAL_MENTORS)) await fbSet(`mentorList/${id}`,mentor);
+  } catch(e) {}
+}
+
+// ── 모달 터치 닫기 ──
+document.addEventListener('DOMContentLoaded', function(){
+  ['loginModalBg','addModalBg','changePwModalBg','roleEditModalBg'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.addEventListener('touchend',function(e){ if(e.target===el) el.classList.remove('open'); },{passive:true});
+  });
+});
+
+// ── 초기화 ──
+async function init(){
+  document.getElementById('loadingScreen').style.display='flex';
+  document.getElementById('mainScreen').style.display='none';
+  await new Promise(r=>setTimeout(r,300)); // Firebase 연결 대기
+  document.getElementById('loadingScreen').style.display='none';
+  document.getElementById('mainScreen').style.display='block';
+  await seedMentors();
+  loadMentors();
+}
+init();
+
+// ── 뒤로가기 시 재로드 ──
+window.addEventListener('pageshow', function(e){ if(e.persisted) loadMentors(); });
+</script>
 </body>
 </html>

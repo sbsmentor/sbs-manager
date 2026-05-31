@@ -624,75 +624,23 @@ button, a, [onclick] { touch-action: manipulation; -webkit-tap-highlight-color: 
   .ef-sched-row { grid-template-columns: repeat(2, 1fr); }
 }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
-// ── Firebase SDK 멀티-CDN 로더 ──
-// gstatic.com이 차단된 환경에서도 jsdelivr, unpkg 등으로 자동 폴백
-(function() {
-  const CDNS = [
-    // CDN 1: jsdelivr (npm 미러, 가장 많이 허용됨)
-    {
-      app: 'https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-app-compat.min.js',
-      db:  'https://cdn.jsdelivr.net/npm/firebase@10.12.0/firebase-database-compat.min.js'
-    },
-    // CDN 2: unpkg
-    {
-      app: 'https://unpkg.com/firebase@10.12.0/firebase-app-compat.js',
-      db:  'https://unpkg.com/firebase@10.12.0/firebase-database-compat.js'
-    },
-    // CDN 3: 원본 gstatic (마지막 시도)
-    {
-      app: 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
-      db:  'https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js'
-    }
-  ];
-
-  function loadScript(src) {
-    return new Promise((resolve) => {
-      const s = document.createElement('script');
-      s.src = src;
-      s.crossOrigin = 'anonymous';
-      s.onload = resolve;
-      s.onerror = resolve; // 실패해도 reject 안 함 - Script error 콘솔 출력 방지
-      document.head.appendChild(s);
-    });
-  }
-
-  async function tryLoadFirebase(cdnIdx) {
-    if (cdnIdx >= CDNS.length) {
-      window._firebaseLoaded = false;
-      return;
-    }
-    const cdn = CDNS[cdnIdx];
-    try {
-      await loadScript(cdn.app);
-      await loadScript(cdn.db);
-      // 로드 실패 시 firebase 객체 없음 → 다음 CDN으로
-      if (typeof firebase === 'undefined' || !firebase.initializeApp) throw new Error('firebase not loaded');
-      // compat SDK는 window.firebase 전역으로 노출됨
-      window.firebaseAppModule = {
-        initializeApp: firebase.initializeApp.bind(firebase)
-      };
-      window.firebaseDatabaseModule = {
-        getDatabase: (app) => firebase.database(app || undefined),
-        ref:     (db, path) => db.ref(path),
-        onValue: (ref, cb, opts) => {
-          if (opts && opts.onlyOnce) { ref.once('value').then(snap => cb(snap)); }
-          else { ref.on('value', cb); }
-        },
-        set:  (ref, val) => ref.set(val),
-        get:  (ref) => ref.once('value'),
-        remove: (ref) => ref.remove(),
-        push: (ref, val) => ref.push(val)
-      };
-      window._firebaseLoaded = true;
-    } catch(e) {
-      tryLoadFirebase(cdnIdx + 1);
-    }
-  }
-
-  window._firebaseLoaded = null; // null=로딩중, true=성공, false=실패
-  tryLoadFirebase(0);
-})();
+window.firebaseAppModule = { initializeApp: firebase.initializeApp.bind(firebase) };
+window.firebaseDatabaseModule = {
+  getDatabase: (app) => firebase.database(app || undefined),
+  ref:     (db, path) => db.ref(path),
+  onValue: (ref, cb, opts) => {
+    if (opts && opts.onlyOnce) { ref.once('value').then(snap => cb(snap)); }
+    else { ref.on('value', cb); }
+  },
+  set:    (ref, val) => ref.set(val),
+  get:    (ref) => ref.once('value'),
+  remove: (ref) => ref.remove(),
+  push:   (ref, val) => ref.push(val)
+};
+window._firebaseLoaded = true;
 </script>
 
 <script>
