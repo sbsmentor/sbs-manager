@@ -3238,6 +3238,9 @@ window.filterTimetable = function() {
     return (c.name||'').toLowerCase().indexOf(q)>=0 || (c.teacher||'').toLowerCase().indexOf(q)>=0;
   });
 
+  // 개강일 정렬
+  results.sort(function(a,b){ return (a.start||'9999').localeCompare(b.start||'9999'); });
+
   updateSelCount();
   var container = document.getElementById('ttResults');
 
@@ -3246,30 +3249,49 @@ window.filterTimetable = function() {
     return;
   }
 
-  // key를 JS 변수로만 관리 (HTML 속성에 넣지 않음)
   var keyMap = {};
-  var html = '<div style="display:flex;flex-direction:column;gap:6px;">';
+
+  // 강사별 그룹핑
+  var groups = {};
   results.forEach(function(c, i) {
+    var teacher = c.teacher || '강사미정';
+    if (!groups[teacher]) groups[teacher] = [];
+    groups[teacher].push({c:c, i:i});
     var key = (c.name||'')+'|'+(c.start||'')+'|'+(c.time||'');
     keyMap[i] = key;
-    var checked = _ttSelected.has(key);
-    var typeBg = c.type==='주말' ? 'var(--orange-dim)' : 'var(--blue-dim)';
-    var typeColor = c.type==='주말' ? 'var(--orange)' : 'var(--blue)';
-    html += '<div class="tt-item" data-idx="' + i + '"'
-      + ' style="padding:9px 13px;border:1.5px solid ' + (checked?'var(--accent)':'var(--border)') + ';border-radius:9px;cursor:pointer;display:flex;gap:10px;align-items:center;background:' + (checked?'var(--accent-dim)':'#fff') + ';touch-action:manipulation;">'
-      + '<input type="checkbox" class="tt-item-chk" ' + (checked?'checked':'') + ' style="width:15px;height:15px;accent-color:var(--accent);flex-shrink:0;">'
-      + '<div style="flex:1;min-width:0;">'
-      + '<div style="font-size:12px;font-weight:700;">' + (c.name||'-') + '</div>'
-      + '<div style="font-size:11px;color:var(--text2);margin-top:1px;">'
-      + '👤 ' + (c.teacher||'-') + ' · 📅 ' + (c.start||'-') + ' ~ ' + (c.end||'-') + ' · ' + (c.days||'-')
-      + '</div></div>'
-      + '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:' + typeBg + ';color:' + typeColor + ';flex-shrink:0;">' + (c.type||'평일') + '</span>'
-      + '</div>';
+  });
+
+  var html = '<div style="display:flex;flex-direction:column;gap:4px;">';
+
+  Object.keys(groups).sort().forEach(function(teacher) {
+    var items = groups[teacher];
+    html += '<div style="background:#f8fafc;border-radius:8px;padding:6px 10px;margin-bottom:2px;">';
+    html += '<div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">👤 '+teacher+'</div>';
+    items.forEach(function(obj) {
+      var c = obj.c, i = obj.i;
+      var key = keyMap[i];
+      var checked = _ttSelected.has(key);
+      var typeBg = c.type==='주말' ? 'var(--orange-dim)' : 'var(--blue-dim)';
+      var typeColor = c.type==='주말' ? 'var(--orange)' : 'var(--blue)';
+      html += '<div class="tt-item" data-idx="'+i+'"'
+        + ' style="padding:7px 10px;border:1.5px solid '+(checked?'var(--accent)':'var(--border)')+';border-radius:7px;cursor:pointer;display:flex;gap:8px;align-items:center;background:'+(checked?'var(--accent-dim)':'#fff')+';margin-bottom:3px;touch-action:manipulation;">'
+        + '<input type="checkbox" class="tt-item-chk" '+(checked?'checked':'')+' style="width:14px;height:14px;accent-color:var(--accent);flex-shrink:0;">'
+        + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:12px;font-weight:700;">'+(c.name||'-')+'</div>'
+        + '<div style="font-size:10px;color:var(--text2);margin-top:1px;">'
+        + (c.time?'⏰ '+c.time+' ':'')
+        + '📅 '+(c.start||'-')+' ~ '+(c.end||'-')
+        + (c.days?' · '+(c.days):'')
+        + '</div></div>'
+        + '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:'+typeBg+';color:'+typeColor+';flex-shrink:0;">'+(c.type||'평일')+'</span>'
+        + '</div>';
+    });
+    html += '</div>';
   });
   html += '</div>';
   container.innerHTML = html;
 
-  // 이벤트 등록 - idx로 keyMap에서 key 조회
+  // 이벤트 등록
   container.querySelectorAll('.tt-item').forEach(function(el) {
     var idx = parseInt(el.dataset.idx);
     var key = keyMap[idx];
@@ -3283,6 +3305,7 @@ window.filterTimetable = function() {
     }
   });
 };
+;
 ;
 ;
 

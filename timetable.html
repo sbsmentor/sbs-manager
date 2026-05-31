@@ -451,6 +451,13 @@ window.uploadTimetable = async function(event, scheduleType) {
 
       for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
         const tds = rows[rowIdx].querySelectorAll('td');
+        if (!tds.length) continue;
+
+        // 행의 첫 번째 셀(th 또는 td)에서 시간 추출 (10:00 형식)
+        const allCells0 = rows[rowIdx].querySelectorAll('th, td');
+        const firstCellText = allCells0.length ? (allCells0[0].textContent || '').replace(/ /g,' ').trim() : '';
+        const timeMatch = firstCellText.match(/^(\d{2}:\d{2})/);
+        const rowTime = timeMatch ? timeMatch[1] : '';
 
         for (let colIdx = 0; colIdx < tds.length; colIdx++) {
           const lines = extractLines(tds[colIdx]);
@@ -467,8 +474,8 @@ window.uploadTimetable = async function(event, scheduleType) {
           const startDate = startM[1];
           const endDate   = endM ? endM[1] : '';
 
-          // 중복 체크
-          const key = courseName + '|' + startDate;
+          // 중복 체크: 강좌명+개강일+시간 (같은 강사 다른시간 허용)
+          const key = courseName + '|' + startDate + '|' + rowTime;
           if (seen.has(key)) { skipped++; continue; }
           seen.add(key);
 
@@ -499,7 +506,7 @@ window.uploadTimetable = async function(event, scheduleType) {
           try {
             const newRef = push(ref('timetable'));
             await set(newRef, { name: courseName, teacher, start: startDate, end: endDate,
-              time: '', room, days, type: scheduleType });
+              time: rowTime, room, days, type: scheduleType });
             added++;
           } catch(pushErr) {
             console.error('push 실패:', pushErr);
