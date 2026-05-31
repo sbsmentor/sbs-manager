@@ -3152,9 +3152,9 @@ window.openTimetableSearch = function(row) {
   _ttFilteredMonth = 'all';
   document.getElementById('ttSearchInp').value = '';
   document.getElementById('ttSearchBg').style.display = 'flex';
-  setTimeout(() => document.getElementById('ttSearchInp').focus(), 100);
+  setTimeout(function() { document.getElementById('ttSearchInp').focus(); }, 100);
 
-  // 이미 로드된 데이터 있으면 바로 표시
+  // 이미 로드된 데이터 있으면 즉시 표시
   if (_ttCourses && _ttCourses.length > 0) {
     filterTimetable();
     return;
@@ -3163,30 +3163,52 @@ window.openTimetableSearch = function(row) {
   document.getElementById('ttResults').innerHTML =
     '<div style="text-align:center;padding:32px;color:var(--text3);">불러오는 중...</div>';
 
-  // Firebase SDK 준비될 때까지 기다렸다가 once 조회
-  const tryFetch = function() {
-    if (window._fbDb && window._fbRef) {
-      window._fbRef(window._fbDb, 'timetable').once('value')
-        .then(function(snap) {
-          const data = snap.val();
-          if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-            _ttCourses = Object.values(data).filter(function(c) { return c && c.name; });
-          }
-          filterTimetable();
-        })
-        .catch(function() { filterTimetable(); });
-    } else {
-      if (!tryFetch._n) tryFetch._n = 0;
-      tryFetch._n++;
-      if (tryFetch._n < 20) {
-        setTimeout(tryFetch, 500);
-      } else {
+  // firebase compat SDK로 직접 읽기
+  function doFetch() {
+    try {
+      var fbApp = (firebase.apps && firebase.apps.length)
+        ? firebase.apps[0]
+        : firebase.initializeApp({
+            apiKey: "AIzaSyCyCtQu20qgyCT1uRvmH3bmT1Q1bsT_pUw",
+            authDomain: "sbs-academy-game.firebaseapp.com",
+            databaseURL: "https://sbs-academy-game-default-rtdb.firebaseio.com",
+            projectId: "sbs-academy-game",
+            storageBucket: "sbs-academy-game.firebasestorage.app",
+            messagingSenderId: "120735998268",
+            appId: "1:120735998268:web:9d0d5c778451f69d63fe39"
+          });
+      firebase.database(fbApp).ref('timetable').once('value').then(function(snap) {
+        var data = snap.val();
+        if (data && typeof data === 'object') {
+          _ttCourses = Object.values(data).filter(function(c) { return c && c.name; });
+        }
+        filterTimetable();
+      }).catch(function(err) {
+        console.error('timetable fetch 실패:', err);
+        filterTimetable();
+      });
+    } catch(e) {
+      console.error('Firebase 초기화 실패:', e);
+      filterTimetable();
+    }
+  }
+
+  // firebase SDK 로드 확인 후 실행
+  if (typeof firebase !== 'undefined' && firebase.database) {
+    doFetch();
+  } else {
+    var t = 0;
+    var wait = setInterval(function() {
+      t += 200;
+      if (typeof firebase !== 'undefined' && firebase.database) {
+        clearInterval(wait);
+        doFetch();
+      } else if (t >= 8000) {
+        clearInterval(wait);
         filterTimetable();
       }
-    }
-  };
-  tryFetch._n = 0;
-  tryFetch();
+    }, 200);
+  }
 };
 
 window.closeTimetableSearch = function() {
