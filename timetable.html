@@ -421,24 +421,74 @@ window.uploadTimetable = async function(event, scheduleType) {
       if (!table) { showToast('❌ 시간표 테이블 없음'); showLoading(false); return; }
 
       const rows = table.querySelectorAll('tr');
+      if (rows.length < 2) { showToast('❌ 데이터 부족'); showLoading(false); return; }
 
-      // rows[0]에서 강의실명 수집
-      const subRooms = Array.from(rows[0]?.querySelectorAll('td,th') || [])
-        .map(td => td.textContent.replace(/\u00a0/g,' ').trim());
+      // rows[1]: 세부 강의실 (th+td 40개, 인덱스 일치)
+      const subRoomCells = rows[1].querySelectorAll('th, td');
+      const subRooms = Array.from(subRoomCells).map(c => c.textContent.replace(/\u00a0/g,' ').trim());
+
+      // 요일 변환 함수
+      function normalizeDays(rawDays, startDateStr) {
+        const dayMap = {
+          '월~금': '월화수목금', '월~목': '월화수목', '화~금': '화수목금',
+          '월~수': '월화수', '수~금': '수목금', '화~목': '화수목',
+          '월~토': '월화수목금토', '월~일': '월화수목금토일',
+          '월/수': '월,수', '화/목': '화,목', '수/금': '수,금',
+          '월/금': '월,금', '토/일': '토,일',
+          '월화수목금': '월화수목금', '월화수목': '월화수목',
+          '화수목금': '화수목금', '수목금토': '수목금토',
+          '월수금': '월수금', '수목금': '수목금', '월수목': '월수목',
+          '월화수': '월화수', '화수목': '화수목',
+          '월수': '월,수', '월화': '월,화', '화목': '화,목',
+          '수금': '수,금', '수목': '수,목', '월금': '월,금', '목금': '목,금',
+          '토일': '토,일', '토': '토', '일': '일', '금': '금', '목': '목',
+          '수': '수', '화': '화', '월': '월'
+        };
+
+        if (dayMap[rawDays]) return dayMap[rawDays];
+
+        // 복합 패턴: 개강일 요일 기준으로 계산
+        if (!startDateStr) return rawDays;
+        const d = new Date(startDateStr);
+        const dow = d.getDay(); // 0=일,1=월,2=화,3=수,4=목,5=금,6=토
+        const DAYS = ['일','월','화','수','목','금','토'];
+
+        if (rawDays === '월수금월수') {
+          // 월에 시작: 1주차 월수금, 이후 월수금
+          // 수에 시작: 1주차 수금, 이후 월수금
+          // 금에 시작: 1주차 금, 이후 월수금
+          if (dow === 1) return '월수금 (1주차 월수금)';
+          if (dow === 3) return '월수금 (1주차 수금)';
+          if (dow === 5) return '월수금 (1주차 금)';
+          return '월수금';
+        }
+        if (rawDays === '화목화목금') {
+          // 화에 시작: 1주차 화목금, 이후 화목금
+          // 목에 시작: 1주차 목금, 이후 화목금
+          // 금에 시작: 1주차 금, 이후 화목금
+          if (dow === 2) return '화목금 (1주차 화목금)';
+          if (dow === 4) return '화목금 (1주차 목금)';
+          if (dow === 5) return '화목금 (1주차 금)';
+          return '화목금';
+        }
+        if (rawDays === '월수금월수금') {
+          return '월수금';
+        }
+
+        return rawDays;
+      }
 
       const DAY_PATS = [
-        '월수금/월수','월수/월수금','화목금/화목','화목/화목금',
-        '월수금월수','월수월수금','화목금화목','화목화목금',
-        '토/일','일/토','화/목','월/수','수/금','월/금',
-        '월~금','월~목','월~수','화~금','화~목','수~금','월~토','월~일',
+        '월수금월수금','월수금월수','화목화목금','화목금화목',
         '월화수목금','월화수목','화수목금','수목금토',
+        '월~금','월~목','화~금','월~수','수~금','화~목','월~토','월~일',
         '월수금','수목금','월수목','월화수','화수목',
+        '월/수','화/목','수/금','월/금','토/일',
         '월수','월화','화목','수금','수목','월금','목금','토일',
         '토','일','금','목','수','화','월'
       ];
 
       function extractLines(cellEl) {
-        if (!cellEl) return [];
         const lis = cellEl.querySelectorAll('li');
         if (lis.length > 0) {
           return Array.from(lis).map(li => li.textContent.replace(/\u00a0/g,' ').trim()).filter(Boolean);
@@ -450,15 +500,17 @@ window.uploadTimetable = async function(event, scheduleType) {
       const seen = new Set();
 
       for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
-        const tds = rows[rowIdx].querySelectorAll('td');
-        if (!tds.length) continue;
+        // 행 전체 셀 (th+td) - 인덱스가 subRooms와 일치
+        const allCells = rows[rowIdx].querySelectorAll('th, td');
+        if (!allCells.length) continue;
 
-        // 행의 첫 번째 셀(th 또는 td)에서 시간 추출 (10:00 형식)
-        const allCells0 = rows[rowIdx].querySelectorAll('th, td');
-        const firstCellText = allCells0.length ? (allCells0[0].textContent || '').replace(/ /g,' ').trim() : '';
-        const timeMatch = firstCellText.match(/^(\d{2}:\d{2})/);
+        // 첫 셀(th)에서 시간 추출
+        const firstText = (allCells[0].textContent || '').replace(/\u00a0/g,' ').trim();
+        const timeMatch = firstText.match(/^(\d{2}:\d{2})/);
         const rowTime = timeMatch ? timeMatch[1] : '';
 
+        // td만 순회 (th는 시간이라 건너뜀)
+        const tds = rows[rowIdx].querySelectorAll('td');
         for (let colIdx = 0; colIdx < tds.length; colIdx++) {
           const lines = extractLines(tds[colIdx]);
           if (!lines.length) continue;
@@ -474,14 +526,14 @@ window.uploadTimetable = async function(event, scheduleType) {
           const startDate = startM[1];
           const endDate   = endM ? endM[1] : '';
 
-          // 중복 체크: 강좌명+개강일+시간 (같은 강사 다른시간 허용)
+          // 중복 체크: 강좌명+개강일+시간
           const key = courseName + '|' + startDate + '|' + rowTime;
           if (seen.has(key)) { skipped++; continue; }
           seen.add(key);
 
           // 강사/요일 파싱
           const baejungIdx = lines.findIndex(l => /^배정\s*:/.test(l));
-          let teacher = '', days = '';
+          let teacher = '', rawDays = '';
           if (baejungIdx >= 0) {
             const afterLines = lines.slice(baejungIdx + 1);
             const beforeEnd = [];
@@ -490,9 +542,9 @@ window.uploadTimetable = async function(event, scheduleType) {
               beforeEnd.push(line);
             }
             for (const line of beforeEnd) {
-              if (DAY_PATS.includes(line)) { days = line; break; }
+              if (DAY_PATS.includes(line)) { rawDays = line; break; }
             }
-            const dayIdx = beforeEnd.findIndex(l => l === days);
+            const dayIdx = beforeEnd.findIndex(l => l === rawDays);
             const beforeDay = dayIdx >= 0 ? beforeEnd.slice(0, dayIdx) : beforeEnd;
             for (let i = beforeDay.length - 1; i >= 0; i--) {
               const cleaned = beforeDay[i].replace(/\d+$/, '').trim();
@@ -500,8 +552,18 @@ window.uploadTimetable = async function(event, scheduleType) {
             }
           }
 
-          // 강의실
-          const room = colIdx < subRooms.length ? subRooms[colIdx] : '';
+          // 요일 정규화
+          const days = normalizeDays(rawDays, startDate);
+
+          // 강의실: allCells 인덱스로 매핑
+          // tds[colIdx]가 allCells의 몇 번째인지 찾기
+          let room = '';
+          for (let ai = 0; ai < allCells.length; ai++) {
+            if (allCells[ai] === tds[colIdx]) {
+              room = ai < subRooms.length ? subRooms[ai] : '';
+              break;
+            }
+          }
 
           try {
             const newRef = push(ref('timetable'));
@@ -524,7 +586,7 @@ window.uploadTimetable = async function(event, scheduleType) {
     }
   };
   reader.readAsText(file, 'utf-8');
-};;;
+};;;;
 
 // ════════ 유틸 ════════
 function showLoading(show) {
