@@ -781,6 +781,15 @@ window.uploadTimetable = async function(event, scheduleType) {
             }
           }
 
+          // 비대면: 강사명 못 찾으면 정원 라인에서 XXX T 패턴 추출
+          // 예) (게임-부산)장덕윤T → 장덕윤
+          if (!teacher) {
+            for (const line of lines) {
+              const mT = line.match(/[가-힣]{2,5}T(?:\s|\/|$)/);
+              if (mT) { teacher = mT[0].trim().replace(/T$/, '').trim(); break; }
+            }
+          }
+
           // 강의실: td의 실제 컬럼 위치로 매핑
           const tdColEntry = rowColMap.find(e => e.cell === tds[colIdx]);
           const tdCol = tdColEntry ? tdColEntry.col : -1;
