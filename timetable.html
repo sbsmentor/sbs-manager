@@ -380,7 +380,19 @@ function loadRoomFix() {
   ref('roomFix').on('value', snap => {
     const saved = snap.val();
     if (saved && Object.keys(saved).length > 0) {
-      _roomFix = saved;
+      // 키 형식 검증: 강사|강좌|구분 순서인지 확인
+      // 올바른 형식이면 강사명이 첫 번째 파트 (한글 2~5자)
+      const firstKey = Object.keys(saved)[0];
+      const parts = firstKey.split('|');
+      const isValidFormat = parts.length === 3 && /^[가-힣]{2,5}$/.test(parts[0]);
+      if (isValidFormat) {
+        _roomFix = saved;
+      } else {
+        // 잘못된 형식 → 기본값으로 리셋
+        console.log('[roomFix] 키 형식 오류, 기본값으로 리셋');
+        _roomFix = Object.assign({}, _DEFAULT_ROOM_FIX);
+        set(ref('roomFix'), _roomFix).catch(()=>{});
+      }
     } else {
       // Firebase에 없으면 기본값으로 초기화
       _roomFix = Object.assign({}, _DEFAULT_ROOM_FIX);
@@ -787,12 +799,12 @@ window.uploadTimetable = async function(event, scheduleType) {
 
           // 비대면: 강사명 못 찾으면 정원 라인에서 XXX T 패턴 추출
           // 예) (게임-부산)장덕윤T → 장덕윤
-          // 비대면: 강사명 못 찾으면 XXXT 패턴으로 추출
-          // 예) (게임-부산)박준석T/매월투입 → 박준석
+          // 비대면: 강사명 못 찾으면 XXXT/t 패턴으로 추출
+          // 예) (게임-부산)박준석T → 박준석, 노광필t → 노광필
           if (!teacher) {
             for (const line of lines) {
-              const mT = line.match(/([가-힣]{2,5})T[^가-힣]/);
-              const mT2 = !mT && line.match(/([가-힣]{2,5})T$/);
+              const mT = line.match(/([가-힣]{2,5})[Tt][^가-힣]/);
+              const mT2 = !mT && line.match(/([가-힣]{2,5})[Tt]$/);
               const matched = mT || mT2;
               if (matched) { teacher = matched[1].trim(); break; }
             }
