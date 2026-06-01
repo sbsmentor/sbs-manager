@@ -326,7 +326,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 <div class="modal-bg" id="changePwModalBg">
   <div class="modal" style="max-width:360px;">
     <h3>🔑 비밀번호 변경</h3>
-    <div class="field"><label>현재 비밀번호</label><input type="password" id="oldPwInput" placeholder="현재 비밀번호" maxlength="20"></div>
+    <div class="field" id="changePwNameField"><label>이름</label><input type="text" id="changePwNameInput" placeholder="이름 입력" maxlength="10"></div>
+    <div class="field"><label>현재 비밀번호</label><input type="password" id="oldPwInput" placeholder="현재 비밀번호 (초기: 1234)" maxlength="20"></div>
     <div class="field"><label>새 비밀번호</label><input type="password" id="newPwInput" placeholder="새 비밀번호 (4자리 이상)" maxlength="20"></div>
     <div class="field"><label>새 비밀번호 확인</label><input type="password" id="newPwInput2" placeholder="새 비밀번호 재입력" maxlength="20"></div>
     <div class="err-msg" id="changePwErr"></div>
@@ -496,27 +497,59 @@ async function doLogin(){
 }
 
 async function doChangePw(){
-  const id=getLoggedInId(); if(!id) return;
-  const oldPw=document.getElementById('oldPwInput').value;
-  const newPw=document.getElementById('newPwInput').value;
-  const newPw2=document.getElementById('newPwInput2').value;
   const errEl=document.getElementById('changePwErr');
   errEl.style.display='none';
+
+  const oldPw  = document.getElementById('oldPwInput').value.trim();
+  const newPw  = document.getElementById('newPwInput').value.trim();
+  const newPw2 = document.getElementById('newPwInput2').value.trim();
+
+  if(!oldPw){ errEl.textContent='현재 비밀번호를 입력해주세요.'; errEl.style.display='block'; return; }
   if(newPw!==newPw2){ errEl.textContent='새 비밀번호가 일치하지 않습니다.'; errEl.style.display='block'; return; }
   if(newPw.length<4){ errEl.textContent='비밀번호는 4자리 이상이어야 합니다.'; errEl.style.display='block'; return; }
-  const snap=await fbGet(`mentorList/${id}/password`);
-  const savedPw=snap.val()||'1234';
+
+  // 로그인 상태면 본인 ID 사용, 아니면 이름 입력으로 찾기
+  let id = getLoggedInId();
+  if(!id){
+    const nameInput = document.getElementById('changePwNameInput').value.trim();
+    if(!nameInput){ errEl.textContent='이름을 입력해주세요.'; errEl.style.display='block'; return; }
+    const allSnap = await fbGet('mentorList');
+    const all = allSnap.val()||{};
+    const found = Object.entries(all).find(([k,v])=>v.name===nameInput);
+    if(!found){ errEl.textContent='이름을 찾을 수 없습니다.'; errEl.style.display='block'; return; }
+    id = found[0];
+  }
+
+  const snap = await fbGet(`mentorList/${id}/password`);
+  const savedPw = snap.val()||'1234';
   if(oldPw!==savedPw){ errEl.textContent='현재 비밀번호가 틀렸습니다.'; errEl.style.display='block'; return; }
+
   await fbSet(`mentorList/${id}/password`, newPw);
   document.getElementById('changePwModalBg').classList.remove('open');
+  // 입력값 초기화
+  ['changePwNameInput','oldPwInput','newPwInput','newPwInput2'].forEach(i=>{
+    const el=document.getElementById(i); if(el) el.value='';
+  });
   showToast('✅ 비밀번호가 변경되었습니다');
 }
 function closeChangePwModal(){ document.getElementById('changePwModalBg').classList.remove('open'); }
-function openChangePwModal(){ document.getElementById('changePwModalBg').classList.add('open'); }
+function openChangePwModal(){
+  document.getElementById('changePwModalBg').classList.add('open');
+  const nf = document.getElementById('changePwNameField');
+  if(nf) nf.style.display = getLoggedInId() ? 'none' : '';
+}
 function showChangePwFromLogin(){
-  // 로그인 모달 닫고 비밀번호 변경 모달 열기
+  // 로그인 모달의 이름 값을 비밀번호 변경 모달에 자동 입력
+  const loginName = document.getElementById('loginNameInput');
   document.getElementById('loginModalBg').classList.remove('open');
   document.getElementById('changePwModalBg').classList.add('open');
+  if(loginName && loginName.value){
+    const nameField = document.getElementById('changePwNameInput');
+    if(nameField) nameField.value = loginName.value;
+  }
+  // 이름 필드 표시 (로그인 전이므로)
+  const nf = document.getElementById('changePwNameField');
+  if(nf) nf.style.display = getLoggedInId() ? 'none' : '';
 }
 
 // ── 관리 토글 ──
