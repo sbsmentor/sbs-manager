@@ -3509,7 +3509,12 @@ function loadExcelFile(event) {
           _excelRows.push({
             name:    name,
             tel:     tel,       // 원본 번호 (저장용)
-            birth:   String(row[idx.birth] || '').trim(),
+            birth:   (function(b) {
+            const s = String(b || '').trim().replace(/[^0-9]/g, '');
+            // yyyymmdd → yyyy-mm-dd
+            if (s.length === 8) return s.slice(0,4) + '-' + s.slice(4,6) + '-' + s.slice(6,8);
+            return String(b || '').trim();
+          })(row[idx.birth]),
             course:  String(row[idx.course >= 0 ? idx.course : 3] || '').trim(),
             no:      String(row[idx.no] || '').trim(),
             date:    String(row[idx.date] || '').trim(),
