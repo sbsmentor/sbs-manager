@@ -2060,12 +2060,13 @@ function renderDashboard() {
     ? '<div style="padding:6px 14px 4px;font-size:11px;font-weight:700;color:#7c3aed;letter-spacing:.5px">🚨 D-7 이내 개강 — 지금 바로 발송하세요</div>'
       + d7Sorted.map(c => {
           const diff = Math.round((new Date(c.startDate+'T00:00:00')-todayD)/86400000);
-          return `<div class="dash-list-row" style="background:#faf5ff;">
-            <span class="dash-name">${c.studentName}</span>
+          return `<div class="dash-list-row" style="background:#faf5ff;gap:6px;">
+            <span class="dash-name" style="cursor:pointer;" onclick="openNotiCardFromBoard('${c._arrName}',${c._si},'${c._mk}')">${c.studentName}</span>
             <span class="dash-cls">📚 ${c.cls}</span>
             <span class="dash-date">${c.startDate}</span>
             <span class="db-d7">D-${diff}</span>
-            <span class="dash-badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #c4b5fd;font-size:10px;">📬 안내 필요</span>
+            <button onclick="openNotiCardFromBoard('${c._arrName}',${c._si},'${c._mk}')" style="padding:4px 8px;border-radius:6px;border:none;background:#7c3aed;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">📋 카드보기</button>
+            <button onclick="quickCopyNotiCard('${c._arrName}',${c._si},'${c._mk}',this)" style="padding:4px 8px;border-radius:6px;border:none;background:#0f172a;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">📸 이미지복사</button>
           </div>`;
         }).join('')
     : '';
@@ -3099,6 +3100,74 @@ saveToLocal = function() {
 
 
 // DOM 완전 로드 후 Firebase 초기화
+
+// ── D-7 빠른 이미지 복사 ──
+async function quickCopyNotiCard(arrName, si, mk, btn) {
+  const origText = btn.innerHTML;
+  btn.innerHTML = '⏳ 생성중...';
+  btn.disabled = true;
+
+  try {
+    // 1. 카드 열기 (백그라운드)
+    openNotiCardFromBoard(arrName, si, mk);
+    
+    // 2. 렌더링 대기 (500ms)
+    await new Promise(r => setTimeout(r, 500));
+    
+    // 3. html2canvas 로드
+    await _loadH2C();
+    
+    // 4. 이미지 캡처
+    const el = document.getElementById('notiCardBody');
+    if (!el) throw new Error('카드 없음');
+    
+    const canvas = await html2canvas(el, {
+      scale: 2, useCORS: true, backgroundColor: '#ffffff',
+      logging: false
+    });
+    
+    // 5. 클립보드 복사
+    canvas.toBlob(async (blob) => {
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        btn.innerHTML = '✅ 복사완료!';
+        btn.style.background = '#18a963';
+        showToast('✅ 이미지가 클립보드에 복사됐습니다\n카카오톡에 붙여넣기(Ctrl+V)하세요');
+        
+        // 6. 카드 닫기
+        setTimeout(() => {
+          const modal = document.getElementById('notiCardModalBg');
+          if (modal) modal.style.display = 'none';
+        }, 300);
+        
+        // 7. 3초 후 버튼 원복
+        setTimeout(() => {
+          btn.innerHTML = origText;
+          btn.style.background = '#0f172a';
+          btn.disabled = false;
+        }, 3000);
+      } catch(e) {
+        // 클립보드 실패 시 다운로드로 대체
+        const a = document.createElement('a');
+        a.href = canvas.toDataURL('image/png');
+        a.download = '개강안내_' + (mk || 'card') + '.png';
+        a.click();
+        btn.innerHTML = '💾 저장완료';
+        setTimeout(() => { btn.innerHTML = origText; btn.style.background = '#0f172a'; btn.disabled = false; }, 3000);
+      }
+    }, 'image/png');
+    
+  } catch(err) {
+    console.error('이미지 생성 오류:', err);
+    showToast('❌ 이미지 생성 실패: ' + err.message);
+    btn.innerHTML = origText;
+    btn.style.background = '#0f172a';
+    btn.disabled = false;
+  }
+}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', loadFirebase);
 } else {
@@ -3485,17 +3554,24 @@ function loadExcelFile(event) {
         }
         if (headerRow < 0) return;
 
+        // 헤더 안전 처리 (null/undefined 제거)
+        const safeHeaders = headers.map(h => String(h || ''));
         const idx = {
-          name:   headers.indexOf('이름'),
-          tel:    headers.indexOf('연락처'),
-          birth:  headers.indexOf('생년월일'),
-          course: headers.findIndex(h => h.includes('과정')),
-          no:     headers.indexOf('원서번호'),
-          date:   headers.indexOf('등록일'),
-          mentor: headers.indexOf('멘토'),
-          status: headers.findIndex(h => h === '상태' || h === 'StudyState'),
-          fee:    headers.indexOf('수납액'),
+          name:   safeHeaders.indexOf('이름'),
+          tel:    safeHeaders.indexOf('연락처'),
+          birth:  safeHeaders.indexOf('생년월일'),
+          course: safeHeaders.findIndex(h => h.includes('과정')),
+          no:     safeHeaders.indexOf('원서번호'),
+          date:   safeHeaders.indexOf('등록일'),
+          mentor: safeHeaders.indexOf('멘토'),
+          status: safeHeaders.findIndex(h => h === '상태' || h === 'StudyState'),
+          fee:    safeHeaders.indexOf('수납액'),
         };
+        console.log('[엑셀] 시트:', sheetName);
+        console.log('[엑셀] headerRow:', headerRow, '헤더:', safeHeaders);
+        console.log('[엑셀] 과정idx:', idx.course, 'nameIdx:', idx.name);
+        // 첫 데이터행 확인
+        if (rows[headerRow+1]) console.log('[엑셀] 첫데이터:', rows[headerRow+1]);
 
         for (let i = headerRow + 1; i < rows.length; i++) {
           const row = rows[i];
@@ -3515,7 +3591,12 @@ function loadExcelFile(event) {
             if (s.length === 8) return s.slice(0,4) + '-' + s.slice(4,6) + '-' + s.slice(6,8);
             return String(b || '').trim();
           })(row[idx.birth]),
-            course:  String(row[idx.course >= 0 ? idx.course : 3] || '').trim(),
+            course:  (function(){
+              if(idx.course >= 0) return String(row[idx.course] || '').trim();
+              // 과정명 직접 찾기
+              const ci = safeHeaders.findIndex(h => h==='과정명'||h==='과정'||h.includes('과정'));
+              return ci >= 0 ? String(row[ci] || '').trim() : '';
+            })(),
             no:      String(row[idx.no] || '').trim(),
             date:    String(row[idx.date] || '').trim(),
             mentor:  String(row[idx.mentor] || '').trim(),
