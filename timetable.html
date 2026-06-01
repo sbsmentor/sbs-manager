@@ -262,6 +262,7 @@ function simplifyRoom(room) {
   return m ? m[1] + (m[2] || '') : room;
 }
 
+
 // 요일 정규화 함수
 function normalizeDays(raw) {
   if (!raw) return '';
@@ -526,10 +527,6 @@ window.uploadTimetable = async function(event, scheduleType) {
           const startDate = startM[1];
           const endDate   = endM ? endM[1] : '';
 
-          // 중복 체크: 강좌명+개강일+시간
-          const key = courseName + '|' + startDate + '|' + rowTime;
-          if (seen.has(key)) { skipped++; continue; }
-          seen.add(key);
 
           // 강사/요일 파싱
           const baejungIdx = lines.findIndex(l => /^배정\s*:/.test(l));
@@ -551,6 +548,11 @@ window.uploadTimetable = async function(event, scheduleType) {
               if (/^[가-힣]{2,5}$/.test(cleaned)) { teacher = cleaned; break; }
             }
           }
+
+          // 중복 체크: 강사+개강일+종강일 기준
+          const key = (teacher||'_') + '|' + startDate + '|' + endDate;
+          if (seen.has(key)) { skipped++; continue; }
+          seen.add(key);
 
           // 요일 정규화
           const days = normalizeDays(rawDays, startDate);
