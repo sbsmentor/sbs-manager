@@ -549,8 +549,8 @@ window.uploadTimetable = async function(event, scheduleType) {
             }
           }
 
-          // 중복 체크: 강사+개강일+종강일 기준
-          const key = (teacher||'_') + '|' + startDate + '|' + endDate;
+          // 중복 체크: 강사+개강일+종강일+시간 기준 (같은 강사 다른 시간 허용)
+          const key = (teacher||'_') + '|' + startDate + '|' + endDate + '|' + rowTime;
           if (seen.has(key)) { skipped++; continue; }
           seen.add(key);
 
