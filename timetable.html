@@ -745,8 +745,12 @@ window.uploadTimetable = async function(event, scheduleType) {
           const flat = lines.join('');
           if (!flat.includes('개:') || !flat.includes('종:')) continue;
 
-          // (국1), (계2) 등 앞 괄호+숫자 제거
-          const courseName = lines[0].trim().replace(/^\([가-힣a-zA-Z]+\d+\)\s*/, '');
+          // 강좌명 정규화: (국1) 제거, 숫자 제거 (웹툰1(주말)→웹툰(주말), 유니티(주말)5→유니티(주말))
+          const courseName = lines[0].trim()
+            .replace(/^\([가-힣a-zA-Z]+\d+\)\s*/, '') // 앞 (국1) 제거
+            .replace(/\d+([（(])/g, '$1')              // 앞 숫자: 웹툰1( → 웹툰(
+            .replace(/([)）])\d+$/g, '$1')             // 뒤 숫자: (주말)2 → (주말)
+            .replace(/\d+$/, '').trim();              // 끝 숫자 제거
           if (!courseName || courseName.length < 2) continue;
 
           const startM = flat.match(/개:(\d{4}-\d{2}-\d{2})/);
