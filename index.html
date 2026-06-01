@@ -419,9 +419,9 @@ function showToast(msg){
   const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
 }
-function getLoggedInId(){ return localStorage.getItem('sbs_logged_in'); }
-function setAuthenticated(id){ localStorage.setItem('sbs_logged_in',id); }
-function clearAuthenticated(){ localStorage.removeItem('sbs_logged_in'); }
+function getLoggedInId(){ return sessionStorage.getItem('sbs_logged_in'); }
+function setAuthenticated(id){ sessionStorage.setItem('sbs_logged_in',id); }
+function clearAuthenticated(){ sessionStorage.removeItem('sbs_logged_in'); }
 
 // ── 로그인 UI ──
 function updateLoginUI(){

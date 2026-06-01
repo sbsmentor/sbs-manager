@@ -557,17 +557,10 @@ window.uploadTimetable = async function(event, scheduleType) {
           // 요일 정규화
           const days = normalizeDays(rawDays, startDate);
 
-          // 강의실: allCells 인덱스로 매핑
-          let room = '';
-          for (let ai = 0; ai < allCells.length; ai++) {
-            if (allCells[ai] === tds[colIdx]) {
-              const rawRoom = ai < subRooms.length ? subRooms[ai] : '';
-              // A-1-1 → A, B-1-2 → B (알파벳만 추출)
-              const roomMatch = rawRoom.match(/^([A-Z]+)/);
-              room = roomMatch ? roomMatch[1] : rawRoom;
-              break;
-            }
-          }
+          // 강의실: tds[colIdx] = allCells[colIdx+1] 이므로 subRooms[colIdx+1]
+          const rawRoom = (colIdx + 1) < subRooms.length ? subRooms[colIdx + 1] : '';
+          const roomMatch = rawRoom.match(/^([A-Z]+)/);
+          const room = roomMatch ? roomMatch[1] : rawRoom;
 
           try {
             const newRef = push(ref('timetable'));
