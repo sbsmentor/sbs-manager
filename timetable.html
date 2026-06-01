@@ -168,10 +168,11 @@ window.addEventListener('unhandledrejection', function(e) {
   </div>
 
   <!-- 탭 -->
-  <div class="tab-bar">
+  <div class="tab-bar" style="display:flex;align-items:center;">
     <button class="tab-btn active" onclick="switchTab('all',this)">전체</button>
     <button class="tab-btn" onclick="switchTab('평일',this)">평일</button>
     <button class="tab-btn" onclick="switchTab('주말',this)">주말</button>
+    <button id="roomMapBtn" onclick="openRoomMapModal()" style="margin-left:auto;padding:6px 14px;border:1.5px solid var(--accent);background:none;color:var(--accent);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">⚙ 강사-강의실 설정</button>
   </div>
 
   <!-- 툴바 -->
@@ -286,7 +287,82 @@ let _sortField = 'start';
 let _sortAsc = true;
 
 // ════════ Firebase 로드 ════════
+
+// ── 강사-강의실 매핑 ──
+let _roomMap = {}; // {강사명: 강의실}
+
+// Firebase에서 로드
+function loadRoomMap() {
+  ref('roomMap').on('value', snap => {
+    _roomMap = snap.val() || {};
+  });
+}
+
+function openRoomMapModal() {
+  renderRoomMapList();
+  document.getElementById('roomMapModalBg').style.display = 'flex';
+}
+function closeRoomMapModal() {
+  document.getElementById('roomMapModalBg').style.display = 'none';
+}
+
+function renderRoomMapList() {
+  const list = document.getElementById('roomMapList');
+  const entries = Object.entries(_roomMap);
+  if (entries.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">강사를 추가해주세요</div>';
+    return;
+  }
+  list.innerHTML = entries.map(([teacher, room]) => `
+    <div class="room-map-row" style="display:flex;gap:8px;align-items:center;">
+      <input class="rm-teacher" value="${teacher}" placeholder="강사명" style="flex:1;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;">
+      <span style="color:#94a3b8;">→</span>
+      <input class="rm-room" value="${room}" placeholder="강의실 (예: L)" style="width:100px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;text-transform:uppercase;">
+      <button onclick="this.closest('.room-map-row').remove()" style="padding:6px 10px;border:none;background:#fee2e2;color:#dc2626;border-radius:7px;cursor:pointer;font-size:13px;">✕</button>
+    </div>
+  `).join('');
+}
+
+function addRoomMapRow() {
+  const list = document.getElementById('roomMapList');
+  // "추가해주세요" 메시지 제거
+  if (list.querySelector('div:not(.room-map-row)')) list.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'room-map-row';
+  row.style.cssText = 'display:flex;gap:8px;align-items:center;';
+  row.innerHTML = `
+    <input class="rm-teacher" placeholder="강사명" style="flex:1;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;">
+    <span style="color:#94a3b8;">→</span>
+    <input class="rm-room" placeholder="강의실 (예: L)" style="width:100px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;text-transform:uppercase;">
+    <button onclick="this.closest('.room-map-row').remove()" style="padding:6px 10px;border:none;background:#fee2e2;color:#dc2626;border-radius:7px;cursor:pointer;font-size:13px;">✕</button>
+  `;
+  list.appendChild(row);
+  row.querySelector('.rm-teacher').focus();
+}
+
+async function saveRoomMap() {
+  const rows = document.querySelectorAll('.room-map-row');
+  const newMap = {};
+  rows.forEach(row => {
+    const teacher = row.querySelector('.rm-teacher').value.trim();
+    const room    = row.querySelector('.rm-room').value.trim().toUpperCase();
+    if (teacher && room) newMap[teacher] = room;
+  });
+  await set(ref('roomMap'), newMap);
+  _roomMap = newMap;
+  closeRoomMapModal();
+  showToast('✅ 강의실 설정이 저장되었습니다');
+}
+
+// 업로드 시 강사→강의실 override 함수
+function getRoomForTeacher(teacher, parsedRoom) {
+  if (!teacher) return parsedRoom;
+  const mapped = _roomMap[teacher];
+  return mapped || parsedRoom; // 매핑 있으면 우선 적용
+}
+
 initTimetableFirebase().then(() => {
+  loadRoomMap(); // 강사-강의실 매핑 로드
   const coursesRef = ref('timetable');
   onValue(coursesRef, snap => {
     allCourses = snap.val() || {};
@@ -597,7 +673,9 @@ window.uploadTimetable = async function(event, scheduleType) {
           const tdCol = tdColEntry ? tdColEntry.col : -1;
           const rawRoom = tdCol >= 0 ? (colToRoom1[tdCol] || colToRoom0[tdCol] || '') : '';
           const roomMatch = rawRoom.match(/^([A-Z]+)/);
-          const room = roomMatch ? roomMatch[1] : rawRoom;
+          const parsedRoom = roomMatch ? roomMatch[1] : rawRoom;
+          // 강사-강의실 매핑 적용 (설정된 경우 우선)
+          const room = getRoomForTeacher(teacher, parsedRoom);
 
           // 중복 체크: 강사+개강일+종강일+시간+세부강의실 (rawRoom 기준)
           const key = (teacher||'_') + '|' + startDate + '|' + endDate + '|' + rowTime + '|' + rawRoom;
@@ -687,5 +765,24 @@ window.showToast = function(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
 };</script>
+
+<!-- 강사-강의실 설정 모달 -->
+<div id="roomMapModalBg" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;width:96%;max-width:600px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+    <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:16px;font-weight:800;">⚙ 강사-강의실 설정</span>
+      <span style="font-size:11px;color:#64748b;flex:1;">업로드 시 강사별 기본 강의실이 자동 적용됩니다</span>
+      <button onclick="closeRoomMapModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;">✕</button>
+    </div>
+    <div style="padding:16px 20px;overflow-y:auto;flex:1;">
+      <div id="roomMapList" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <button onclick="addRoomMapRow()" style="margin-top:12px;width:100%;padding:10px;border:2px dashed #cbd5e1;background:none;border-radius:10px;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">＋ 강사 추가</button>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid #e2e8f0;display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="closeRoomMapModal()" style="padding:9px 20px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">취소</button>
+      <button onclick="saveRoomMap()" style="padding:9px 24px;border:none;background:#5b4fff;color:#fff;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">💾 저장</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
