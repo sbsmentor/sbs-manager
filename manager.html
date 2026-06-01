@@ -913,10 +913,35 @@ function calcAge(birth){
   const age=t.getFullYear()-b.getFullYear()+1;
   return age+'세';
 }
+
+// ── 전화번호 유틸 ──
+function maskPhone(phone) {
+  if (!phone) return '-';
+  const p = String(phone).replace(/[^0-9]/g, '');
+  if (p.length === 11) return p.slice(0,3) + '-****-' + p.slice(7);
+  if (p.length === 10) return p.slice(0,3) + '-***-' + p.slice(7);
+  return phone;
+}
+function rawPhone(phone) {
+  if (!phone) return '';
+  const p = String(phone).replace(/[^0-9]/g, '');
+  if (p.length >= 10) return p.slice(0,3) + '-' + p.slice(3, p.length-4) + '-' + p.slice(-4);
+  return phone;
+}
+function normalizePhone(phone) {
+  // 검색용 - 숫자만 추출
+  return String(phone || '').replace(/[^0-9]/g, '');
+}
+
 function match(item,q){
   if(!q) return true;
-  const s=q.toLowerCase();
-  return Object.values(item).some(v=>v&&String(v).toLowerCase().includes(s));
+  const s = q.toLowerCase().replace(/[^0-9a-z가-힣]/g,'');
+  // 전화번호 숫자 검색 지원
+  const phoneRaw = normalizePhone(item['연락처'] || item['phone'] || '');
+  if (s.length >= 4 && /^\d+$/.test(s) && phoneRaw.includes(s)) return true;
+  // 일반 검색
+  const sq = q.toLowerCase();
+  return Object.values(item).some(v=>v&&String(v).toLowerCase().includes(sq));
 }
 function courseClass(c){
   if(!c) return 'ct-etc';
@@ -1365,7 +1390,14 @@ function openViewModal(item){
   </div><div class="modal-grid">`;
   fields.forEach(k=>{
     if(k==='나이'&&item['생년월일']) return;
-    const v=k==='나이'?(calcAge(item['생년월일'])||item[k]||'-'):(item[k]||'-');
+    let v;
+    if(k==='연락처') {
+      const tel = item[k] || '';
+      const raw = rawPhone(tel);
+      v = raw ? `<a href="tel:${raw.replace(/[^0-9]/g,'')}" style="color:var(--accent);text-decoration:none;font-weight:700;">${raw}</a>` : '-';
+    } else {
+      v = k==='나이'?(calcAge(item['생년월일'])||item[k]||'-'):(item[k]||'-');
+    }
     html+=`<div class="modal-field"><div class="modal-label">${k}</div><div class="modal-value">${v}</div></div>`;
   });
   html+=`</div>`;
@@ -2212,7 +2244,7 @@ function renderStudents(data){
         <td><span class="course-tag ${courseClass(s['과정']||'')}">${s['과정']||'-'}</span></td>
         <td><span class="pur-tag">${s['수강목적']||'-'}</span></td>
         <td style="font-family:var(--mono);font-size:12px;color:var(--text2)">${age}</td>
-        <td class="contact">${s['연락처']||'-'}</td>
+        <td class="contact">${maskPhone(s['연락처'])}</td>
         <td style="font-size:12px;color:var(--text2)">${s['주소']||'-'}</td>
         <td>${s['따즈아']?`<span class="ddazua-badge">${s['따즈아']}</span>`:'<span style="color:var(--text3);font-size:12px">-</span>'}</td>
         <td class="notice-td" onclick="event.stopPropagation()">${oniceHtml}</td>
@@ -2259,7 +2291,7 @@ function renderCOD(){
       <td style="text-align:center;"><input type="checkbox" class="tab-chk" data-idx="${i}" onchange="tabChkChange('cod')" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);"></td>
       <td><strong>${s['이름']||'-'}</strong></td>
       <td style="font-family:var(--mono);font-size:12px;color:var(--text2)">${age}</td>
-      <td class="contact">${s['연락처']||'-'}</td>
+      <td class="contact">${maskPhone(s['연락처'])}</td>
       <td><span class="course-tag ${courseClass(s['과정']||'')}">${s['과정']||'-'}</span></td>
       <td style="font-size:12px;color:var(--text2)">${s['등록일']||'-'}</td>
       <td style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--purple)">${s['COD금액']?Number(s['COD금액'].replace(/[^0-9]/g,'')||0).toLocaleString()+'원':'-'}</td>
@@ -2300,7 +2332,7 @@ function renderNatl(){
   items.forEach(({s,i})=>{
     html+=`<tr>
       <td style="text-align:center;"><input type="checkbox" class="tab-chk" data-idx="${i}" onchange="tabChkChange('natl')" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);"></td>
-      <td><strong>${s['이름']||'-'}</strong></td><td class="contact">${s['연락처']||'-'}</td>
+      <td><strong>${s['이름']||'-'}</strong></td><td class="contact">${maskPhone(s['연락처'])}</td>
       <td><span class="course-tag ${courseClass(s['과정']||'')}">${s['과정']||'-'}</span></td>
       <td><span class="status-badge s-natl">${s['유형']||'-'}</span></td>
       <td style="font-size:12px;color:var(--text2)">${s['기간']||'-'}</td>
@@ -2330,7 +2362,7 @@ function renderGrad(){
     const age=calcAge(s['생년월일'])||s['나이']||'-';
     html+=`<tr>
       <td style="text-align:center;"><input type="checkbox" class="tab-chk" data-idx="${i}" onchange="tabChkChange('grad')" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);"></td>
-      <td><strong>${s['이름']||'-'}</strong></td><td style="font-family:var(--mono);font-size:12px;color:var(--text2)">${age}</td><td class="contact">${s['연락처']||'-'}</td><td><span class="course-tag ${courseClass(s['과정']||'')}">${s['과정']||'-'}</span></td>
+      <td><strong>${s['이름']||'-'}</strong></td><td style="font-family:var(--mono);font-size:12px;color:var(--text2)">${age}</td><td class="contact">${maskPhone(s['연락처'])}</td><td><span class="course-tag ${courseClass(s['과정']||'')}">${s['과정']||'-'}</span></td>
       <td><div class="action-dropdown"><button class="action-dropdown-btn" onclick="toggleDropdown(event,'gd-${i}')">설정 ⚙</button><div class="action-dropdown-menu" id="gd-${i}"><button class="adm-item edit" onclick="closeAllDropdowns();openEditModal(GRAD_DATA,${i})">✏️ 수정</button><button class="adm-item restore" onclick="closeAllDropdowns();restoreToActive(GRAD_DATA,${i},'weekday')">↩ 평일 재학</button><button class="adm-item restore" onclick="closeAllDropdowns();restoreToActive(GRAD_DATA,${i},'weekend')">↩ 주말 재학</button><button class="adm-item del" onclick="closeAllDropdowns();deleteRow(GRAD_DATA,${i})">🗑 삭제</button></div></div></td></tr>`;
   });
   html+=`</tbody></table></div>`;
@@ -2355,7 +2387,7 @@ function renderRefund(){
   items.forEach(({s,i})=>{
     html+=`<tr>
       <td style="text-align:center;"><input type="checkbox" class="tab-chk" data-idx="${i}" onchange="tabChkChange('refund')" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);"></td>
-      <td><strong>${s['이름']||'-'}</strong></td><td class="contact">${s['연락처']||'-'}</td><td><span class="course-tag ${courseClass(s['과정']||'')}">${s['과정']||'-'}</span></td><td class="amount">-${s['환불금액']||'0'}</td><td class="remark">${s['특이사항']||'-'}</td>
+      <td><strong>${s['이름']||'-'}</strong></td><td class="contact">${maskPhone(s['연락처'])}</td><td><span class="course-tag ${courseClass(s['과정']||'')}">${s['과정']||'-'}</span></td><td class="amount">-${s['환불금액']||'0'}</td><td class="remark">${s['특이사항']||'-'}</td>
       <td><div class="action-dropdown"><button class="action-dropdown-btn" onclick="toggleDropdown(event,'rf-${i}')">설정 ⚙</button><div class="action-dropdown-menu" id="rf-${i}"><button class="adm-item edit" onclick="closeAllDropdowns();openEditModal(REFUND_DATA,${i})">✏️ 수정</button><button class="adm-item restore" onclick="closeAllDropdowns();restoreToActive(REFUND_DATA,${i},'weekday')">↩ 평일 재학</button><button class="adm-item restore" onclick="closeAllDropdowns();restoreToActive(REFUND_DATA,${i},'weekend')">↩ 주말 재학</button><button class="adm-item del" onclick="closeAllDropdowns();deleteRow(REFUND_DATA,${i})">🗑 삭제</button></div></div></td></tr>`;
   });
   html+=`</tbody></table></div>`;
@@ -2743,7 +2775,7 @@ function renderLeave(){
       <td><span class="course-tag ${courseClass(s['과정']||'')}">${s['과정']||'-'}</span></td>
       <td><span class="pur-tag">${s['수강목적']||'-'}</span></td>
       <td style="font-family:var(--mono);font-size:12px;color:var(--text2)">${age}</td>
-      <td class="contact">${s['연락처']||'-'}</td>
+      <td class="contact">${maskPhone(s['연락처'])}</td>
       <td style="font-family:var(--mono);font-size:12px;color:var(--orange);font-weight:700">${s['남은수강']||'-'}</td>
       <td><div class="action-dropdown">
         <button class="action-dropdown-btn" onclick="toggleDropdown(event,'lv-dd-${i}')">설정 ⚙</button>
@@ -3413,6 +3445,89 @@ function applyCourseToRow(row, course) {
 // ════════════════════════════════════════════
 let _excelRows = []; // 파싱된 행들
 
+
+// ── 엑셀 일괄등록 파싱 ──
+function loadExcelFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  document.getElementById('excelFileName').textContent = file.name;
+  _excelRows = [];
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+
+      // 학생 데이터가 있는 시트 찾기 (이름/연락처 헤더 기준)
+      const targetSheets = wb.SheetNames.filter(n =>
+        n.includes('멘토') || n.includes('학생')
+      );
+      const sheetNames = targetSheets.length > 0 ? targetSheets : wb.SheetNames;
+
+      const seen = new Set();
+      sheetNames.forEach(function(sheetName) {
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (!rows.length) return;
+
+        // 헤더 행 찾기
+        let headerRow = -1;
+        let headers = [];
+        for (let i = 0; i < Math.min(rows.length, 5); i++) {
+          const r = rows[i].map(String);
+          if (r.includes('이름') && r.includes('연락처')) {
+            headerRow = i;
+            headers = r;
+            break;
+          }
+        }
+        if (headerRow < 0) return;
+
+        const idx = {
+          name:   headers.indexOf('이름'),
+          tel:    headers.indexOf('연락처'),
+          birth:  headers.indexOf('생년월일'),
+          course: headers.findIndex(h => h.includes('과정')),
+          no:     headers.indexOf('원서번호'),
+          date:   headers.indexOf('등록일'),
+          mentor: headers.indexOf('멘토'),
+          status: headers.findIndex(h => h === '상태' || h === 'StudyState'),
+          fee:    headers.indexOf('수납액'),
+        };
+
+        for (let i = headerRow + 1; i < rows.length; i++) {
+          const row = rows[i];
+          const name = String(row[idx.name] || '').trim();
+          if (!name || name === 'null') continue;
+          const tel = String(row[idx.tel] || '').replace(/[^0-9\-]/g, '').trim();
+          const key = name + '|' + tel;
+          if (seen.has(key)) continue;
+          seen.add(key);
+
+          _excelRows.push({
+            name:    name,
+            tel:     tel,       // 원본 번호 (저장용)
+            birth:   String(row[idx.birth] || '').trim(),
+            course:  String(row[idx.course >= 0 ? idx.course : 3] || '').trim(),
+            no:      String(row[idx.no] || '').trim(),
+            date:    String(row[idx.date] || '').trim(),
+            mentor:  String(row[idx.mentor] || '').trim(),
+            status:  String(row[idx.status >= 0 ? idx.status : 8] || '').trim(),
+            fee:     String(row[idx.fee] || '').trim(),
+            selected: true,
+          });
+        }
+      });
+
+      renderExcelPreview();
+    } catch(err) {
+      console.error('엑셀 파싱 오류:', err);
+      showToast('❌ 파일 읽기 오류: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
 function openExcelBulkModal(){
   _excelRows = [];
   document.getElementById('excelPreview').innerHTML = '<div style="text-align:center;padding:32px;color:var(--text3);">엑셀 파일을 선택하면 미리보기가 나타납니다</div>';
@@ -3455,7 +3570,7 @@ async function renderExcelPreview(){
               <input type="checkbox" ${r.selected?'checked':''} onchange="_excelRows[${i}].selected=this.checked;updateExcelSelCount()" style="width:13px;height:13px;accent-color:var(--accent);">
             </td>
             <td style="padding:4px 8px;border:1px solid var(--border);font-weight:700;">${r.name}</td>
-            <td style="padding:4px 8px;border:1px solid var(--border);font-family:var(--mono);">${r.tel||'-'}</td>
+            <td style="padding:4px 8px;border:1px solid var(--border);font-family:var(--mono);">${maskPhone(r.tel)}</td>
             <td style="padding:4px 8px;border:1px solid var(--border);font-family:var(--mono);">${r.birth||'-'}</td>
             <td style="padding:4px 8px;border:1px solid var(--border);">${r.course||'-'}</td>
           </tr>
@@ -3485,7 +3600,7 @@ function saveExcelBulk(){
     const item={
       이름:r.name, 구분:gubn, 과정:r.course, 수강목적:'취업',
       생년월일:r.birth, 나이:r.birth?calcAge(r.birth):'',
-      연락처:r.tel, 보호자연락처:'', 주소:'',
+      연락처:rawPhone(r.tel), 보호자연락처:'', 주소:'',
       수강권:'', 따즈아:'', 이관자:'',
       수업배정:{}, assign:false
     };
