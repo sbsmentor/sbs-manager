@@ -425,8 +425,19 @@ window.uploadTimetable = async function(event, scheduleType) {
       if (rows.length < 2) { showToast('❌ 데이터 부족'); showLoading(false); return; }
 
       // rows[1]: 세부 강의실 (th+td 40개, 인덱스 일치)
-      const subRoomCells = rows[1].querySelectorAll('th, td');
-      const subRooms = Array.from(subRoomCells).map(c => c.textContent.replace(/\u00a0/g,' ').trim());
+      // colspan 고려한 컬럼→강의실 매핑
+      function buildColMap(rowEl) {
+        const map = {}; let col = 0;
+        rowEl.querySelectorAll('th, td').forEach(cell => {
+          const cs = parseInt(cell.getAttribute('colspan') || '1');
+          const t = cell.textContent.replace(/\u00a0/g,' ').trim();
+          for (let i = 0; i < cs; i++) map[col + i] = t;
+          col += cs;
+        });
+        return map;
+      }
+      const colToRoom0 = buildColMap(rows[0]); // 대강의실
+      const colToRoom1 = buildColMap(rows[1]); // 세부강의실
 
       // 요일 변환 함수
       function normalizeDays(rawDays, startDateStr) {
@@ -502,15 +513,23 @@ window.uploadTimetable = async function(event, scheduleType) {
 
       for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
         // 행 전체 셀 (th+td) - 인덱스가 subRooms와 일치
-        const allCells = rows[rowIdx].querySelectorAll('th, td');
-        if (!allCells.length) continue;
+        // colspan 기반 컬럼 위치 계산
+        const rowCells = rows[rowIdx].querySelectorAll('th, td');
+        if (!rowCells.length) continue;
 
-        // 첫 셀(th)에서 시간 추출
-        const firstText = (allCells[0].textContent || '').replace(/\u00a0/g,' ').trim();
+        const firstText = (rowCells[0].textContent || '').replace(/\u00a0/g,' ').trim();
         const timeMatch = firstText.match(/^(\d{2}:\d{2})/);
         const rowTime = timeMatch ? timeMatch[1] : '';
 
-        // td만 순회 (th는 시간이라 건너뜀)
+        // 각 셀의 실제 컬럼 위치 (colspan 반영)
+        const rowColMap = [];
+        let colPos = 0;
+        rowCells.forEach(cell => {
+          const cs = parseInt(cell.getAttribute('colspan') || '1');
+          rowColMap.push({cell, col: colPos, cs});
+          colPos += cs;
+        });
+
         const tds = rows[rowIdx].querySelectorAll('td');
         for (let colIdx = 0; colIdx < tds.length; colIdx++) {
           const lines = extractLines(tds[colIdx]);
@@ -549,18 +568,20 @@ window.uploadTimetable = async function(event, scheduleType) {
             }
           }
 
-          // 중복 체크: 강사+개강일+종강일+시간 기준 (같은 강사 다른 시간 허용)
-          const key = (teacher||'_') + '|' + startDate + '|' + endDate + '|' + rowTime;
+          // 강의실: td의 실제 컬럼 위치로 매핑
+          const tdColEntry = rowColMap.find(e => e.cell === tds[colIdx]);
+          const tdCol = tdColEntry ? tdColEntry.col : -1;
+          const rawRoom = tdCol >= 0 ? (colToRoom1[tdCol] || colToRoom0[tdCol] || '') : '';
+          const roomMatch = rawRoom.match(/^([A-Z]+)/);
+          const room = roomMatch ? roomMatch[1] : rawRoom;
+
+          // 중복 체크: 강사+개강일+종강일+시간+세부강의실 (rawRoom 기준)
+          const key = (teacher||'_') + '|' + startDate + '|' + endDate + '|' + rowTime + '|' + rawRoom;
           if (seen.has(key)) { skipped++; continue; }
           seen.add(key);
 
           // 요일 정규화
           const days = normalizeDays(rawDays, startDate);
-
-          // 강의실: tds[colIdx] = allCells[colIdx+1] 이므로 subRooms[colIdx+1]
-          const rawRoom = (colIdx + 1) < subRooms.length ? subRooms[colIdx + 1] : '';
-          const roomMatch = rawRoom.match(/^([A-Z]+)/);
-          const room = roomMatch ? roomMatch[1] : rawRoom;
 
           try {
             const newRef = push(ref('timetable'));
