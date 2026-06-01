@@ -556,11 +556,13 @@ window.uploadTimetable = async function(event, scheduleType) {
           const days = normalizeDays(rawDays, startDate);
 
           // 강의실: allCells 인덱스로 매핑
-          // tds[colIdx]가 allCells의 몇 번째인지 찾기
           let room = '';
           for (let ai = 0; ai < allCells.length; ai++) {
             if (allCells[ai] === tds[colIdx]) {
-              room = ai < subRooms.length ? subRooms[ai] : '';
+              const rawRoom = ai < subRooms.length ? subRooms[ai] : '';
+              // A-1-1 → A, B-1-2 → B (알파벳만 추출)
+              const roomMatch = rawRoom.match(/^([A-Z]+)/);
+              room = roomMatch ? roomMatch[1] : rawRoom;
               break;
             }
           }
