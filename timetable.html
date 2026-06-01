@@ -172,7 +172,7 @@ window.addEventListener('unhandledrejection', function(e) {
     <button class="tab-btn active" onclick="switchTab('all',this)">전체</button>
     <button class="tab-btn" onclick="switchTab('평일',this)">평일</button>
     <button class="tab-btn" onclick="switchTab('주말',this)">주말</button>
-    <button id="roomMapBtn" onclick="openRoomMapModal()" style="margin-left:auto;padding:6px 14px;border:1.5px solid var(--accent);background:none;color:var(--accent);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">⚙ 강사-강의실 설정</button>
+    <button onclick="openRoomFixModal()" style="margin-left:auto;padding:6px 14px;border:1.5px solid var(--accent);background:none;color:var(--accent);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">⚙ 강의실 고정</button>
   </div>
 
   <!-- 툴바 -->
@@ -288,81 +288,189 @@ let _sortAsc = true;
 
 // ════════ Firebase 로드 ════════
 
-// ── 강사-강의실 매핑 ──
-let _roomMap = {}; // {강사명: 강의실}
 
-// Firebase에서 로드
-function loadRoomMap() {
-  ref('roomMap').on('value', snap => {
-    _roomMap = snap.val() || {};
+
+// ── 강의실 고정 설정 (강사+강좌+구분 → 강의실) ──
+let _roomFix = {}; // key: "강사|강좌|구분" → 강의실
+
+function _roomFixKey(teacher, course, type) {
+  return (teacher||'').trim() + '|' + (course||'').trim() + '|' + (type||'').trim();
+}
+
+const _DEFAULT_ROOM_FIX = {
+  "웹툰|원태룡|평일": "A",
+  "웹툰|임현철|평일": "A",
+  "아트웍|황민주|평일": "B",
+  "게임원화2H|박솔이|평일": "B",
+  "게임원화(2H/격)|김유정|평일": "B",
+  "게그|이동수|평일": "C",
+  "웹툰드로잉|최해광|평일": "C",
+  "게임그래픽디자이너양성과정|이동수|평일": "C",
+  "게임원화|이승민|평일": "F",
+  "게임원화3H|박솔이|평일": "F",
+  "언리얼PO|김보성|평일": "D",
+  "유니티PO|정우일|평일": "D",
+  "게임원화|나주연|평일": "E",
+  "게임원화(프)|나주연|평일": "E",
+  "아트웍|최해광|평일": "F",
+  "유니티게임프로그래머양성과정|정우일|평일": "G",
+  "웹소설PO|황윤솔|평일": "G",
+  "웹소설2H|김남영|평일": "G",
+  "웹소설2H|김성규|평일": "G",
+  "언리얼|김보성|평일": "H",
+  "게프|김보성|평일": "H",
+  "게임기획|지바롬|평일": "H",
+  "게임기획PO|지바롬|평일": "H",
+  "게그|김선욱|평일": "I",
+  "게그(배/애)|백문선|평일": "I",
+  "게그(캐/이)|백문선|평일": "I",
+  "게임UI|노유지|평일": "J",
+  "게임기획실무자양성과정|이종주|평일": "K",
+  "팀프로젝트|이민수|평일": "K",
+  "유니티|이민수|평일": "K",
+  "게임원화(격/3h)|조아라|평일": "L",
+  "문예창작|박찬주|평일": "비대면",
+  "웹툰PD|강성민|평일": "비대면",
+  "웹툰심화|김지윤|평일": "비대면",
+  "게임이펙트(FX)|최영길|평일": "비대면",
+  "웹툰(주말)|임현철|주말": "비대면",
+  "아트웍/취미(주말)|윤정민|주말": "B",
+  "아트웍/취미(주말)|최해광|주말": "B",
+  "웹툰(주말)|원태룡|주말": "A",
+  "웹툰(주말)|김준하|주말": "A",
+  "아트웍(주말)|윤정민|주말": "B",
+  "아트웍(주말)|최해광|주말": "B",
+  "게임원화(주말)|신민종|주말": "C",
+  "게임시네마틱(주말)|염만호|주말": "C",
+  "웹소설(주말)|김성규|주말": "D",
+  "게임기획(주말)|문상윤|주말": "D",
+  "웹소설심화(주말)|김성규|주말": "D",
+  "아트웍(주말)|황현우|주말": "E",
+  "게임원화(주말)|황찬노|주말": "E",
+  "게임원화(주말)|기준호|주말": "E",
+  "핸드드로잉|남수진|주말": "F",
+  "이모티콘(주말)|김규진|주말": "F",
+  "유니티(주말)|김도균|주말": "G",
+  "게임사업기획(주말)|강범희|주말": "G",
+  "언리얼엔진(주말)|김민수|주말": "H",
+  "유니티PO(주말)|남병철|주말": "H",
+  "게프(주말)|남병철|주말": "H",
+  "게임그래픽(주말)|한정훈|주말": "I",
+  "게임그래픽(주말)|김종태|주말": "J",
+  "게임그래픽(주말)|현경업|주말": "J",
+  "게임기획(주말)|이종주|주말": "K",
+  "게임QA(주말)|이상민|주말": "K",
+  "웹소설(주말)|민경선|주말": "L",
+  "웹소설PD(주말)|서연서|주말": "L",
+  "게임원화(주말)|장희선|주말": "L",
+  "QA기초|장덕윤|주말": "비대면",
+  "게임UI|신은진|주말": "비대면",
+  "웹소설PD/주|노용선|주말": "비대면",
+  "게임QA심화(주말)|이상민|주말": "비대면",
+  "웹드라마(주말)|강예은|주말": "비대면",
+  "2D애니(주말)|노광필|주말": "비대면",
+  "이모티콘/아이패드(주말)|이혜영|주말": "비대면"
+};
+
+function loadRoomFix() {
+  ref('roomFix').on('value', snap => {
+    const saved = snap.val();
+    if (saved && Object.keys(saved).length > 0) {
+      _roomFix = saved;
+    } else {
+      // Firebase에 없으면 기본값으로 초기화
+      _roomFix = Object.assign({}, _DEFAULT_ROOM_FIX);
+      set(ref('roomFix'), _roomFix).catch(()=>{});
+    }
   });
 }
 
-function openRoomMapModal() {
-  renderRoomMapList();
-  document.getElementById('roomMapModalBg').style.display = 'flex';
-}
-function closeRoomMapModal() {
-  document.getElementById('roomMapModalBg').style.display = 'none';
+function getFixedRoom(teacher, course, type, parsedRoom) {
+  // 정확한 매칭
+  const key = _roomFixKey(teacher, course, type);
+  if (_roomFix[key]) return _roomFix[key];
+  // 공백 제거 후 매칭 (유니티 게임프로그래머 ↔ 유니티게임프로그래머)
+  const normCourse = (course||'').replace(/\s+/g,'');
+  const normTeacher = (teacher||'').trim();
+  for (const [k, v] of Object.entries(_roomFix)) {
+    const [kt, kc, ktype] = k.split('|');
+    if ((kt||'').trim() === normTeacher &&
+        (kc||'').replace(/\s+/g,'') === normCourse &&
+        (ktype||'') === type) return v;
+  }
+  return parsedRoom;
 }
 
-function renderRoomMapList() {
-  const list = document.getElementById('roomMapList');
-  const entries = Object.entries(_roomMap);
+function openRoomFixModal() {
+  renderRoomFixList();
+  document.getElementById('roomFixModalBg').style.display = 'flex';
+}
+
+function closeRoomFixModal() {
+  document.getElementById('roomFixModalBg').style.display = 'none';
+}
+
+function renderRoomFixList() {
+  const list = document.getElementById('roomFixList');
+  const entries = Object.entries(_roomFix);
+  list.innerHTML = '';
   if (entries.length === 0) {
-    list.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">강사를 추가해주세요</div>';
+    list.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;">설정이 없습니다. 추가 버튼을 눌러주세요.</div>';
     return;
   }
-  list.innerHTML = entries.map(([teacher, room]) => `
-    <div class="room-map-row" style="display:flex;gap:8px;align-items:center;">
-      <input class="rm-teacher" value="${teacher}" placeholder="강사명" style="flex:1;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;">
-      <span style="color:#94a3b8;">→</span>
-      <input class="rm-room" value="${room}" placeholder="강의실 (예: L)" style="width:100px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;text-transform:uppercase;">
-      <button onclick="this.closest('.room-map-row').remove()" style="padding:6px 10px;border:none;background:#fee2e2;color:#dc2626;border-radius:7px;cursor:pointer;font-size:13px;">✕</button>
-    </div>
-  `).join('');
+  entries.forEach(([key, room]) => {
+    const [teacher, course, type] = key.split('|');
+    list.appendChild(_makeRoomFixRow(teacher, course, type, room));
+  });
 }
 
-function addRoomMapRow() {
-  const list = document.getElementById('roomMapList');
-  // "추가해주세요" 메시지 제거
-  if (list.querySelector('div:not(.room-map-row)')) list.innerHTML = '';
+function _makeRoomFixRow(teacher, course, type, room) {
   const row = document.createElement('div');
-  row.className = 'room-map-row';
-  row.style.cssText = 'display:flex;gap:8px;align-items:center;';
-  row.innerHTML = `
-    <input class="rm-teacher" placeholder="강사명" style="flex:1;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;">
-    <span style="color:#94a3b8;">→</span>
-    <input class="rm-room" placeholder="강의실 (예: L)" style="width:100px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Noto Sans KR',sans-serif;text-transform:uppercase;">
-    <button onclick="this.closest('.room-map-row').remove()" style="padding:6px 10px;border:none;background:#fee2e2;color:#dc2626;border-radius:7px;cursor:pointer;font-size:13px;">✕</button>
-  `;
-  list.appendChild(row);
-  row.querySelector('.rm-teacher').focus();
+  row.className = 'rf-row';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 80px 80px 36px;gap:6px;align-items:center;';
+  const inp = (val, ph, cls) => `<input class="${cls}" value="${val||''}" placeholder="${ph}" style="padding:7px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:12px;font-family:'Noto Sans KR',sans-serif;width:100%;box-sizing:border-box;">`;
+  const sel = (val) => `<select class="rf-type" style="padding:7px 6px;border:1px solid #e2e8f0;border-radius:7px;font-size:12px;font-family:'Noto Sans KR',sans-serif;width:100%;box-sizing:border-box;">
+    <option value="평일"${val==='평일'?' selected':''}>평일</option>
+    <option value="주말"${val==='주말'?' selected':''}>주말</option>
+  </select>`;
+  row.innerHTML = inp(teacher,'강사명','rf-teacher') + inp(course,'강좌명','rf-course') + sel(type||'평일') + inp(room,'강의실','rf-room') +
+    '<button onclick="this.closest(\'.rf-row\').remove()" style="padding:6px;border:none;background:#fee2e2;color:#dc2626;border-radius:7px;cursor:pointer;font-size:13px;width:36px;">✕</button>';
+  return row;
 }
 
-async function saveRoomMap() {
-  const rows = document.querySelectorAll('.room-map-row');
+function addRoomFixRow() {
+  const list = document.getElementById('roomFixList');
+  const empty = list.querySelector('div:not(.rf-row)');
+  if (empty) empty.remove();
+  const row = _makeRoomFixRow('', '', '평일', '');
+  list.appendChild(row);
+  row.querySelector('.rf-teacher').focus();
+}
+
+async function saveRoomFix() {
+  const rows = document.querySelectorAll('.rf-row');
   const newMap = {};
   rows.forEach(row => {
-    const teacher = row.querySelector('.rm-teacher').value.trim();
-    const room    = row.querySelector('.rm-room').value.trim().toUpperCase();
-    if (teacher && room) newMap[teacher] = room;
+    const teacher = row.querySelector('.rf-teacher').value.trim();
+    const course  = row.querySelector('.rf-course').value.trim();
+    const type    = row.querySelector('.rf-type').value;
+    const room    = row.querySelector('.rf-room').value.trim().toUpperCase();
+    if (teacher && room) {
+      newMap[_roomFixKey(teacher, course, type)] = room;
+    }
   });
-  await set(ref('roomMap'), newMap);
-  _roomMap = newMap;
-  closeRoomMapModal();
-  showToast('✅ 강의실 설정이 저장되었습니다');
-}
-
-// 업로드 시 강사→강의실 override 함수
-function getRoomForTeacher(teacher, parsedRoom) {
-  if (!teacher) return parsedRoom;
-  const mapped = _roomMap[teacher];
-  return mapped || parsedRoom; // 매핑 있으면 우선 적용
+  try {
+    await set(ref('roomFix'), newMap);
+    _roomFix = newMap;
+    closeRoomFixModal();
+    showToast('✅ 강의실 고정 설정 저장 완료 (' + Object.keys(newMap).length + '개)');
+  } catch(e) {
+    showToast('❌ 저장 실패: ' + e.message);
+  }
 }
 
 initTimetableFirebase().then(() => {
-  loadRoomMap(); // 강사-강의실 매핑 로드
+  loadRoomFix(); // 강의실 고정 설정 로드
   const coursesRef = ref('timetable');
   onValue(coursesRef, snap => {
     allCourses = snap.val() || {};
@@ -637,7 +745,8 @@ window.uploadTimetable = async function(event, scheduleType) {
           const flat = lines.join('');
           if (!flat.includes('개:') || !flat.includes('종:')) continue;
 
-          const courseName = lines[0].trim();
+          // (국1), (계2) 등 앞 괄호+숫자 제거
+          const courseName = lines[0].trim().replace(/^\([가-힣a-zA-Z]+\d+\)\s*/, '');
           if (!courseName || courseName.length < 2) continue;
 
           const startM = flat.match(/개:(\d{4}-\d{2}-\d{2})/);
@@ -674,8 +783,8 @@ window.uploadTimetable = async function(event, scheduleType) {
           const rawRoom = tdCol >= 0 ? (colToRoom1[tdCol] || colToRoom0[tdCol] || '') : '';
           const roomMatch = rawRoom.match(/^([A-Z]+)/);
           const parsedRoom = roomMatch ? roomMatch[1] : rawRoom;
-          // 강사-강의실 매핑 적용 (설정된 경우 우선)
-          const room = getRoomForTeacher(teacher, parsedRoom);
+          // 강의실 고정 설정 적용 (강사+강좌+구분 매핑)
+          const room = getFixedRoom(teacher, courseName, scheduleType, parsedRoom);
 
           // 중복 체크: 강사+개강일+종강일+시간+세부강의실 (rawRoom 기준)
           const key = (teacher||'_') + '|' + startDate + '|' + endDate + '|' + rowTime + '|' + rawRoom;
@@ -766,14 +875,6 @@ window.showToast = function(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 };</script>
 
-<!-- 강사-강의실 설정 모달 -->
-<div id="roomMapModalBg" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:16px;width:96%;max-width:600px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.2);">
-    <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;">
-      <span style="font-size:16px;font-weight:800;">⚙ 강사-강의실 설정</span>
-      <span style="font-size:11px;color:#64748b;flex:1;">업로드 시 강사별 기본 강의실이 자동 적용됩니다</span>
-      <button onclick="closeRoomMapModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;">✕</button>
-    </div>
     <div style="padding:16px 20px;overflow-y:auto;flex:1;">
       <div id="roomMapList" style="display:flex;flex-direction:column;gap:8px;"></div>
       <button onclick="addRoomMapRow()" style="margin-top:12px;width:100%;padding:10px;border:2px dashed #cbd5e1;background:none;border-radius:10px;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">＋ 강사 추가</button>
@@ -781,6 +882,29 @@ window.showToast = function(msg) {
     <div style="padding:12px 20px;border-top:1px solid #e2e8f0;display:flex;gap:8px;justify-content:flex-end;">
       <button onclick="closeRoomMapModal()" style="padding:9px 20px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">취소</button>
       <button onclick="saveRoomMap()" style="padding:9px 24px;border:none;background:#5b4fff;color:#fff;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">💾 저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 강의실 고정 설정 모달 -->
+<div id="roomFixModalBg" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;width:96%;max-width:640px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+    <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+      <span style="font-size:16px;font-weight:800;">⚙ 강의실 고정 설정</span>
+      <span style="font-size:11px;color:#64748b;flex:1;">강사명+강좌명+구분으로 강의실을 고정합니다. 업로드 시 자동 적용됩니다.</span>
+      <button onclick="closeRoomFixModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;line-height:1;">✕</button>
+    </div>
+    <div style="padding:12px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;flex-shrink:0;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 80px 80px 36px;gap:6px;font-size:11px;font-weight:700;color:#64748b;padding:0 4px;">
+        <span>강사명</span><span>강좌명</span><span>구분</span><span>강의실</span><span></span>
+      </div>
+    </div>
+    <div id="roomFixList" style="padding:10px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;"></div>
+    <div style="padding:12px 16px;border-top:1px solid #e2e8f0;flex-shrink:0;display:flex;gap:8px;align-items:center;">
+      <button onclick="addRoomFixRow()" style="padding:8px 16px;border:2px dashed #cbd5e1;background:none;border-radius:8px;color:#64748b;font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">＋ 추가</button>
+      <div style="flex:1;"></div>
+      <button onclick="closeRoomFixModal()" style="padding:8px 18px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">취소</button>
+      <button onclick="saveRoomFix()" style="padding:8px 22px;border:none;background:#5b4fff;color:#fff;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">💾 저장</button>
     </div>
   </div>
 </div>
