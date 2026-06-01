@@ -197,12 +197,12 @@ window.addEventListener('unhandledrejection', function(e) {
       <thead>
         <tr>
           <th style="width:32px;text-align:center;"><input type="checkbox" id="ttChkAll" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);"></th>
-          <th>강좌명</th>
-          <th>강사명</th>
-          <th>개강일</th>
-          <th>종강일</th>
-          <th>시간</th>
-          <th>강의실</th>
+          <th onclick="sortTable('name')" style="cursor:pointer;user-select:none;" id="th-name">강좌명 <span class="sort-arrow"></span></th>
+          <th onclick="sortTable('teacher')" style="cursor:pointer;user-select:none;" id="th-teacher">강사명 <span class="sort-arrow"></span></th>
+          <th onclick="sortTable('start')" style="cursor:pointer;user-select:none;" id="th-start">개강일 <span class="sort-arrow">▲</span></th>
+          <th onclick="sortTable('end')" style="cursor:pointer;user-select:none;" id="th-end">종강일 <span class="sort-arrow"></span></th>
+          <th onclick="sortTable('time')" style="cursor:pointer;user-select:none;" id="th-time">시간 <span class="sort-arrow"></span></th>
+          <th onclick="sortTable('room')" style="cursor:pointer;user-select:none;" id="th-room">강의실 <span class="sort-arrow"></span></th>
           <th>요일</th>
           <th>구분</th>
           <th></th>
@@ -282,6 +282,8 @@ function normalizeDays(raw) {
 // 전역 상태
 let allCourses = {};
 let currentTab = 'all';
+let _sortField = 'start';
+let _sortAsc = true;
 
 // ════════ Firebase 로드 ════════
 initTimetableFirebase().then(() => {
@@ -307,6 +309,22 @@ window.switchTab = function(tab, btn) {
 // 월별 접힘 상태 저장
 const _monthCollapsed = {};
 
+
+// ── 정렬 ──
+function sortTable(field) {
+  if (_sortField === field) {
+    _sortAsc = !_sortAsc;
+  } else {
+    _sortField = field;
+    _sortAsc = true;
+  }
+  // 화살표 업데이트
+  document.querySelectorAll('thead th .sort-arrow').forEach(el => el.textContent = '');
+  const th = document.getElementById('th-' + field);
+  if (th) th.querySelector('.sort-arrow').textContent = _sortAsc ? '▲' : '▼';
+  window.renderTable();
+}
+
 window.renderTable = function() {
   var q = (document.getElementById('searchInp').value||'').toLowerCase();
   var timeF = document.getElementById('timeFilter').value;
@@ -314,7 +332,13 @@ window.renderTable = function() {
   if (currentTab !== 'all') items = items.filter(function(c){ return c.type === currentTab; });
   if (q) items = items.filter(function(c){ return (c.name||'').toLowerCase().indexOf(q)>=0||(c.teacher||'').toLowerCase().indexOf(q)>=0; });
   if (timeF) items = items.filter(function(c){ return c.time === timeF; });
-  items.sort(function(a,b){ return (a.start||'9999').localeCompare(b.start||'9999'); });
+  items.sort(function(a,b) {
+    var av = (a[_sortField]||'').toLowerCase();
+    var bv = (b[_sortField]||'').toLowerCase();
+    if (av < bv) return _sortAsc ? -1 : 1;
+    if (av > bv) return _sortAsc ? 1 : -1;
+    return 0;
+  });
 
   document.getElementById('countBadge').textContent = items.length + '개';
 
