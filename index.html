@@ -513,6 +513,11 @@ async function doChangePw(){
 }
 function closeChangePwModal(){ document.getElementById('changePwModalBg').classList.remove('open'); }
 function openChangePwModal(){ document.getElementById('changePwModalBg').classList.add('open'); }
+function showChangePwFromLogin(){
+  // 로그인 모달 닫고 비밀번호 변경 모달 열기
+  document.getElementById('loginModalBg').classList.remove('open');
+  document.getElementById('changePwModalBg').classList.add('open');
+}
 
 // ── 관리 토글 ──
 function toggleAdmin(){
