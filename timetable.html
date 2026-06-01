@@ -293,8 +293,12 @@ let _sortAsc = true;
 // ── 강의실 고정 설정 (강사+강좌+구분 → 강의실) ──
 let _roomFix = {}; // key: "강사|강좌|구분" → 강의실
 
+function _sanitizeKey(s) {
+  // Firebase 키에 금지된 문자 제거: . # $ / [ ]
+  return (s||'').trim().replace(/[.#$\/\[\]]/g, '_');
+}
 function _roomFixKey(teacher, course, type) {
-  return (teacher||'').trim() + '|' + (course||'').trim() + '|' + (type||'').trim();
+  return _sanitizeKey(teacher) + '|' + _sanitizeKey(course) + '|' + _sanitizeKey(type);
 }
 
 const _DEFAULT_ROOM_FIX = {
@@ -302,7 +306,7 @@ const _DEFAULT_ROOM_FIX = {
   "웹툰|임현철|평일": "A",
   "아트웍|황민주|평일": "B",
   "게임원화2H|박솔이|평일": "B",
-  "게임원화(2H/격)|김유정|평일": "B",
+  "게임원화(2H_격)|김유정|평일": "B",
   "게그|이동수|평일": "C",
   "웹툰드로잉|최해광|평일": "C",
   "게임그래픽디자이너양성과정|이동수|평일": "C",
@@ -322,20 +326,20 @@ const _DEFAULT_ROOM_FIX = {
   "게임기획|지바롬|평일": "H",
   "게임기획PO|지바롬|평일": "H",
   "게그|김선욱|평일": "I",
-  "게그(배/애)|백문선|평일": "I",
-  "게그(캐/이)|백문선|평일": "I",
+  "게그(배_애)|백문선|평일": "I",
+  "게그(캐_이)|백문선|평일": "I",
   "게임UI|노유지|평일": "J",
   "게임기획실무자양성과정|이종주|평일": "K",
   "팀프로젝트|이민수|평일": "K",
   "유니티|이민수|평일": "K",
-  "게임원화(격/3h)|조아라|평일": "L",
+  "게임원화(격_3h)|조아라|평일": "L",
   "문예창작|박찬주|평일": "비대면",
   "웹툰PD|강성민|평일": "비대면",
   "웹툰심화|김지윤|평일": "비대면",
   "게임이펙트(FX)|최영길|평일": "비대면",
   "웹툰(주말)|임현철|주말": "비대면",
-  "아트웍/취미(주말)|윤정민|주말": "B",
-  "아트웍/취미(주말)|최해광|주말": "B",
+  "아트웍_취미(주말)|윤정민|주말": "B",
+  "아트웍_취미(주말)|최해광|주말": "B",
   "웹툰(주말)|원태룡|주말": "A",
   "웹툰(주말)|김준하|주말": "A",
   "아트웍(주말)|윤정민|주말": "B",
@@ -365,11 +369,11 @@ const _DEFAULT_ROOM_FIX = {
   "게임원화(주말)|장희선|주말": "L",
   "QA기초|장덕윤|주말": "비대면",
   "게임UI|신은진|주말": "비대면",
-  "웹소설PD/주|노용선|주말": "비대면",
+  "웹소설PD_주|노용선|주말": "비대면",
   "게임QA심화(주말)|이상민|주말": "비대면",
   "웹드라마(주말)|강예은|주말": "비대면",
   "2D애니(주말)|노광필|주말": "비대면",
-  "이모티콘/아이패드(주말)|이혜영|주말": "비대면"
+  "이모티콘_아이패드(주말)|이혜영|주말": "비대면"
 };
 
 function loadRoomFix() {
@@ -386,15 +390,15 @@ function loadRoomFix() {
 }
 
 function getFixedRoom(teacher, course, type, parsedRoom) {
-  // 정확한 매칭
+  // 정확한 매칭 (sanitize 적용)
   const key = _roomFixKey(teacher, course, type);
   if (_roomFix[key]) return _roomFix[key];
-  // 공백 제거 후 매칭 (유니티 게임프로그래머 ↔ 유니티게임프로그래머)
-  const normCourse = (course||'').replace(/\s+/g,'');
-  const normTeacher = (teacher||'').trim();
+  // 공백+특수문자 제거 후 매칭
+  const normCourse  = _sanitizeKey((course||'').replace(/\s+/g,''));
+  const normTeacher = _sanitizeKey((teacher||'').trim());
   for (const [k, v] of Object.entries(_roomFix)) {
     const [kt, kc, ktype] = k.split('|');
-    if ((kt||'').trim() === normTeacher &&
+    if ((kt||'').replace(/\s+/g,'') === normTeacher &&
         (kc||'').replace(/\s+/g,'') === normCourse &&
         (ktype||'') === type) return v;
   }
@@ -783,10 +787,14 @@ window.uploadTimetable = async function(event, scheduleType) {
 
           // 비대면: 강사명 못 찾으면 정원 라인에서 XXX T 패턴 추출
           // 예) (게임-부산)장덕윤T → 장덕윤
+          // 비대면: 강사명 못 찾으면 XXXT 패턴으로 추출
+          // 예) (게임-부산)박준석T/매월투입 → 박준석
           if (!teacher) {
             for (const line of lines) {
-              const mT = line.match(/[가-힣]{2,5}T(?:\s|\/|$)/);
-              if (mT) { teacher = mT[0].trim().replace(/T$/, '').trim(); break; }
+              const mT = line.match(/([가-힣]{2,5})T[^가-힣]/);
+              const mT2 = !mT && line.match(/([가-힣]{2,5})T$/);
+              const matched = mT || mT2;
+              if (matched) { teacher = matched[1].trim(); break; }
             }
           }
 
@@ -888,16 +896,6 @@ window.showToast = function(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 };</script>
 
-    <div style="padding:16px 20px;overflow-y:auto;flex:1;">
-      <div id="roomMapList" style="display:flex;flex-direction:column;gap:8px;"></div>
-      <button onclick="addRoomMapRow()" style="margin-top:12px;width:100%;padding:10px;border:2px dashed #cbd5e1;background:none;border-radius:10px;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">＋ 강사 추가</button>
-    </div>
-    <div style="padding:12px 20px;border-top:1px solid #e2e8f0;display:flex;gap:8px;justify-content:flex-end;">
-      <button onclick="closeRoomMapModal()" style="padding:9px 20px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">취소</button>
-      <button onclick="saveRoomMap()" style="padding:9px 24px;border:none;background:#5b4fff;color:#fff;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">💾 저장</button>
-    </div>
-  </div>
-</div>
 
 <!-- 강의실 고정 설정 모달 -->
 <div id="roomFixModalBg" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
