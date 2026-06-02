@@ -829,6 +829,7 @@ window.onerror = function(msg) {
       <select id="excelGubn" style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;">
         <option value="평일">평일</option>
         <option value="주말">주말</option>
+        <option value="cod">COD</option>
       </select>
       <button onclick="saveExcelBulk()" style="margin-left:auto;padding:8px 22px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">✅ 선택 등록</button>
     </div>
@@ -1353,9 +1354,16 @@ function moveStudent(fromArr,idx,toTab){
   } else if(toTab==='weekend_cod'){
     const newItem={이름:item['이름']||'',구분:'주말',과정:item['과정']||'',수강목적:item['수강목적']||'취업',생년월일:item['생년월일']||'',나이:item['나이']||'',연락처:item['연락처']||'',보호자연락처:'',주소:'',수강권:'',따즈아:'',이관자:'',수업배정:{},assign:false};
     WEEKEND.push(newItem);
+  } else if(toTab==='cod'){
+    COD_DATA.push({
+      이름:item['이름']||'', 생년월일:item['생년월일']||'', 나이:item['나이']||'',
+      연락처:item['연락처']||'', 과정:item['과정']||'',
+      등록일:'', COD금액:'', COD잔액:'', 내용:''
+    });
   }
   renderTabs();
   renderContent();
+  saveToLocal();
   showToast('이동되었습니다 ✓');
 }
 
@@ -1655,7 +1663,7 @@ function bulkAction(action){
   if(indices.length === 0){ showToast('⚠ 선택된 학생이 없습니다'); return; }
 
   const names = indices.map(i=>merged[i]?.['이름']||'?').reverse().join(', ');
-  const actionLabel = action==='leave'?'휴학':action==='grad'?'종강':action==='refund'?'환불':'삭제';
+  const actionLabel = action==='leave'?'휴학':action==='grad'?'종강':action==='refund'?'환불':action==='cod'?'COD이동':'삭제';
   if(!confirm(`${names} (${indices.length}명)을 일괄 ${actionLabel} 처리하시겠습니까?`)) return;
 
   // 역순으로 처리 (splice 인덱스 꼬임 방지)
@@ -1683,6 +1691,12 @@ function bulkAction(action){
         GRAD_DATA.push({이름:it['이름']||'',생년월일:it['생년월일']||'',나이:it['나이']||'',연락처:it['연락처']||'',과정:it['과정']||''});
       } else if(action==='refund'){
         REFUND_DATA.push({이름:it['이름']||'',연락처:it['연락처']||'',과정:it['과정']||'',환불금액:'',특이사항:''});
+      } else if(action==='cod'){
+        COD_DATA.push({
+          이름:it['이름']||'', 생년월일:it['생년월일']||'', 나이:it['나이']||'',
+          연락처:it['연락처']||'', 과정:it['과정']||'',
+          등록일:'', COD금액:'', COD잔액:'', 내용:''
+        });
       }
       realArr.splice(realIdx,1);
     }
@@ -2220,6 +2234,7 @@ function renderStudents(data){
       <button style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--orange);background:var(--orange-dim);color:var(--orange);cursor:pointer;white-space:nowrap;" onclick="bulkAction('leave')">휴학</button>
       <button style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--blue);background:var(--blue-dim);color:var(--blue);cursor:pointer;white-space:nowrap;" onclick="bulkAction('grad')">종강</button>
       <button style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--red);background:var(--red-dim);color:var(--red);cursor:pointer;white-space:nowrap;" onclick="bulkAction('refund')">환불</button>
+      <button style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--purple);background:var(--purple-dim);color:var(--purple);cursor:pointer;white-space:nowrap;" onclick="bulkAction('cod')">💛 COD이동</button>
       <button style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--red);background:var(--red-dim);color:var(--red);cursor:pointer;white-space:nowrap;" onclick="bulkAction('delete')">삭제</button>
       <button style="font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--border2);background:none;color:var(--text3);cursor:pointer;margin-left:2px;" onclick="clearSelection()">✕</button>
     </div>
@@ -2260,6 +2275,7 @@ function renderStudents(data){
               <button class="adm-item grad" onclick="closeAllDropdowns();moveStudent(window['${realArr}'],${realIdx},'grad')">🎓 종강</button>
               <button class="adm-item refund" onclick="closeAllDropdowns();moveStudent(window['${realArr}'],${realIdx},'refund')">↩ 환불</button>
               <button class="adm-item" style="color:var(--blue);" onclick="closeAllDropdowns();moveStudent(window['${realArr}'],${realIdx},'natl')">🏛 국비</button>
+              <button class="adm-item" style="color:var(--purple);" onclick="closeAllDropdowns();moveStudent(window['${realArr}'],${realIdx},'cod')">💛 COD</button>
               <button class="adm-item del" onclick="closeAllDropdowns();deleteRow(window['${realArr}'],${realIdx})">🗑 삭제</button>
             </div>
           </div>
@@ -3684,15 +3700,23 @@ function saveExcelBulk(){
 
   let added=0;
   selected.forEach(r=>{
-    const item={
-      이름:r.name, 구분:gubn, 과정:r.course, 수강목적:'취업',
-      생년월일:r.birth, 나이:r.birth?calcAge(r.birth):'',
-      연락처:rawPhone(r.tel), 보호자연락처:'', 주소:'',
-      수강권:'', 따즈아:'', 이관자:'',
-      수업배정:{}, assign:false
-    };
-    if(gubn==='주말') WEEKEND.push(item);
-    else WEEKDAY.push(item);
+    if(gubn==='cod'){
+      COD_DATA.push({
+        이름:r.name, 생년월일:r.birth, 나이:r.birth?calcAge(r.birth):'',
+        연락처:rawPhone(r.tel), 과정:r.course,
+        등록일:'', COD금액:'', COD잔액:'', 내용:''
+      });
+    } else {
+      const item={
+        이름:r.name, 구분:gubn, 과정:r.course, 수강목적:'취업',
+        생년월일:r.birth, 나이:r.birth?calcAge(r.birth):'',
+        연락처:rawPhone(r.tel), 보호자연락처:'', 주소:'',
+        수강권:'', 따즈아:'', 이관자:'',
+        수업배정:{}, assign:false
+      };
+      if(gubn==='주말') WEEKEND.push(item);
+      else WEEKDAY.push(item);
+    }
     added++;
   });
 
@@ -3712,17 +3736,18 @@ const TAB_DATA_MAP = {
 
 // 탭별 일괄처리 바 HTML
 function tabBulkBar(tab) {
+  const _btn = (action, color, label) =>
+    `<button onclick="tabBulkAction('\${tab}','\${action}')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--\${color});background:var(--\${color}-dim);color:var(--\${color});cursor:pointer;">\${label}</button>`;
+  const _restore = `\${_btn('restore_weekday','green','↩ 평일복귀')} \${_btn('restore_weekend','green','↩ 주말복귀')}`;
+  const _toCod   = _btn('to_cod','purple','💛 COD');
   const actions = {
-    cod:    `<button onclick="tabBulkAction('${tab}','restore_weekday')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--green);background:var(--green-dim);color:var(--green);cursor:pointer;">↩ 평일복귀</button>
-             <button onclick="tabBulkAction('${tab}','restore_weekend')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--green);background:var(--green-dim);color:var(--green);cursor:pointer;">↩ 주말복귀</button>`,
-    natl:   `<button onclick="tabBulkAction('${tab}','restore_weekday')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--green);background:var(--green-dim);color:var(--green);cursor:pointer;">↩ 평일복귀</button>
-             <button onclick="tabBulkAction('${tab}','restore_weekend')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--green);background:var(--green-dim);color:var(--green);cursor:pointer;">↩ 주말복귀</button>`,
-    grad:   `<button onclick="tabBulkAction('${tab}','restore_weekday')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--green);background:var(--green-dim);color:var(--green);cursor:pointer;">↩ 평일복귀</button>
-             <button onclick="tabBulkAction('${tab}','restore_weekend')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--green);background:var(--green-dim);color:var(--green);cursor:pointer;">↩ 주말복귀</button>`,
-    refund: `<button onclick="tabBulkAction('${tab}','restore_weekday')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--green);background:var(--green-dim);color:var(--green);cursor:pointer;">↩ 평일복귀</button>
-             <button onclick="tabBulkAction('${tab}','restore_weekend')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--green);background:var(--green-dim);color:var(--green);cursor:pointer;">↩ 주말복귀</button>`,
-    leave:  `<button onclick="tabBulkAction('${tab}','restore_weekday')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--green);background:var(--green-dim);color:var(--green);cursor:pointer;">↩ 평일복귀</button>
-             <button onclick="tabBulkAction('${tab}','restore_weekend')" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;border:1px solid var(--green);background:var(--green-dim);color:var(--green);cursor:pointer;">↩ 주말복귀</button>`,
+    weekday: _toCod,
+    weekend: _toCod,
+    cod:     _restore,
+    natl:    _restore,
+    grad:    _restore,
+    refund:  _restore,
+    leave:   _restore,
   };
   return `<div id="tabBulkBar_${tab}" style="display:none;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:5px 10px;margin-bottom:8px;align-items:center;gap:6px;">
     <span id="tabBulkCount_${tab}" style="font-size:11px;font-weight:700;color:var(--accent);font-family:var(--mono);white-space:nowrap;">0명</span>
@@ -3765,6 +3790,18 @@ function tabBulkAction(tab, action) {
   if (action === 'delete') {
     indices.forEach(i => { if(arr[i]) arr.splice(i,1); });
     showToast(`🗑 ${indices.length}명 삭제 완료`);
+  } else if (action === 'to_cod') {
+    indices.forEach(i => {
+      if(!arr[i]) return;
+      const item = arr[i];
+      COD_DATA.push({
+        이름:item['이름']||'', 생년월일:item['생년월일']||'', 나이:item['나이']||'',
+        연락처:item['연락처']||'', 과정:item['과정']||'',
+        등록일:'', COD금액:'', COD잔액:'', 내용:''
+      });
+      arr.splice(i, 1);
+    });
+    showToast(`💛 ${indices.length}명 COD로 이동 완료`);
   } else {
     const target = action === 'restore_weekday' ? 'weekday' : 'weekend';
     indices.forEach(i => {
