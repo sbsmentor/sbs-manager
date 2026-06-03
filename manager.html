@@ -3073,7 +3073,7 @@ function _saveToFirebase(){
     const mentorData = getMentorData();
     mentorData._savedAt = now;
     mentorData._savedBy = MENTOR_ID || 'unknown';
-    ref('students/shared/data').set(mentorData)
+    ref('students/' + MENTOR_ID + '/data').set(mentorData)
       .catch(e=>console.error('멘토 데이터 저장 실패:', e));
 
     // 2. 공통 수업 목록 저장
@@ -3278,7 +3278,7 @@ async function loadFirebase() {
     // Firebase에서 직접 로드 (compat SDK)
     let fbData = null;
     try {
-      const snap = await db.ref('students/shared/data').once('value');
+      const snap = await db.ref('students/' + MENTOR_ID + '/data').once('value');
       fbData = snap.val();
       console.log('[Firebase] 로드 성공, 데이터:', fbData ? '있음' : '없음');
     } catch(loadErr) {
@@ -3288,7 +3288,7 @@ async function loadFirebase() {
     console.log('[Firebase] students/shared/data 로드 결과:', fbData ? '데이터 있음' : '없음 또는 타임아웃');
     if (fbData) {
       setAllData(fbData);
-      try{ localStorage.setItem(LS_KEY(), JSON.stringify(getAllData())); }catch(e){}
+      // localStorage는 덮어쓰지 않음
       renderTabs(); renderContent();
       showToast('✅ Firebase 데이터 로드 완료');
     } else {
@@ -3298,7 +3298,7 @@ async function loadFirebase() {
 
     // 실시간 동기화: 다른 기기에서 저장하면 자동 반영
     let _lastSavedAt = 0;
-    ref(db, 'students/shared/data').on('value', snap => {
+    ref(db, 'students/' + MENTOR_ID + '/data').on('value', snap => {
       if (!snap.val()) return;
       const data = snap.val();
       const remoteAt = data._savedAt || 0;
