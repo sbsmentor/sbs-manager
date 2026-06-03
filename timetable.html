@@ -602,11 +602,52 @@ window.deleteCourse = async function(key, name) {
 // 중복 강좌 자동 감지 및 삭제
 // 기준: 강사 + 개강일 + 시간 + 종강일 동일하면 중복
 window.removeDuplicateCourses = async function() {
-  const courses = Object.entries(allCourses); // [key, data]
-  if (!courses.length) { showToast('⚠ 시간표 데이터가 없습니다'); return; }
+  const courses = Object.entries(allCourses);
+  if (!courses.length) { showToast('시간표 데이터가 없습니다'); return; }
 
   // 중복 그룹핑: 강사+개강일+종강일+시간 기준
   const groups = {};
+  courses.forEach(([key, c]) => {
+    const groupKey = (c.teacher||'_') + '|' + (c.start||'') + '|' + (c.end||'') + '|' + (c.time||'');
+    if (!groups[groupKey]) groups[groupKey] = [];
+    groups[groupKey].push({ key, c });
+  });
+
+  // 중복된 그룹만 추출 (2개 이상)
+  const dupGroups = Object.entries(groups).filter(([, items]) => items.length > 1);
+
+  if (!dupGroups.length) {
+    showToast('중복 강좌가 없습니다');
+    return;
+  }
+
+  const totalDup = dupGroups.reduce(function(sum, entry) { return sum + entry[1].length - 1; }, 0);
+  const previewLines = dupGroups.slice(0, 5).map(function(entry) {
+    const c = entry[1][0].c;
+    return '- ' + (c.name||'?') + ' / ' + (c.teacher||'강사없음') + ' / ' + (c.start||'?') + ' (' + entry[1].length + '개)';
+  });
+  const moreText = dupGroups.length > 5 ? ('외 ' + (dupGroups.length - 5) + '건 더') : '';
+  const confirmMsg = '중복 강좌 ' + totalDup + '개를 삭제합니다.\n각 그룹에서 1개만 남기고 나머지를 삭제합니다.\n\n'
+    + previewLines.join('\n') + (moreText ? '\n' + moreText : '') + '\n\n계속하시겠습니까?';
+
+  if (!confirm(confirmMsg)) return;
+
+  showLoading(true);
+  let deleted = 0;
+  for (let gi = 0; gi < dupGroups.length; gi++) {
+    const items = dupGroups[gi][1];
+    // dates 필드 있는 것 우선 보존, 나머지 삭제
+    items.sort(function(a, b) { return (b.c.dates ? 1 : 0) - (a.c.dates ? 1 : 0); });
+    for (let i = 1; i < items.length; i++) {
+      try {
+        await remove(ref('timetable/' + items[i].key));
+        deleted++;
+      } catch(e) { console.error('삭제 실패:', e); }
+    }
+  }
+  showLoading(false);
+  showToast('중복 ' + deleted + '개 삭제 완료');
+};
   courses.forEach(([key, c]) => {
     const groupKey = (c.teacher||'_') + '|' + (c.start||'') + '|' + (c.end||'') + '|' + (c.time||'');
     if (!groups[groupKey]) groups[groupKey] = [];
@@ -621,29 +662,21 @@ window.removeDuplicateCourses = async function() {
     return;
   }
 
-  // 중복 목록 표시 및 확인
-  const totalDup = dupGroups.reduce((sum, [, items]) => sum + items.length - 1, 0);
-  const preview = dupGroups.slice(0, 5).map(([gk, items]) => {
-    const c = items[0].c;
-    return `• ${c.name||'?'} / ${c.teacher||'강사없음'} / ${c.start||'?'} (${items.length}개)`;
-  }).join('
-');
-  const moreText = dupGroups.length > 5 ? `
-외 ${dupGroups.length - 5}건 더...` : '';
-
-  if (!confirm(`중복 강좌 ${totalDup}개를 삭제합니다.
-각 그룹에서 1개만 남기고 나머지를 삭제합니다.
-
-${preview}${moreText}
-
-계속하시겠습니까?`)) return;
+  const totalDup = dupGroups.reduce(function(sum, entry) { return sum + entry[1].length - 1; }, 0);
+  const previewLines = dupGroups.slice(0, 5).map(function(entry) {
+    const c = entry[1][0].c;
+    return '- ' + (c.name||'?') + ' / ' + (c.teacher||'강사없음') + ' / ' + (c.start||'?') + ' (' + entry[1].length + '개)';
+  });
+  const moreText = dupGroups.length > 5 ? ('외 ' + (dupGroups.length - 5) + '건 더') : '';
+  const confirmMsg = '중복 강좌 ' + totalDup + '개를 삭제합니다.\n각 그룹에서 1개만 남기고 나머지를 삭제합니다.\n\n'
+    + previewLines.join('\n') + (moreText ? '\n' + moreText : '') + '\n\n계속하시겠습니까?';
+  if (!confirm(confirmMsg)) return;
 
   showLoading(true);
   let deleted = 0;
-  for (const [, items] of dupGroups) {
-    // 첫 번째(가장 오래된 것)는 남기고 나머지 삭제
-    // dates 필드 있는 것 우선 보존
-    items.sort((a, b) => (b.c.dates ? 1 : 0) - (a.c.dates ? 1 : 0));
+  for (let gi = 0; gi < dupGroups.length; gi++) {
+    const items = dupGroups[gi][1];
+    items.sort(function(a, b) { return (b.c.dates ? 1 : 0) - (a.c.dates ? 1 : 0); });
     for (let i = 1; i < items.length; i++) {
       try {
         await remove(ref('timetable/' + items[i].key));
@@ -652,7 +685,7 @@ ${preview}${moreText}
     }
   }
   showLoading(false);
-  showToast(`🧹 중복 ${deleted}개 삭제 완료`);
+  showToast('중복 ' + deleted + '개 삭제 완료');
 };
 
 
