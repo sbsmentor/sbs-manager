@@ -4517,7 +4517,8 @@ document.addEventListener('click', function(e) {
 function notiCalClick(ds) {
   if (!_notiCtx) return;
   // 원래 수업일이면 제거 토글, 아니면 추가 토글
-  const origDates = getClassDatesForNoti(
+  // _notiCtx.origDates: 연강/dates 합산된 원본 날짜 목록
+  const origDates = _notiCtx.origDates || getClassDatesForNoti(
     _notiCtx.p.startDate, _notiCtx.p.endDate, _notiCtx.p.days
   );
   const isOrig = origDates.includes(ds);
@@ -4590,17 +4591,61 @@ async function loadNotiDates(cacheKey) {
   }
 }
 
+// Firebase timetable에서 해당 강좌의 dates 필드 조회
+async function _getTimetableDates(teacher, startDate, time) {
+  if (!window._fbDb) return null;
+  try {
+    const snap = await window._fbDb.ref('timetable').once('value');
+    const data = snap.val() || {};
+    const course = Object.values(data).find(c =>
+      c.teacher === teacher && c.start === startDate && (c.time||'') === (time||'')
+    );
+    return (course && course.dates && course.dates.length > 0) ? course.dates : null;
+  } catch(e) { return null; }
+}
+
 async function openNotiCardFromBoard(arrName, si, mk){
   const arr=window[arrName];
   if(!arr||!arr[si]) return;
   const sched=arr[si]['수업배정']||{};
+
+  // ── 연강 감지: 같은 개강일을 가진 모든 수업 묶기 ──
+  // mk 기준 수업 파싱
   const allVals=Object.entries(sched).filter(([k])=>k===mk||k.startsWith(mk+'_')).map(([,v])=>v);
   const val=allVals[0]||'';
   const p=bdParseVal(val);
   if(!p.cls){ showToast('⚠ 수업 정보가 없습니다. 먼저 수업을 배정해주세요.'); return; }
 
+  // 같은 개강일을 가진 다른 수업 찾기 (연강)
+  const linkedMks = [];
+  Object.entries(sched).forEach(([k,v]) => {
+    if(k===mk || k.startsWith(mk+'_')) return; // 자기 자신 제외
+    const pp = bdParseVal(v);
+    if(pp.startDate && pp.startDate === p.startDate && pp.endDate === p.endDate) {
+      linkedMks.push({mk:k, p:pp});
+    }
+  });
+
   const startDate=p.startDate||''; const endDate=p.endDate||''; const daysStr=p.days||'';
-  const classDates=getClassDatesForNoti(startDate, endDate, daysStr);
+
+  // ── Firebase timetable에서 dates 조회 (격일반 실제 수업일) ──
+  const fbDates = await _getTimetableDates(p.teacher, startDate, p.time);
+  let classDates;
+  if(fbDates){
+    classDates = fbDates; // 격일반: Firebase 실제 수업일 사용
+  } else {
+    classDates=getClassDatesForNoti(startDate, endDate, daysStr);
+  }
+
+  // 연강이면 두 수업 날짜 합산 (중복제거)
+  if(linkedMks.length > 0){
+    for(const {p:pp} of linkedMks){
+      const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.time);
+      const d2 = fbD2 || getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
+      d2.forEach(d=>{ if(!classDates.includes(d)) classDates.push(d); });
+    }
+    classDates.sort();
+  }
   const holidayHits=classDates.filter(d=>KR_HOLIDAYS_NOTI[d]&&!KR_HOLIDAYS_NOTI[d].includes('대체공휴일'));
   const noClassNote=holidayHits.length
     ?holidayHits.map(d=>`${KR_HOLIDAYS_NOTI[d]}(${d.slice(5).replace('-','/')})`).join(', ')
@@ -4631,6 +4676,13 @@ async function openNotiCardFromBoard(arrName, si, mk){
   // 수업 정보 (편집 가능)
   const labelStyle = 'display:inline-block;width:52px;font-weight:700;';
   const valStyle = 'border:none;border-bottom:none;background:transparent;font-size:11px;font-family:inherit;color:inherit;cursor:text;outline:none;min-width:80px;text-decoration:none;';
+  // 연강 안내 배너
+  const linkedBanner = linkedMks.length > 0
+    ? `<div style="margin-bottom:8px;padding:6px 10px;background:rgba(91,79,255,.08);border-radius:8px;font-size:11px;color:var(--accent);font-weight:700;">
+        🔗 연강 수업 포함 (${linkedMks.map(l=>l.p.cls).join(' + ')}) — 수업일 합산 표시
+       </div>`
+    : '';
+  document.getElementById('notiInfo').insertAdjacentHTML('beforebegin', '');
   const infoRows=[
     `<div><b style="${labelStyle}">과 목 :</b> <input value="${p.cls||''}" style="${valStyle}" onchange="_notiEditField('cls',this.value)" /></div>`,
     `<div><b style="${labelStyle}">강 사 :</b> <input value="${(p.teacher||'').replace(' 강사','')}" style="${valStyle}" onchange="_notiEditField('teacher',this.value)" /></div>`,
@@ -4639,13 +4691,25 @@ async function openNotiCardFromBoard(arrName, si, mk){
     `<div><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /></div>`,
     `<div><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /></div>`,
   ].join('');
-  document.getElementById('notiInfo').innerHTML=infoRows;
+  document.getElementById('notiInfo').innerHTML = linkedBanner + infoRows;
 
-  _notiCtx={arrName,si,mk,val,p,noClassNote,sy,sm,startDow,endDow,daysLabel};
+  _notiCtx={arrName,si,mk,val,p,noClassNote,sy,sm,startDow,endDow,daysLabel,origDates:classDates};
 
   document.getElementById('notiImgCopyBtn').onclick=()=>saveNotiImage(p.cls,startDate);
   document.getElementById('notiTxtCopyBtn').onclick=()=>copyNotiText();
   document.getElementById('notiDoneBtn').onclick=()=>markNotiDone();
+  // 이미 안내완료 상태면 버튼 색상/텍스트 변경
+  const _isDone = (arr[si]['수업배정']?.[mk]||'').includes('[O]');
+  const _doneBtn = document.getElementById('notiDoneBtn');
+  if(_doneBtn){
+    if(_isDone){
+      _doneBtn.style.background='#6b7280';
+      _doneBtn.innerHTML='↩ 완료취소<br><span style="font-size:10px;font-weight:500;opacity:.85;">다시 누르면 취소</span>';
+    } else {
+      _doneBtn.style.background='#18a963';
+      _doneBtn.innerHTML='✅<br><span style="font-size:10px;font-weight:500;opacity:.85;">안내완료</span>';
+    }
+  }
   // 날짜 상태 캐시 키: 강사+개강일+시간 (전체 멘토 공유)
   const _cacheKey = (p.teacher||'') + '|' + startDate + '|' + (p.time||'');
 
@@ -4793,9 +4857,21 @@ function markNotiDone(){
   const arr=window[arrName]; if(!arr||!arr[si]) return;
   if(!arr[si]['수업배정']) arr[si]['수업배정']={};
   const cur=arr[si]['수업배정'][mk]||'';
-  if(!cur.includes('[O]')) arr[si]['수업배정'][mk]=(cur?cur+' ':'')+'[O]';
-  saveToLocal(); renderContent(); closeNotiCard();
-  showToast(`✅ ${arr[si]['이름']} 개강안내 완료 처리!`);
+  const isDone = cur.includes('[O]');
+  if(isDone){
+    // 안내완료 → 취소
+    arr[si]['수업배정'][mk]=cur.replace(' [O]','').replace('[O]','').trim();
+    saveToLocal(); renderContent();
+    // 버튼 텍스트 변경
+    const btn=document.getElementById('notiDoneBtn');
+    if(btn){ btn.style.background='#7c3aed'; btn.innerHTML='📬<br><span style="font-size:10px;font-weight:500;opacity:.85;">안내완료</span>'; }
+    showToast(`↩ ${arr[si]['이름']} 개강안내 완료 취소됨`);
+  } else {
+    // 안내완료 처리
+    arr[si]['수업배정'][mk]=(cur?cur+' ':'')+'[O]';
+    saveToLocal(); renderContent(); closeNotiCard();
+    showToast(`✅ ${arr[si]['이름']} 개강안내 완료 처리!`);
+  }
 }
 // ═══════════════════════════════════════════════════════════════
 // ★ zio_crm 시간표 / 개강안내 로직 (원본 이식)
