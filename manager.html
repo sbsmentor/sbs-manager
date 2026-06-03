@@ -3,7 +3,17 @@
 <head>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+// SheetJS 로드 실패 시 폴백
+window.addEventListener('error', function(e) {
+  if (e.target && e.target.src && e.target.src.includes('xlsx')) {
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    document.head.appendChild(s);
+  }
+}, true);
+</script>
 <script>
 // 크로스오리진/로컬파일 Script error 완전 억제
 window.onerror = function(msg, src, line, col, err) {
@@ -3273,11 +3283,15 @@ async function loadFirebase() {
       new Promise(resolve => setTimeout(() => resolve(null), 3000))
     ]);
 
+    console.log('[Firebase] students/shared/data 로드 결과:', fbData ? '데이터 있음' : '없음 또는 타임아웃');
     if (fbData) {
       setAllData(fbData);
-      // localStorage도 최신 데이터로 업데이트
       try{ localStorage.setItem(LS_KEY(), JSON.stringify(getAllData())); }catch(e){}
       renderTabs(); renderContent();
+      showToast('✅ Firebase 데이터 로드 완료');
+    } else {
+      console.warn('[Firebase] 데이터 없음 - Rules 확인 필요');
+      showToast('⚠ Firebase 로드 실패 - localStorage 데이터 표시 중');
     }
 
     // 실시간 동기화: 다른 기기에서 저장하면 자동 반영
@@ -4635,7 +4649,13 @@ function _loadH2C(){
     if(_h2cLoaded){ res(); return; }
     if(typeof html2canvas!=='undefined'){ _h2cLoaded=true; res(); return; }
     const s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+    s.src='https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js';
+    s.onerror=()=>{
+      const s2=document.createElement('script');
+      s2.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s2.onload=()=>{_h2cLoaded=true;res();};
+      document.head.appendChild(s2);
+    };
     s.onload=()=>{ _h2cLoaded=true; res(); };
     s.onerror=()=>res(); // 실패해도 조용히 처리
     document.head.appendChild(s);
