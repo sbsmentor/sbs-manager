@@ -2875,7 +2875,7 @@ function updateHeader(){
   const natl=NATL_DATA.length;
   const grad=GRAD_DATA.length;
   const refund=REFUND_DATA.length;
-  const total=all.length+cod+natl+grad+refund;
+  const total=all.length+cod+natl+grad+refund+leave;
   document.getElementById('hd-active').textContent=`재학 ${active}`;
   document.getElementById('hd-leave').textContent=`휴학 ${leave}`;
   document.getElementById('hd-cod').textContent=`COD ${cod}`;
@@ -2964,7 +2964,28 @@ function loadFromLocalWithFallback() {
   return false;
 }
 
+// 저장 버튼 상태 업데이트 (전체보기/타 멘토 뷰잉 중엔 비활성 표시)
+function _updateSaveButtonState() {
+  const saveBtn = document.querySelector('.hdr-btn-save');
+  if (!saveBtn) return;
+  const isOtherView = _viewingMentorId && _viewingMentorId !== MENTOR_ID;
+  if (isOtherView) {
+    saveBtn.style.opacity = '0.4';
+    saveBtn.style.cursor = 'not-allowed';
+    saveBtn.title = '다른 멘토/전체보기 상태에서는 저장 불가 — 내 목록으로 전환 후 저장하세요';
+  } else {
+    saveBtn.style.opacity = '';
+    saveBtn.style.cursor = '';
+    saveBtn.title = '저장';
+  }
+}
+
 function saveToLocal(){
+  // 전체보기 또는 다른 멘토 뷰잉 중에는 저장 차단 (데이터 오염 방지)
+  if (_viewingMentorId && _viewingMentorId !== MENTOR_ID) {
+    showToast('⚠ 다른 멘토/전체보기 상태에서는 저장할 수 없습니다. 내 목록으로 전환 후 저장하세요.');
+    return;
+  }
   // localStorage 백업 (멘토 데이터만)
   try{ localStorage.setItem(LS_KEY(), JSON.stringify(getMentorData())); }catch(e){}
   // Firebase에 저장
@@ -3006,6 +3027,21 @@ async function switchMentorView(mentorId) {
   if (!window._isSuperRole) return;
   _viewingMentorId = mentorId;
 
+  // 내 목록으로 돌아올 때: 본인 Firebase 데이터 다시 로드
+  if (mentorId === MENTOR_ID) {
+    const db = window._fbDb;
+    if (!db) return;
+    const snap = await db.ref('students/' + MENTOR_ID + '/data').once('value');
+    const data = snap.val();
+    if (data) {
+      setAllData(data);
+      showToast('👤 내 목록으로 돌아왔습니다');
+    }
+    _updateSaveButtonState();
+    renderTabs(); renderContent();
+    return;
+  }
+
   if (mentorId === '__all__') {
     // 전체 멘토 데이터 합산
     await _loadAllMentorsData();
@@ -3028,6 +3064,7 @@ async function switchMentorView(mentorId) {
     });
     showToast('⚠ ' + mentorId + ' 데이터 없음');
   }
+  _updateSaveButtonState();
   renderTabs(); renderContent();
 }
 
@@ -3058,7 +3095,7 @@ async function _loadAllMentorsData() {
     count++;
   });
   showToast(`📋 전체 ${count}명 멘토 데이터 통합`);
-  renderTabs(); renderContent();
+  _updateSaveButtonState(); renderTabs(); renderContent();
 }
 
 function _saveToFirebase(){
@@ -3330,6 +3367,7 @@ async function loadFirebase() {
     });
     window._setLastSavedAt = (t) => { _lastSavedAt = t; };
     _viewingMentorId = MENTOR_ID; // MENTOR_ID 초기화 후 설정
+    _updateSaveButtonState(); // 저장 버튼 상태 초기화
 
     // ④ 강사 정보 로드
     onValue(ref(db, `mentorList/${MENTOR_ID}`), snap => {
@@ -3369,8 +3407,13 @@ async function loadFirebase() {
 // saveToLocal을 Firebase 저장으로 교체
 const _origSaveToLocal = saveToLocal;
 saveToLocal = function() {
-  _origSaveToLocal(); // localStorage도 유지
-  if (window._fbSave) window._fbSave();
+  // 전체보기/타 멘토 뷰잉 중에는 저장 차단 (override된 버전에서도 동일하게 적용)
+  if (_viewingMentorId && _viewingMentorId !== MENTOR_ID) {
+    showToast('⚠ 다른 멘토/전체보기 상태에서는 저장할 수 없습니다. 내 목록으로 전환 후 저장하세요.');
+    return;
+  }
+  _origSaveToLocal(); // localStorage + Firebase(_saveToFirebase) 저장
+  // window._fbSave는 중복 저장이므로 호출하지 않음
 };
 
 
