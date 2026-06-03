@@ -4585,15 +4585,19 @@ async function loadNotiDates(cacheKey) {
 }
 
 // Firebase timetable에서 해당 강좌의 dates 필드 조회
+// 격일반은 시간 무관하게 강사+개강일이 같으면 날짜 동일 → 시간 조건 없이 매칭
 async function _getTimetableDates(teacher, startDate, time) {
   if (!window._fbDb) return null;
   try {
     const snap = await window._fbDb.ref('timetable').once('value');
     const data = snap.val() || {};
-    const course = Object.values(data).find(c =>
-      c.teacher === teacher && c.start === startDate && (c.time||'') === (time||'')
+    const candidates = Object.values(data).filter(c =>
+      c.teacher === teacher && c.start === startDate && c.dates && c.dates.length > 0
     );
-    return (course && course.dates && course.dates.length > 0) ? course.dates : null;
+    if (!candidates.length) return null;
+    // 시간 일치하는 것 우선, 없으면 첫 번째
+    const exact = candidates.find(c => (c.time||'') === (time||''));
+    return (exact || candidates[0]).dates;
   } catch(e) { return null; }
 }
 
@@ -4609,12 +4613,17 @@ async function openNotiCardFromBoard(arrName, si, mk){
   const p=bdParseVal(val);
   if(!p.cls){ showToast('⚠ 수업 정보가 없습니다. 먼저 수업을 배정해주세요.'); return; }
 
-  // 같은 개강일을 가진 다른 수업 찾기 (연강)
+  // 같은 개강 그룹의 다른 수업 찾기 (연강)
+  // 격일반: 월수금(월 개강)과 화목금(화 개강)처럼 개강일이 ±3일 차이날 수 있음
   const linkedMks = [];
   Object.entries(sched).forEach(([k,v]) => {
     if(k===mk || k.startsWith(mk+'_')) return; // 자기 자신 제외
     const pp = bdParseVal(v);
-    if(pp.startDate && pp.startDate === p.startDate && pp.endDate === p.endDate) {
+    if(!pp.startDate || !pp.endDate) return;
+    const diffStart = Math.abs(new Date(pp.startDate) - new Date(p.startDate)) / 86400000;
+    const diffEnd   = Math.abs(new Date(pp.endDate)   - new Date(p.endDate))   / 86400000;
+    // 개강일 ±3일 이내 + 종강일 ±3일 이내 → 같은 격일반 그룹(연강)으로 판단
+    if(diffStart <= 3 && diffEnd <= 3) {
       linkedMks.push({mk:k, p:pp});
     }
   });
