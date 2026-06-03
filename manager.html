@@ -2941,26 +2941,19 @@ function setAllData(d){
 const LS_KEY = () => 'sbs_students_v2_' + (MENTOR_ID || 'default');
 // 기존 데이터 복구: 여러 키 시도
 function loadFromLocalWithFallback() {
-  // 1. 현재 키
-  const keys = [
-    'sbs_students_v2_' + (MENTOR_ID || 'default'),
-    'sbs_students_v2_shared',
-    'sbs_students_v2_default',
-    'sbs_manager_data'
-  ];
-  for (const key of keys) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      const d = JSON.parse(raw);
-      if (!d) continue;
-      if (d.WEEKDAY || d.WEEKEND || d.WEEKDAY_CLASSES) {
-        setAllData(d);
-        console.log('[복구] localStorage 키:', key, '데이터 로드됨');
-        return true;
-      }
-    } catch(e) {}
-  }
+  // 현재 멘토 키만 로드 (다른 멘토 데이터 폴백 제거 — 데이터 오염 방지)
+  const key = 'sbs_students_v2_' + (MENTOR_ID || 'default');
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    if (!d) return false;
+    if (d.WEEKDAY || d.WEEKEND || d.WEEKDAY_CLASSES) {
+      setAllData(d);
+      console.log('[복구] localStorage 키:', key, '데이터 로드됨');
+      return true;
+    }
+  } catch(e) {}
   return false;
 }
 
