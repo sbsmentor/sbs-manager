@@ -2939,7 +2939,7 @@ function saveToLocal(){
 
 
 // ── 팀장/부장/원장: 멘토 선택해서 데이터 열람/편집 ──
-let _viewingMentorId = MENTOR_ID; // 현재 보고 있는 멘토
+let _viewingMentorId = null; // 현재 보고 있는 멘토 (loadFirebase 후 초기화)
 
 function _loadMentorSelector() {
   // mentorList에서 전체 멘토 목록 가져오기
@@ -3039,7 +3039,7 @@ function _saveToFirebase(){
     const mentorData = getMentorData();
     mentorData._savedAt = now;
     mentorData._savedBy = MENTOR_ID || 'unknown';
-    const saveTarget = (_viewingMentorId && _viewingMentorId !== '__all__') ? _viewingMentorId : MENTOR_ID;
+    const saveTarget = (_viewingMentorId && _viewingMentorId !== '__all__') ? _viewingMentorId : (MENTOR_ID || 'default');
     ref('students/' + saveTarget + '/data').set(mentorData)
       .catch(e=>console.error('멘토 데이터 저장 실패:', e));
 
@@ -3290,6 +3290,7 @@ async function loadFirebase() {
       }
     });
     window._setLastSavedAt = (t) => { _lastSavedAt = t; };
+    _viewingMentorId = MENTOR_ID; // MENTOR_ID 초기화 후 설정
 
     // ④ 강사 정보 로드
     onValue(ref(db, `mentorList/${MENTOR_ID}`), snap => {
