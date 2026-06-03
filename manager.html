@@ -1429,6 +1429,24 @@ function closeViewModal(e){
 // ════════════════════════════════════════════
 // 수정/추가 모달
 // ════════════════════════════════════════════
+
+// ── 금액 포맷 유틸 ──
+function fmtMoney(v) {
+  if (!v && v !== 0) return '';
+  const n = parseInt(String(v).replace(/[^0-9]/g,''));
+  return isNaN(n) ? '' : n.toLocaleString();
+}
+function toNumVal(v) {
+  const n = parseInt(String(v||'0').replace(/[^0-9]/g,''));
+  return isNaN(n) ? 0 : n;
+}
+function onMoneyInput(el) {
+  const raw = el.value.replace(/[^0-9]/g,'');
+  const num = parseInt(raw);
+  el.value = raw === '' ? '' : isNaN(num) ? '' : num.toLocaleString();
+  el.dataset.raw = raw; // 저장용 raw 값
+}
+
 function openEditModal(arr,idx){
   const isNew=idx===-1;
   // arr가 WEEKEND 배열이거나 currentTab이 weekend인 경우 주말로 판단
@@ -1451,14 +1469,19 @@ function openEditModal(arr,idx){
     {key:'이름',type:'text'},
     {key:'생년월일',type:'date'},{key:'나이',type:'age_auto'},
     {key:'연락처',type:'text'},{key:'과정',type:'text'},
-    ...(currentTab==='cod'?[{key:'등록일',type:'text'},{key:'COD금액',type:'text'},{key:'COD잔액',type:'text'},{key:'내용',type:'text'}]:[]),
+    ...(currentTab==='cod'?[{key:'등록일',type:'text'},{key:'COD금액',type:'money'},{key:'COD잔액',type:'money'},{key:'내용',type:'text'}]:[]),
     ...(currentTab==='natl'?[{key:'유형',type:'text'},{key:'기간',type:'text'},{key:'비고',type:'text'}]:[]),
-    ...(currentTab==='refund'?[{key:'환불금액',type:'text'},{key:'특이사항',type:'text'}]:[]),
+    ...(currentTab==='refund'?[{key:'환불금액',type:'money'},{key:'특이사항',type:'text'}]:[]),
     ...(currentTab==='leave'?[{key:'남은수강',type:'text'}]:[]),
   ];
 
   let rows=FIELD_DEFS.map(f=>{
     if(f.type==='age_auto') return `<div class="ef-row"><label class="ef-label">나이(자동)</label><span class="ef-age-display" id="ageDisplay">${calcAge(item['생년월일'])||'생년월일 입력시 자동계산'}</span></div>`;
+    if(f.type==='money'){
+      const moneyRaw = (item[f.key]||'').toString().replace(/[^0-9]/g,'');
+      const moneyFmt = moneyRaw ? parseInt(moneyRaw).toLocaleString() : '';
+      return `<div class="ef-row"><label class="ef-label">${f.key}</label><div style="display:flex;align-items:center;gap:4px;flex:1"><input class="ef-input money-input" data-key="${f.key}" value="${moneyFmt}" placeholder="0" oninput="onMoneyInput(this)" style="flex:1;text-align:right;"><span style="font-size:12px;color:var(--text2);">원</span></div></div>`;
+    }
     if(f.type==='date') return `<div class="ef-row"><label class="ef-label">${f.key}</label><input class="ef-input" type="text" data-key="${f.key}" value="${item[f.key]||''}" placeholder="YYMMDD (6자리)" maxlength="10" oninput="birthFormat6(this)" style="width:140px;"></div>`;
     if(f.type==='select'){const opts=f.opts.map(o=>`<option${item[f.key]===o?' selected':''}>${o}</option>`).join('');return `<div class="ef-row"><label class="ef-label">${f.key}</label><select class="ef-select" data-key="${f.key}" style="flex:1">${opts}</select></div>`;}
     if(f.type==='number'){
@@ -1530,6 +1553,9 @@ function saveEdit(){
     if(el.dataset.key==='수강권'&&el.type==='number'){
       const n=parseInt(el.value)||0;
       item[el.dataset.key]=n>0?`${n}개`:'';
+    } else if(el.classList.contains('money-input')) {
+      // 콤마 제거 후 숫자만 저장
+      item[el.dataset.key]=el.value.replace(/[^0-9]/g,'');
     } else {
       item[el.dataset.key]=el.value;
     }
@@ -2405,7 +2431,7 @@ function renderRefund(){
   items.forEach(({s,i})=>{
     html+=`<tr>
       <td style="text-align:center;"><input type="checkbox" class="tab-chk" data-idx="${i}" onchange="tabChkChange('refund')" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent);"></td>
-      <td><strong>${s['이름']||'-'}</strong></td><td class="contact">${maskPhone(s['연락처'])}</td><td><span class="course-tag ${courseClass(s['과정']||'')}">${s['과정']||'-'}</span></td><td class="amount">-${s['환불금액']||'0'}</td><td class="remark">${s['특이사항']||'-'}</td>
+      <td><strong>${s['이름']||'-'}</strong></td><td class="contact">${maskPhone(s['연락처'])}</td><td><span class="course-tag ${courseClass(s['과정']||'')}">${s['과정']||'-'}</span></td><td class="amount">-${s['환불금액']?Number(String(s['환불금액']).replace(/[^0-9]/g,'')||0).toLocaleString()+'원':'0원'}</td><td class="remark">${s['특이사항']||'-'}</td>
       <td><div class="action-dropdown"><button class="action-dropdown-btn" onclick="toggleDropdown(event,'rf-${i}')">설정 ⚙</button><div class="action-dropdown-menu" id="rf-${i}"><button class="adm-item edit" onclick="closeAllDropdowns();openEditModal(REFUND_DATA,${i})">✏️ 수정</button><button class="adm-item restore" onclick="closeAllDropdowns();restoreToActive(REFUND_DATA,${i},'weekday')">↩ 평일 재학</button><button class="adm-item restore" onclick="closeAllDropdowns();restoreToActive(REFUND_DATA,${i},'weekend')">↩ 주말 재학</button><button class="adm-item del" onclick="closeAllDropdowns();deleteRow(REFUND_DATA,${i})">🗑 삭제</button></div></div></td></tr>`;
   });
   html+=`</tbody></table></div>`;
