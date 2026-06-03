@@ -3063,8 +3063,7 @@ function _saveToFirebase(){
     const mentorData = getMentorData();
     mentorData._savedAt = now;
     mentorData._savedBy = MENTOR_ID || 'unknown';
-    const saveTarget = (_viewingMentorId && _viewingMentorId !== '__all__') ? _viewingMentorId : (MENTOR_ID || 'default');
-    ref('students/' + saveTarget + '/data').set(mentorData)
+    ref('students/shared/data').set(mentorData)
       .catch(e=>console.error('멘토 데이터 저장 실패:', e));
 
     // 2. 공통 수업 목록 저장
@@ -3268,7 +3267,7 @@ async function loadFirebase() {
     // ③ Firebase 데이터 로드 (타임아웃 3초)
     const fbData = await Promise.race([
       new Promise(resolve => {
-        const dataRef = ref(db, 'students/' + MENTOR_ID + '/data');
+        const dataRef = ref(db, 'students/shared/data');
         onValue(dataRef, snap => resolve(snap.val()), { onlyOnce: true });
       }),
       new Promise(resolve => setTimeout(() => resolve(null), 3000))
@@ -3283,7 +3282,7 @@ async function loadFirebase() {
 
     // 실시간 동기화: 다른 기기에서 저장하면 자동 반영
     let _lastSavedAt = 0;
-    ref(db, 'students/' + MENTOR_ID + '/data').on('value', snap => {
+    ref(db, 'students/shared/data').on('value', snap => {
       if (!snap.val()) return;
       const data = snap.val();
       const remoteAt = data._savedAt || 0;
