@@ -649,46 +649,6 @@ window.removeDuplicateCourses = async function() {
   showToast('중복 ' + deleted + '개 삭제 완료');
 };
   courses.forEach(([key, c]) => {
-    const groupKey = (c.teacher||'_') + '|' + (c.start||'') + '|' + (c.end||'') + '|' + (c.time||'');
-    if (!groups[groupKey]) groups[groupKey] = [];
-    groups[groupKey].push({ key, c });
-  });
-
-  // 중복된 그룹만 추출 (2개 이상)
-  const dupGroups = Object.entries(groups).filter(([, items]) => items.length > 1);
-
-  if (!dupGroups.length) {
-    showToast('✅ 중복 강좌가 없습니다');
-    return;
-  }
-
-  const totalDup = dupGroups.reduce(function(sum, entry) { return sum + entry[1].length - 1; }, 0);
-  const previewLines = dupGroups.slice(0, 5).map(function(entry) {
-    const c = entry[1][0].c;
-    return '- ' + (c.name||'?') + ' / ' + (c.teacher||'강사없음') + ' / ' + (c.start||'?') + ' (' + entry[1].length + '개)';
-  });
-  const moreText = dupGroups.length > 5 ? ('외 ' + (dupGroups.length - 5) + '건 더') : '';
-  const confirmMsg = '중복 강좌 ' + totalDup + '개를 삭제합니다.\n각 그룹에서 1개만 남기고 나머지를 삭제합니다.\n\n'
-    + previewLines.join('\n') + (moreText ? '\n' + moreText : '') + '\n\n계속하시겠습니까?';
-  if (!confirm(confirmMsg)) return;
-
-  showLoading(true);
-  let deleted = 0;
-  for (let gi = 0; gi < dupGroups.length; gi++) {
-    const items = dupGroups[gi][1];
-    items.sort(function(a, b) { return (b.c.dates ? 1 : 0) - (a.c.dates ? 1 : 0); });
-    for (let i = 1; i < items.length; i++) {
-      try {
-        await remove(ref('timetable/' + items[i].key));
-        deleted++;
-      } catch(e) { console.error('삭제 실패:', e); }
-    }
-  }
-  showLoading(false);
-  showToast('중복 ' + deleted + '개 삭제 완료');
-};
-
-
 // ════════ 전체 초기화 ════════
 async function resetAllTimetable() {
   if (!confirm('⚠️ 전체 시간표 데이터를 삭제하시겠습니까?\n삭제 후 재업로드가 필요합니다.')) return;
