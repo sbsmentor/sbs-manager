@@ -648,7 +648,7 @@ window.removeDuplicateCourses = async function() {
   showLoading(false);
   showToast('중복 ' + deleted + '개 삭제 완료');
 };
-  courses.forEach(([key, c]) => {
+
 // ════════ 전체 초기화 ════════
 async function resetAllTimetable() {
   if (!confirm('⚠️ 전체 시간표 데이터를 삭제하시겠습니까?\n삭제 후 재업로드가 필요합니다.')) return;
