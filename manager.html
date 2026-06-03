@@ -2493,6 +2493,11 @@ function renderBoard(){
         <option value="weekday">평일만</option>
         <option value="weekend">주말만</option>
       </select>
+      <label id="gkyilUploadBtn" style="margin-left:8px;display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;border:1px dashed #7c3aed;color:#7c3aed;background:rgba(124,58,237,.08);font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;white-space:nowrap;" title="격일반 수업일 xlsx 업로드 — 개강안내 카드에 자동 적용됩니다">
+        📊 격일반 업로드
+        <input type="file" accept=".xlsx" style="display:none" onchange="uploadGkyilDates(event)">
+      </label>
+      <span id="gkyilStatus" style="font-size:11px;color:var(--green);font-family:var(--mono);display:none;">✅ 격일반 로드됨</span>
     </div>
     <div id="boardTable"></div>
   </div>`;
@@ -3361,6 +3366,7 @@ async function loadFirebase() {
     window._setLastSavedAt = (t) => { _lastSavedAt = t; };
     _viewingMentorId = MENTOR_ID; // MENTOR_ID 초기화 후 설정
     _updateSaveButtonState(); // 저장 버튼 상태 초기화
+    _loadGkyilDatesFromFirebase(); // 격일반 날짜 데이터 로드
 
     // ④ 강사 정보 로드
     onValue(ref(db, `mentorList/${MENTOR_ID}`), snap => {
@@ -4584,19 +4590,152 @@ async function loadNotiDates(cacheKey) {
   }
 }
 
+// ════════ 격일반 날짜 데이터 (메모리 캐시) ════════
+// 구조: { '임현철': ['2026-03-18', '2026-03-20', ...], ... }
+window._gkyilDates = {};
+
+// 배정표 탭 격일반 xlsx 업로드 파서
+window.uploadGkyilDates = async function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (typeof XLSX === 'undefined') { showToast('⚠ SheetJS 로딩 중. 잠시 후 시도해주세요.'); return; }
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, cellDates: true });
+
+      // index 0: 강의실+강사명(XXXT) 행
+      // index 1: 패턴 행
+      // index 3~: 날짜 행 (개강 마커 행 섞여있음)
+      const headerRow = rows[0] || [];
+
+      // 강사 컬럼 매핑
+      const teacherCols = {};
+      headerRow.forEach(function(v, i) {
+        if (v && typeof v === 'string') {
+          const m = v.trim().match(/^([가-힣]{2,5})T$/);
+          if (m) teacherCols[i] = m[1];
+        }
+      });
+
+      if (!Object.keys(teacherCols).length) {
+        showToast('❌ 강사명을 찾을 수 없습니다.');
+        event.target.value = '';
+        return;
+      }
+
+      // Date → 'yyyy-mm-dd'
+      function fmtDate(v) {
+        if (!v) return null;
+        if (v instanceof Date) {
+          return v.getFullYear() + '-'
+            + String(v.getMonth()+1).padStart(2,'0') + '-'
+            + String(v.getDate()).padStart(2,'0');
+        }
+        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0,10);
+        return null;
+      }
+
+      // 강사별 전체 날짜 수집 (개강 마커 행 건너뜀)
+      const result = {};
+      Object.keys(teacherCols).forEach(function(col) { result[teacherCols[col]] = []; });
+
+      for (let ri = 3; ri < rows.length; ri++) {
+        const row = rows[ri] || [];
+        const col0 = row[0];
+        // 개강 마커 행 건너뜀
+        if (col0 && typeof col0 === 'string' && col0.includes('개강')) continue;
+        let anyDate = false;
+        Object.keys(teacherCols).forEach(function(col) {
+          const ds = fmtDate(row[parseInt(col)]);
+          if (ds) { result[teacherCols[col]].push(ds); anyDate = true; }
+        });
+        // 연속 3행 빈 행이면 종료
+        if (!anyDate) {
+          let empty = 0;
+          for (let k = ri; k < Math.min(ri+3, rows.length); k++) {
+            const hasAny = Object.keys(teacherCols).some(function(col) {
+              return fmtDate((rows[k]||[])[parseInt(col)]);
+            });
+            if (!hasAny) empty++;
+          }
+          if (empty >= 3) break;
+        }
+      }
+
+      // 메모리에 저장
+      window._gkyilDates = result;
+
+      // Firebase gkyilDates 경로에도 저장 (다른 기기 공유)
+      if (window._fbDb) {
+        try {
+          await window._fbDb.ref('gkyilDates').set(result);
+        } catch(fe) { console.warn('gkyilDates Firebase 저장 실패:', fe); }
+      }
+
+      const teacherCount = Object.keys(result).length;
+      const dateCount = Object.values(result)[0]?.length || 0;
+      showToast('✅ 격일반 ' + teacherCount + '명 / 강사당 ' + dateCount + '일 로드됨');
+      // 상태 표시
+      const st = document.getElementById('gkyilStatus');
+      if (st) { st.style.display='inline'; st.textContent = '✅ ' + teacherCount + '명 로드됨'; }
+      event.target.value = '';
+    } catch(err) {
+      showToast('❌ 오류: ' + err.message);
+      console.error(err);
+      event.target.value = '';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+};
+
+// 앱 시작 시 Firebase gkyilDates 로드
+function _loadGkyilDatesFromFirebase() {
+  if (!window._fbDb) return;
+  window._fbDb.ref('gkyilDates').once('value').then(function(snap) {
+    const data = snap.val();
+    if (data && Object.keys(data).length) {
+      window._gkyilDates = data;
+      const st = document.getElementById('gkyilStatus');
+      if (st) { st.style.display='inline'; st.textContent = '✅ ' + Object.keys(data).length + '명 로드됨'; }
+      console.log('[gkyilDates] Firebase에서 로드됨:', Object.keys(data).length, '명');
+    }
+  }).catch(function(e) { console.warn('gkyilDates 로드 실패:', e); });
+}
+
 // Firebase timetable에서 해당 강좌의 dates 필드 조회
-// 격일반은 시간 무관하게 강사+개강일이 같으면 날짜 동일 → 시간 조건 없이 매칭
-async function _getTimetableDates(teacher, startDate, time) {
+// 우선순위: 1) 메모리 _gkyilDates (개강일~종강일 범위 필터) 2) Firebase timetable.dates
+async function _getTimetableDates(teacher, startDate, endDate, time) {
+  // 1) 메모리 격일반 데이터 우선 (강사명 + 개강일~종강일 범위 필터)
+  if (window._gkyilDates && window._gkyilDates[teacher]) {
+    const allDates = window._gkyilDates[teacher];
+    if (allDates.length) {
+      const start = startDate || '';
+      const end   = endDate   || '';
+      if (start && end) {
+        const filtered = allDates.filter(function(d) { return d >= start && d <= end; });
+        if (filtered.length) return filtered;
+      } else if (start) {
+        // 종강일 없으면 개강일 이후 10일
+        const filtered = allDates.filter(function(d) { return d >= start; }).slice(0, 10);
+        if (filtered.length) return filtered;
+      }
+    }
+  }
+
+  // 2) Firebase timetable.dates 폴백
   if (!window._fbDb) return null;
   try {
     const snap = await window._fbDb.ref('timetable').once('value');
     const data = snap.val() || {};
-    const candidates = Object.values(data).filter(c =>
-      c.teacher === teacher && c.start === startDate && c.dates && c.dates.length > 0
-    );
+    const candidates = Object.values(data).filter(function(c) {
+      return c.teacher === teacher && c.start === startDate && c.dates && c.dates.length > 0;
+    });
     if (!candidates.length) return null;
-    // 시간 일치하는 것 우선, 없으면 첫 번째
-    const exact = candidates.find(c => (c.time||'') === (time||''));
+    const exact = candidates.find(function(c) { return (c.time||'') === (time||''); });
     return (exact || candidates[0]).dates;
   } catch(e) { return null; }
 }
@@ -4630,8 +4769,8 @@ async function openNotiCardFromBoard(arrName, si, mk){
 
   const startDate=p.startDate||''; const endDate=p.endDate||''; const daysStr=p.days||'';
 
-  // ── Firebase timetable에서 dates 조회 (격일반 실제 수업일) ──
-  const fbDates = await _getTimetableDates(p.teacher, startDate, p.time);
+  // ── 격일반 날짜 조회 (메모리 _gkyilDates 우선, Firebase timetable 폴백) ──
+  const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time);
   let classDates;
   if(fbDates){
     classDates = fbDates; // 격일반: Firebase 실제 수업일 사용
@@ -4642,7 +4781,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
   // 연강이면 두 수업 날짜 합산 (중복제거)
   if(linkedMks.length > 0){
     for(const {p:pp} of linkedMks){
-      const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.time);
+      const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.endDate, pp.time);
       const d2 = fbD2 || getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
       d2.forEach(d=>{ if(!classDates.includes(d)) classDates.push(d); });
     }
