@@ -3275,13 +3275,17 @@ async function loadFirebase() {
     window._fbOnValue = onValue;
 
     // ③ Firebase 데이터 로드 (타임아웃 3초)
-    const fbData = await Promise.race([
-      new Promise(resolve => {
-        const dataRef = ref(db, 'students/shared/data');
-        onValue(dataRef, snap => resolve(snap.val()), { onlyOnce: true });
-      }),
-      new Promise(resolve => setTimeout(() => resolve(null), 3000))
-    ]);
+    // Firebase에서 직접 once로 로드
+    let fbData = null;
+    try {
+      const snap = await Promise.race([
+        ref(db, 'students/shared/data').once('value'),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))
+      ]);
+      fbData = snap.val();
+    } catch(loadErr) {
+      console.warn('[Firebase] 로드 실패:', loadErr.message);
+    }
 
     console.log('[Firebase] students/shared/data 로드 결과:', fbData ? '데이터 있음' : '없음 또는 타임아웃');
     if (fbData) {
