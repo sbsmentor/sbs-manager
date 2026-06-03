@@ -1440,6 +1440,24 @@ function toNumVal(v) {
   const n = parseInt(String(v||'0').replace(/[^0-9]/g,''));
   return isNaN(n) ? 0 : n;
 }
+
+// ── 전화번호 자동 하이픈 ──
+function phoneHyphen(el) {
+  let v = el.value.replace(/[^0-9]/g, '');
+  if (v.length > 11) v = v.slice(0, 11);
+  if (v.startsWith('02')) {
+    // 서울 지역번호
+    if (v.length < 6)       el.value = v;
+    else if (v.length < 10) el.value = v.slice(0,2) + '-' + v.slice(2,5) + '-' + v.slice(5);
+    else                     el.value = v.slice(0,2) + '-' + v.slice(2,6) + '-' + v.slice(6);
+  } else {
+    if (v.length < 4)       el.value = v;
+    else if (v.length < 8)  el.value = v.slice(0,3) + '-' + v.slice(3);
+    else if (v.length < 11) el.value = v.slice(0,3) + '-' + v.slice(3,6) + '-' + v.slice(6);
+    else                     el.value = v.slice(0,3) + '-' + v.slice(3,7) + '-' + v.slice(7);
+  }
+}
+
 function onMoneyInput(el) {
   const raw = el.value.replace(/[^0-9]/g,'');
   const num = parseInt(raw);
@@ -1488,7 +1506,8 @@ function openEditModal(arr,idx){
       const numVal=parseInt((item[f.key]||'').toString().replace(/[^0-9]/g,''))||'';
       return `<div class="ef-row"><label class="ef-label">${f.key}</label><div style="display:flex;align-items:center;gap:6px;flex:1"><input class="ef-input" type="number" min="0" max="999" data-key="${f.key}" value="${numVal}" placeholder="0" style="width:80px;flex:none;"><span style="font-size:12px;color:var(--text2);">개</span><span id="sugang-status" style="font-size:11px;color:var(--text2);"></span></div></div>`;
     }
-    return `<div class="ef-row"><label class="ef-label">${f.key}</label><input class="ef-input" data-key="${f.key}" value="${(item[f.key]||'').toString().replace(/"/g,'\x22')}"></div>`;
+    const _isPhone = f.key==='연락처'||f.key==='보호자연락처';
+    return `<div class="ef-row"><label class="ef-label">${f.key}</label><input class="ef-input" data-key="${f.key}" value="${(item[f.key]||'').toString().replace(/"/g,'\x22')}" ${_isPhone?'oninput="phoneHyphen(this)" maxlength="13" placeholder="010-0000-0000" inputmode="numeric"':''} ></div>`;
   }).join('');
 
   let schedSection='';
