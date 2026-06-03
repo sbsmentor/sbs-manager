@@ -3382,6 +3382,7 @@ async function loadFirebase() {
           window._myName = m.name;
           // 팀장/부장/원장: 멘토 선택 UI 표시
           _loadMentorSelector();
+
         } else {
           window._isSuperRole = false;
           window._myRole = m.role || '멘토';
