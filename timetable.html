@@ -619,16 +619,19 @@ window.uploadGkyilTimetable = async function(event) {
   const reader = new FileReader();
   reader.onload = async function(e) {
     try {
+      // cellDates:true + raw:true → Date 객체로 날짜 수신
       const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, cellDates: true });
 
-      // 2행(index 1): 강의실+강사명 헤더
-      // 3행(index 2): 패턴 (월수금월수, 화목화목금 등)
-      const headerRow = rows[1] || [];
-      const patternRow = rows[2] || [];
+      // SheetJS 기준:
+      // index 0 (1행): 강의실명 + 강사명(XXXT)
+      // index 1 (2행): 패턴 (월수금월수, 화목화목금 등)
+      // index 3~ : 개강 그룹 ('2026-XX\r\n개강' + Date 객체들)
+      const headerRow  = rows[0] || [];
+      const patternRow = rows[1] || [];
 
-      // 강사 컬럼 매핑: 'XXX T' 형태
+      // 강사 컬럼 매핑: 'XXXT' 형태 (한글 2~5자 + T)
       const teacherCols = {};
       headerRow.forEach(function(v, i) {
         if (v && typeof v === 'string') {
@@ -640,13 +643,14 @@ window.uploadGkyilTimetable = async function(event) {
       if (Object.keys(teacherCols).length === 0) {
         showToast('❌ 강사명을 찾을 수 없습니다. 파일 형식을 확인해주세요.');
         showLoading(false);
+        event.target.value = '';
         return;
       }
 
-      // 개강 그룹 시작 행 찾기: col1(index 1)에 '개강' 포함된 행
+      // 개강 그룹 시작행 찾기: col0에 '개강' 포함된 행
       const groupStartRows = [];
       rows.forEach(function(row, ri) {
-        const v = row[1];
+        const v = row[0];
         if (v && typeof v === 'string' && v.includes('개강')) {
           groupStartRows.push(ri);
         }
@@ -655,17 +659,20 @@ window.uploadGkyilTimetable = async function(event) {
       if (!groupStartRows.length) {
         showToast('❌ 개강 정보를 찾을 수 없습니다.');
         showLoading(false);
+        event.target.value = '';
         return;
       }
 
-      // 날짜 문자열 정규화: yyyy-mm-dd 형태로
-      function normalizeDate(v) {
+      // Date 객체 → 'yyyy-mm-dd' 문자열
+      function fmtDate(v) {
         if (!v) return null;
-        const s = String(v).trim();
-        // yyyy-mm-dd 형태
-        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-        // Date 객체인 경우
-        if (s.match(/^\d{4}\/\d{2}\/\d{2}$/)) return s.replace(/\//g, '-');
+        if (v instanceof Date) {
+          const y = v.getFullYear();
+          const m = String(v.getMonth() + 1).padStart(2, '0');
+          const d = String(v.getDate()).padStart(2, '0');
+          return y + '-' + m + '-' + d;
+        }
+        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
         return null;
       }
 
@@ -678,19 +685,18 @@ window.uploadGkyilTimetable = async function(event) {
         for (const col in teacherCols) {
           const colIdx = parseInt(col);
           const teacher = teacherCols[col];
-          const pat = (patternRow[colIdx] || '').trim();
+          const pat = typeof patternRow[colIdx] === 'string' ? patternRow[colIdx].trim() : '';
 
           // 해당 컬럼에서 날짜 수집
           const dates = [];
           for (let ri = startRi; ri < endRi && ri < rows.length; ri++) {
-            const v = normalizeDate(rows[ri][colIdx]);
-            if (v) dates.push(v);
+            const ds = fmtDate(rows[ri][colIdx]);
+            if (ds) dates.push(ds);
           }
-
           if (!dates.length) continue;
 
           const startDate = dates[0];
-          const endDate = dates[dates.length - 1];
+          const endDate   = dates[dates.length - 1];
 
           // Firebase 기존 데이터 중복 체크 (강사+개강일 기준)
           const exists = Object.values(allCourses).some(function(c) {
@@ -703,10 +709,9 @@ window.uploadGkyilTimetable = async function(event) {
           if (pat.includes('월수금')) days = '월수금';
           else if (pat.includes('화목')) days = '화목금';
 
-          // 강좌명: 헤더에서 강의실명 추출 (강사 컬럼 왼쪽 컬럼)
-          const roomCol = colIdx - 1;
-          const roomRaw = headerRow[roomCol] || '';
-          const roomMatch = roomRaw.match(/^([A-Z]+)/);
+          // 강의실: 강사 컬럼 왼쪽 컬럼에서 추출
+          const roomRaw = typeof headerRow[colIdx - 1] === 'string' ? headerRow[colIdx - 1] : '';
+          const roomMatch = roomRaw.match(/^([A-Z가-힣]+)/);
           const room = roomMatch ? roomMatch[1] : '';
 
           try {
@@ -734,6 +739,7 @@ window.uploadGkyilTimetable = async function(event) {
       showToast('✅ ' + added + '개 추가 (' + skipped + '개 중복 스킵)');
     } catch(err) {
       showLoading(false);
+      event.target.value = '';
       showToast('❌ 오류: ' + err.message);
       console.error(err);
     }
