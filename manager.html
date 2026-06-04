@@ -805,6 +805,8 @@ button, a, [onclick] { touch-action: manipulation; -webkit-tap-highlight-color: 
   .tab-btn { font-size: 10px; padding: 7px 8px; }
   .count-badge { font-size: 10px; padding: 2px 7px; }
 }
+/* mobileBadgeBar: 모바일에서만 표시 */
+#mobileBadgeBar { display: none; }
 </style>
 
 
@@ -857,7 +859,7 @@ window.onerror = function(msg) {
 
 <div class="tab-bar" id="tabBar"></div>
 <!-- 모바일 전용 카운트 배지 바 -->
-<div id="mobileBadgeBar" style="display:none;">
+<div id="mobileBadgeBar">
   <div class="count-badge cb-active" id="mb-active" style="cursor:default;">재학 0</div>
   <div class="count-badge cb-leave" id="mb-leave" style="cursor:pointer;" onclick="openGroupPopup('leave')">휴학 0</div>
   <div class="count-badge" style="color:var(--purple);border-color:var(--purple);background:var(--purple-dim);cursor:pointer;" id="mb-cod" onclick="openGroupPopup('cod')">COD 0</div>
@@ -3157,9 +3159,7 @@ function updateHeader(){
     const el=document.getElementById('mb-'+k);
     if(el) el.textContent=document.getElementById('hd-'+k).textContent;
   });
-  // 모바일 배지 바 표시 조건 (CSS @media로 제어하지만 초기값 세팅)
-  const mb=document.getElementById('mobileBadgeBar');
-  if(mb) mb.style.display='';
+  // 모바일 배지 바는 CSS @media로만 제어 (JS에서 display 건드리지 않음)
 }
 
 function switchTab(id){
