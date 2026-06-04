@@ -4883,6 +4883,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
     const diffStart = Math.abs(new Date(pp.startDate) - new Date(startDate)) / 86400000;
     if (diffStart <= 3 && pp.endDate && pp.endDate > endDate) endDate = pp.endDate;
   });
+  console.log('[종강일 확정]', endDate, '/ sched keys:', Object.keys(sched));
 
   // ── 격일반 날짜 조회 (메모리 _gkyilDates 우선, Firebase timetable 폴백) ──
   const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time);
