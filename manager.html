@@ -3082,16 +3082,16 @@ function renderBoardTable(){
       const hasDate=allVals.some(v=>bdParseVal(v).startDate);
       const isNoticed=allVals.some(v=>v&&v.includes('[O]'));
        const notiBtnHtml=hasDate?`<div onclick="event.stopPropagation();openNotiCardFromBoard('${arrName}',${i},'${mk.replace(/'/g,"\\'")}');" style="padding:3px 8px 4px;border-top:1px solid ${isNoticed?'rgba(22,163,74,.25)':'rgba(124,58,237,.12)'};background:${isNoticed?'rgba(22,163,74,.07)':'rgba(124,58,237,.05)'};color:${isNoticed?'var(--green)':'#7c3aed'};cursor:pointer;font-size:10px;font-weight:700;font-family:'Noto Sans KR',sans-serif;user-select:none;">${isNoticed?'✅ 안내완료':'📬 개강안내'}</div>`:'';
-
-       html+=`<td style="padding:0;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:top;display:flex;flex-direction:column;">
-
-         <button class="bd-chip-btn" data-arr="${arrName}" data-idx="${i}" data-mk="${mk.replace(/"/g,'\x22')}"
-
-           style="flex:1;width:100%;min-height:52px;padding:6px 8px;background:${bg};border:none;text-align:left;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;gap:2px;transition:background .1s;box-sizing:border-box;"
-
+       html+=`<td style="padding:0;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:top;">
+         <button class="bd-chip-btn" data-arr="${arrName}" data-idx="${i}" data-mk="${mk.replace(/"/g,'\x22')}" 
+           style="width:100%;min-height:52px;padding:6px 8px;background:${bg};border:none;text-align:left;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;gap:2px;transition:background .1s;box-sizing:border-box;" 
            data-bg="${bg}" data-hover="${hoverBg}">${chipContent}</button>${notiBtnHtml}
-
        </td>`;
+
+
+
+
+
 
     });
     html+=`</tr>`;
