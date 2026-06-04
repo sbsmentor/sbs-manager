@@ -601,40 +601,209 @@ button, a, [onclick] { touch-action: manipulation; -webkit-tap-highlight-color: 
   .notice-toggle.on { background:var(--green);border-color:var(--green);color:#fff; }
 
 
-/* ── 모바일 추가 최적화 ── */
+/* ══════════════════════════════════════════
+   모바일 최적화 — 아이폰 16 기준 (393px)
+   ══════════════════════════════════════════ */
 @media (max-width: 768px) {
-  /* 탭바 */
-  .tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
-  .tab-btn { white-space: nowrap; font-size: 11px; padding: 6px 10px; }
-  /* 학생 테이블 */
-  .student-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  /* 모달 */
-  .modal-sheet, .modal-overlay .modal-box { 
-    width: 96% !important; 
-    max-width: 96% !important; 
-    max-height: 90vh;
-    overflow-y: auto;
+
+  /* ── 헤더 ── */
+  .header {
+    padding: 0 10px;
+    height: 52px;
+    gap: 6px;
   }
-  /* 수업선택 팝업 */
-  #ttSearchBg .tt-search-modal { width: 96% !important; }
-  /* 버튼 터치 영역 */
-  button { min-height: 36px; }
-  /* 입력창 iOS 자동확대 방지 */
-  input, select, textarea { font-size: 16px !important; }
-  /* 상단 카운터 */
-  .hdr-counts { font-size: 10px; gap: 4px; }
-  .count-badge { padding: 2px 6px; font-size: 10px; }
-  /* 배정표 */
-  .board-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  /* 헤더 저장/백업 버튼 */
-  .hdr-right-btns { gap: 4px; }
-  .hdr-right-btns button { font-size: 11px; padding: 5px 8px; }
+  .logo { font-size: 13px; }
+  /* 헤더 카운트 배지 — 모바일에선 숨김 (탭바 아래 별도 표시) */
+  .header-counts { display: none; }
+  /* 저장/백업 버튼: 아이콘만 */
+  .hdr-btn span { display: none; }
+  .hdr-btn { font-size: 16px; padding: 4px 7px; min-height: 32px; }
+  .search-wrap { max-width: 150px; }
+  .search-wrap input { font-size: 14px; padding: 5px 8px 5px 28px; }
+
+  /* ── 탭바 ── */
+  .tab-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding: 0 4px;
+    gap: 2px;
+    scrollbar-width: none;
+  }
+  .tab-bar::-webkit-scrollbar { display: none; }
+  .tab-btn { white-space: nowrap; font-size: 11px; padding: 8px 10px; }
+
+  /* ── 카운트 배지 — 탭바 아래 가로 스크롤 바 ── */
+  #mobileBadgeBar {
+    display: flex !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 5px;
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  #mobileBadgeBar::-webkit-scrollbar { display: none; }
+  #mobileBadgeBar .count-badge {
+    font-size: 11px;
+    padding: 3px 9px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ── 콘텐츠 ── */
+  .content { padding: 8px 10px; }
+
+  /* ── 요약 카드 ── */
+  .summary-cards { grid-template-columns: repeat(2,1fr); gap: 7px; margin-bottom: 10px; }
+  .sum-card { padding: 9px 11px; }
+  .sum-val { font-size: 17px; }
+  .sum-label { font-size: 11px; }
+
+  /* ── 필터 ── */
+  .filter-row { gap: 4px; flex-wrap: wrap; }
+  .filter-btn { padding: 4px 9px; font-size: 11px; }
+  .add-btn { font-size: 12px; padding: 6px 10px; }
+
+  /* ── 수강생 테이블 → 카드형 ── */
+  .table-wrap { border-radius: 10px; overflow: hidden; }
+  table { min-width: unset; }
+  thead { display: none; }
+  tbody tr {
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    grid-template-rows: auto auto auto;
+    padding: 10px 10px 10px 8px;
+    gap: 2px 6px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  /* 체크박스 */
+  tbody td:nth-child(1) {
+    grid-column: 1; grid-row: 1 / 4;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0; border: none;
+  }
+  /* 이름 */
+  tbody td:nth-child(2) {
+    grid-column: 2; grid-row: 1;
+    font-size: 14px; font-weight: 700;
+    padding: 0; border: none;
+  }
+  /* 구분 태그 */
+  tbody td:nth-child(3) {
+    grid-column: 3; grid-row: 1;
+    padding: 0; border: none; font-size: 11px;
+  }
+  /* 과정 */
+  tbody td:nth-child(4) {
+    grid-column: 2 / 4; grid-row: 2;
+    font-size: 12px; color: var(--text2);
+    padding: 0; border: none;
+  }
+  /* 목적 — 숨김 */
+  tbody td:nth-child(5) { display: none; }
+  /* 나이 */
+  tbody td:nth-child(6) {
+    grid-column: 2; grid-row: 3;
+    font-size: 11px; color: var(--text3);
+    padding: 0; border: none;
+  }
+  /* 연락처 */
+  tbody td:nth-child(7) {
+    grid-column: 3; grid-row: 3;
+    font-size: 11px; color: var(--text2);
+    padding: 0; border: none;
+  }
+  /* 주소 — 숨김 */
+  tbody td:nth-child(8) { display: none; }
+  /* 수강권 */
+  tbody td:nth-child(9) { display: none; }
+  /* 개강안내 O/X — 숨김 */
+  tbody td:nth-child(10) { display: none; }
+  /* 수업현황 */
+  tbody td:nth-child(11) {
+    grid-column: 1 / 5; grid-row: 4;
+    font-size: 11px; padding: 4px 0 0 0; border: none;
+  }
+  /* 설정 버튼 */
+  tbody td:last-child {
+    grid-column: 1 / 5; grid-row: 5;
+    padding: 4px 0 0 0; border: none;
+  }
+
+  /* ── 수정 모달 — 바텀시트 ── */
+  .edit-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 95dvh;
+    border-radius: 20px 20px 0 0 !important;
+    position: fixed !important;
+    bottom: 0 !important; left: 0 !important; right: 0 !important;
+    top: auto !important;
+    margin: 0 !important;
+  }
+  .em-header { padding: 12px 16px 10px; }
+  .em-title { font-size: 15px; }
+  .em-body { padding: 10px 14px 16px; }
+  .em-footer { padding: 10px 14px 14px; }
+  .ef-row { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .ef-label { width: auto; text-align: left; font-size: 12px; }
+  .ef-input, .ef-select { width: 100% !important; font-size: 16px !important; }
+  .ef-age-display { font-size: 12px; }
+  .ef-sched-row { flex-direction: column !important; gap: 6px !important; }
+  .ef-sched-row > div { flex-wrap: wrap; }
+  .ef-yr-sel, .ef-mo-sel, .ef-time-sel { width: 72px; }
+  .ef-class-sel { min-width: 0 !important; width: 100% !important; }
+  .ef-teacher-inp { width: 100% !important; }
+  .ef-add-sched { width: 100%; text-align: center; padding: 8px; font-size: 13px; }
+
+  /* ── 일반 모달 ── */
+  .modal { width: 99%; padding: 14px; }
+  .modal-grid { grid-template-columns: 1fr; }
+
+  /* ── 일괄등록 모달 ── */
+  .bulk-modal {
+    width: 100% !important;
+    border-radius: 20px 20px 0 0;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    max-height: 95dvh;
+  }
+
+  /* ── 시간표 검색 팝업 ── */
+  #ttSearchBg > div { width: 100% !important; max-width: 100% !important; border-radius: 20px 20px 0 0; position: fixed; bottom: 0; left: 0; right: 0; top: auto !important; max-height: 90dvh; }
+
+  /* ── 개강안내 카드 — 전체화면 ── */
+  #notiCardBg > div { width: 100% !important; max-width: 100% !important; border-radius: 0; position: fixed; inset: 0; max-height: 100dvh; overflow-y: auto; }
+
+  /* ── 배정표 ── */
+  #boardTable { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  #boardTable table { min-width: 900px; }
+
+  /* ── 버튼 터치 영역 최소화 ── */
+  button { min-height: 34px; }
+
+  /* ── iOS 입력 자동확대 방지 ── */
+  input[type="text"], input[type="search"], input[type="month"],
+  input[type="number"], select, textarea { font-size: 16px !important; }
+
+  /* ── 액션 드롭다운 ── */
+  .action-dropdown-menu { right: 0; min-width: 110px; }
+  .adm-item { padding: 9px 13px; font-size: 12px; }
+
+  /* ── 그룹 팝업 모달 ── */
+  #groupPopupBg > div { width: 100% !important; max-width: 100% !important; border-radius: 20px 20px 0 0; position: fixed; bottom: 0; left: 0; right: 0; top: auto !important; max-height: 90dvh; }
 }
-@media (max-width: 480px) {
-  .header { height: auto; padding: 8px 10px; flex-wrap: wrap; }
-  .logo-text { font-size: 14px; }
-  .ef-row { flex-direction: column; }
-  .ef-sched-row { grid-template-columns: repeat(2, 1fr); }
+
+@media (max-width: 393px) {
+  /* 아이폰 16 정확 기준 미세 조정 */
+  .header { padding: 0 8px; height: 50px; }
+  .logo { font-size: 12px; }
+  .search-wrap { max-width: 130px; }
+  .content { padding: 6px 8px; }
+  .tab-btn { font-size: 10px; padding: 7px 8px; }
+  .count-badge { font-size: 10px; padding: 2px 7px; }
 }
 </style>
 
@@ -687,6 +856,16 @@ window.onerror = function(msg) {
 </header>
 
 <div class="tab-bar" id="tabBar"></div>
+<!-- 모바일 전용 카운트 배지 바 -->
+<div id="mobileBadgeBar" style="display:none;">
+  <div class="count-badge cb-active" id="mb-active" style="cursor:default;">재학 0</div>
+  <div class="count-badge cb-leave" id="mb-leave" style="cursor:pointer;" onclick="openGroupPopup('leave')">휴학 0</div>
+  <div class="count-badge" style="color:var(--purple);border-color:var(--purple);background:var(--purple-dim);cursor:pointer;" id="mb-cod" onclick="openGroupPopup('cod')">COD 0</div>
+  <div class="count-badge" style="color:var(--blue);border-color:var(--blue);background:var(--blue-dim);cursor:pointer;" id="mb-natl" onclick="openGroupPopup('natl')">국비 0</div>
+  <div class="count-badge" style="color:var(--blue);border-color:var(--blue);background:var(--blue-dim);cursor:pointer;" id="mb-grad" onclick="openGroupPopup('grad')">종강 0</div>
+  <div class="count-badge" style="color:var(--red);border-color:var(--red);background:var(--red-dim);cursor:pointer;" id="mb-refund" onclick="openGroupPopup('refund')">환불 0</div>
+  <div class="count-badge cb-total" id="mb-total" style="cursor:default;">전체 0</div>
+</div>
 <div class="content" id="content"></div>
 
 <!-- 상세보기 -->
@@ -2901,12 +3080,12 @@ function renderBoardTable(){
       // 개강안내 버튼 (개강일이 있는 수업에만)
       const hasDate=allVals.some(v=>bdParseVal(v).startDate);
       const isNoticed=allVals.some(v=>v&&v.includes('[O]'));
-      const notiBtn=hasDate?`<div style="margin-top:4px;"><button onclick="event.stopPropagation();openNotiCardFromBoard('${arrName}',${i},'${mk.replace(/'/g,"\\'")}')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid ${isNoticed?'var(--green)':'#7c3aed'};background:${isNoticed?'rgba(22,163,74,.1)':'rgba(124,58,237,.08)'};color:${isNoticed?'var(--green)':'#7c3aed'};cursor:pointer;font-weight:700;font-family:'Noto Sans KR',sans-serif;white-space:nowrap;">${isNoticed?'✅ 안내완료':'📬 개강안내'}</button></div>`:'';
-      html+=`<td style="padding:0;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:top;">
-        <button class="bd-chip-btn" data-arr="${arrName}" data-idx="${i}" data-mk="${mk.replace(/"/g,'\x22')}"
-          style="width:100%;min-height:52px;padding:6px 8px;background:${bg};border:none;text-align:left;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;gap:2px;transition:background .1s;box-sizing:border-box;"
-          data-bg="${bg}" data-hover="${hoverBg}">${chipContent}${notiBtn}</button>
-      </td>`;
+       const notiBtnHtml=hasDate?`<button onclick="openNotiCardFromBoard('${arrName}',${i},'${mk.replace(/'/g,"\\'")}')" style="display:block;width:100%;font-size:10px;padding:3px 8px;border-radius:0 0 4px 4px;border:none;border-top:1px solid ${isNoticed?'rgba(22,163,74,.3)':'rgba(124,58,237,.15)'};background:${isNoticed?'rgba(22,163,74,.08)':'rgba(124,58,237,.06)'};color:${isNoticed?'var(--green)':'#7c3aed'};cursor:pointer;font-weight:700;font-family:'Noto Sans KR',sans-serif;text-align:left;">${isNoticed?'✅ 안내완료':'📬 개강안내'}</button>`:'';
+       html+=`<td style="padding:0;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:top;">
+         <button class="bd-chip-btn" data-arr="${arrName}" data-idx="${i}" data-mk="${mk.replace(/"/g,'\x22')}"
+           style="width:100%;min-height:52px;padding:6px 8px;background:${bg};border:none;text-align:left;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;gap:2px;transition:background .1s;box-sizing:border-box;"
+           data-bg="${bg}" data-hover="${hoverBg}">${chipContent}</button>${notiBtnHtml}
+       </td>`;
     });
     html+=`</tr>`;
   });
@@ -2968,6 +3147,14 @@ function updateHeader(){
   document.getElementById('hd-grad').textContent=`종강 ${grad}`;
   document.getElementById('hd-refund').textContent=`환불 ${refund}`;
   document.getElementById('hd-total').textContent=`전체 ${total}`;
+  // 모바일 배지 바도 동기화
+  ['active','leave','cod','natl','grad','refund','total'].forEach(function(k){
+    const el=document.getElementById('mb-'+k);
+    if(el) el.textContent=document.getElementById('hd-'+k).textContent;
+  });
+  // 모바일 배지 바 표시 조건 (CSS @media로 제어하지만 초기값 세팅)
+  const mb=document.getElementById('mobileBadgeBar');
+  if(mb) mb.style.display='';
 }
 
 function switchTab(id){
