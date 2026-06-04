@@ -4706,6 +4706,8 @@ window.uploadGkyilDates = async function(event) {
           });
           await Promise.all(saves);
           console.log('[gkyilDates] Firebase 저장 완료:', Object.keys(result).length, '명');
+          // 저장 완료 후 메모리를 최신 데이터로 확정
+          window._gkyilDates = result;
         } catch(fe) { console.warn('gkyilDates Firebase 저장 실패:', fe); }
       }
 
@@ -4731,13 +4733,11 @@ function _loadGkyilDatesFromFirebase() {
   window._fbDb.ref('gkyilDates').once('value').then(function(snap) {
     const data = snap.val();
     if (data && typeof data === 'object' && Object.keys(data).length) {
-      // 각 강사별 날짜 배열이 Firebase에서 객체로 올 수 있으므로 변환
       const converted = {};
       Object.keys(data).forEach(function(teacher) {
         const raw = data[teacher];
         let arr;
         if (typeof raw === 'string') {
-          // 쉼표 구분 문자열 → 배열 변환
           arr = raw.split(',').filter(Boolean).sort();
         } else if (Array.isArray(raw)) {
           arr = raw.slice().sort();
@@ -4746,13 +4746,19 @@ function _loadGkyilDatesFromFirebase() {
         } else {
           arr = [];
         }
-        // 날짜 형식(yyyy-mm-dd)인 것만 필터링
+        // 날짜 형식(yyyy-mm-dd)인 것만 필터링 (강사명 등 오염 방지)
         converted[teacher] = arr.filter(function(d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); });
       });
-      window._gkyilDates = converted;
-      const st = document.getElementById('gkyilStatus');
-      if (st) { st.style.display='inline'; st.textContent = '✅ ' + Object.keys(converted).length + '명 로드됨'; }
-      console.log('[gkyilDates] Firebase에서 로드됨:', Object.keys(converted).length, '명');
+      // 유효한 날짜 데이터가 있는 경우만 메모리 업데이트
+      const hasValidDates = Object.values(converted).some(function(dates) {
+        return dates.length > 0;
+      });
+      if (hasValidDates) {
+        window._gkyilDates = converted;
+        const st = document.getElementById('gkyilStatus');
+        if (st) { st.style.display='inline'; st.textContent = '✅ ' + Object.keys(converted).length + '명 로드됨'; }
+        console.log('[gkyilDates] Firebase에서 로드됨:', Object.keys(converted).length, '명');
+      }
     }
   }).catch(function(e) { console.warn('gkyilDates 로드 실패:', e); });
 }
