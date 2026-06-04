@@ -4309,10 +4309,10 @@ function renderNotiCalGrid(yearMonth, classDates, startDate, endDate){
     const borderR=cellBg!=='transparent'?`border-radius:5px;`:'';
     const isCustomOn=window._notiCustomDates&&window._notiCustomDates.has(ds);
     const isCustomOff=window._notiRemovedDates&&window._notiRemovedDates.has(ds);
-    const finalBg=isCustomOn?'#bbf7d0':isCustomOff?cellBg:cellBg;
+    const finalBg=isCustomOn?'#dbeafe':isCustomOff?cellBg:cellBg;
     const finalMark=isCustomOff
     ? `<div style="font-size:9px;color:#ef4444;line-height:1;text-decoration:line-through;opacity:0.5;">${markHtml?'●':''}</div>`
-    : (isCustomOn?`<div style="font-size:9px;font-weight:700;color:#16a34a;line-height:1;">●</div>`:markHtml);
+    : (isCustomOn?`<div style="font-size:9px;font-weight:700;color:#1d4ed8;line-height:1;">●</div>`:markHtml);
     cells+=`<div onclick="notiCalClick('${ds}')" oncontextmenu="openHolidayCtx(event,'${ds}')" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:3px 1px;background:${finalBg};${borderR}min-height:36px;">
       <div style="font-size:11px;font-weight:${isClass||isFirst||isLast?'700':'400'};color:${numColor};line-height:1.2;">${day}</div>
       ${finalMark}
@@ -4895,6 +4895,8 @@ async function openNotiCardFromBoard(arrName, si, mk){
       if(pp.endDate && pp.endDate > endDate) endDate = pp.endDate;
     }
     classDates.sort();
+    // 연강 시 종강일을 합산된 날짜의 마지막 날짜로 확정
+    if(classDates.length > 0) endDate = classDates[classDates.length - 1];
   }
   const holidayHits=classDates.filter(d=>KR_HOLIDAYS_NOTI[d]&&!KR_HOLIDAYS_NOTI[d].includes('대체공휴일'));
   const noClassNote=holidayHits.length
