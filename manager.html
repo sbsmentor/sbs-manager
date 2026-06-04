@@ -4568,7 +4568,8 @@ async function saveNotiDates() {
     savedAt: new Date().toISOString()
   };
   try {
-    await fbSet('notiDates/' + key, data);
+    if (!window._fbDb) throw new Error('Firebase 연결 안됨');
+    await window._fbDb.ref('notiDates/' + key).set(data);
     const btn = document.getElementById('notiSaveBtn');
     if (btn) { btn.textContent = '✅ 저장됨'; setTimeout(() => { btn.textContent = '💾 저장'; }, 1500); }
     showToast('✅ 날짜 설정 저장됨');
@@ -4873,7 +4874,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
     }
   });
 
-  const startDate=p.startDate||''; const endDate=p.endDate||''; const daysStr=p.days||'';
+  const startDate=p.startDate||''; let endDate=p.endDate||''; const daysStr=p.days||'';
 
   // ── 격일반 날짜 조회 (메모리 _gkyilDates 우선, Firebase timetable 폴백) ──
   const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time);
@@ -4890,6 +4891,8 @@ async function openNotiCardFromBoard(arrName, si, mk){
       const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.endDate, pp.time);
       const d2 = fbD2 || getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
       d2.forEach(d=>{ if(!classDates.includes(d)) classDates.push(d); });
+      // 연강 종강일: 두 수업 중 나중 종강일 사용
+      if(pp.endDate && pp.endDate > endDate) endDate = pp.endDate;
     }
     classDates.sort();
   }
