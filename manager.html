@@ -4688,13 +4688,20 @@ window.uploadGkyilDates = async function(event) {
         }
       }
 
+      // 날짜 정렬
+      Object.keys(result).forEach(function(teacher) {
+        result[teacher].sort();
+      });
+
       // 메모리에 저장
       window._gkyilDates = result;
 
-      // Firebase gkyilDates 경로에도 저장 (다른 기기 공유)
+      // Firebase gkyilDates 경로: 삭제 후 재저장 (이전 데이터 완전 제거)
       if (window._fbDb) {
         try {
+          await window._fbDb.ref('gkyilDates').remove();
           await window._fbDb.ref('gkyilDates').set(result);
+          console.log('[gkyilDates] Firebase 저장 완료:', Object.keys(result).length, '명');
         } catch(fe) { console.warn('gkyilDates Firebase 저장 실패:', fe); }
       }
 
@@ -4724,7 +4731,8 @@ function _loadGkyilDatesFromFirebase() {
       const converted = {};
       Object.keys(data).forEach(function(teacher) {
         const raw = data[teacher];
-        converted[teacher] = Array.isArray(raw) ? raw : Object.values(raw || {});
+        const arr = Array.isArray(raw) ? raw.slice() : Object.values(raw || {});
+        converted[teacher] = arr.sort();
       });
       window._gkyilDates = converted;
       const st = document.getElementById('gkyilStatus');
@@ -4769,9 +4777,9 @@ async function _getTimetableDates(teacher, startDate, endDate, time) {
       // Firebase는 배열을 {0:..., 1:...} 객체로 반환 → 배열로 변환
       let allDates = null;
       if (Array.isArray(raw)) {
-        allDates = raw;
+        allDates = raw.slice().sort();
       } else if (raw && typeof raw === 'object') {
-        allDates = Object.values(raw);
+        allDates = Object.values(raw).sort();
       }
       if (allDates && allDates.length) {
         if (!window._gkyilDates) window._gkyilDates = {};
