@@ -5255,20 +5255,11 @@ async function _getTimetableDates(teacher, startDate, endDate, time) {
       const result = filterDates(window._gkyilDates[exactKey], start, end);
       if (result) { console.log('[gkyil] 메모리(exact) 캐시 적용:', result.length, '일'); return result; }
     }
-    // 강사명만으로 있을 경우: 첫 수업일이 개강일 ±7일 내이면 유효한 데이터로 판단
+    // 강사명만으로 있을 경우: startDate 이후 날짜가 있으면 바로 사용
     if (window._gkyilDates[teacher]) {
       const allDates = window._gkyilDates[teacher];
-      const firstDate = allDates[0] || '';
-      const startMs = start ? new Date(start).getTime() : 0;
-      const firstMs = firstDate ? new Date(firstDate).getTime() : 0;
-      const diffDays = Math.abs(startMs - firstMs) / 86400000;
-      // 개강일 기준 ±7일 내 첫 수업일이면 이 강사의 데이터로 인정
-      if (start && firstDate && diffDays > 14) {
-        console.log('[gkyil] 첫 수업일 차이 너무 큼(' + Math.round(diffDays) + '일) — days 폴백');
-      } else {
-        const result = filterDates(allDates, start, end);
-        if (result) { console.log('[gkyil] 메모리 캐시 적용:', result.length, '일'); return result; }
-      }
+      const result = filterDates(allDates, start, end);
+      if (result) { console.log('[gkyil] 메모리 캐시 적용:', result.length, '일'); return result; }
     }
   }
 
@@ -5288,17 +5279,9 @@ async function _getTimetableDates(teacher, startDate, endDate, time) {
       if (allDates && allDates.length) {
         if (!window._gkyilDates) window._gkyilDates = {};
         window._gkyilDates[teacher] = allDates;
-        // 첫 수업일이 개강일 ±14일 내이면 유효
-        const firstDate = allDates[0] || '';
-        const startMs = start ? new Date(start).getTime() : 0;
-        const firstMs = firstDate ? new Date(firstDate).getTime() : 0;
-        const diffDays = Math.abs(startMs - firstMs) / 86400000;
-        if (start && firstDate && diffDays > 14) {
-          console.log('[gkyil] Firebase 첫 수업일 차이 너무 큼 — days 폴백:', teacher, start);
-        } else {
-          const result = filterDates(allDates, start, end);
-          if (result) { console.log('[gkyil] Firebase 직접 조회 적용:', result.length, '일'); return result; }
-        }
+        // startDate~endDate 범위 날짜 필터 — 여러 기수 데이터가 있어도 범위로 정확히 추출
+        const result = filterDates(allDates, start, end);
+        if (result) { console.log('[gkyil] Firebase 직접 조회 적용:', result.length, '일'); return result; }
       }
     } catch(e) { console.warn('[gkyil] Firebase 직접 조회 실패:', e); }
   }
