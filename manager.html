@@ -4693,14 +4693,18 @@ window.uploadGkyilDates = async function(event) {
         result[teacher].sort();
       });
 
-      // 메모리에 저장
+      // 메모리에 즉시 저장
       window._gkyilDates = result;
 
-      // Firebase gkyilDates 경로: 삭제 후 재저장 (이전 데이터 완전 제거)
+      // Firebase: 강사별로 개별 저장 (배열→객체 변환 문제 방지를 위해 JSON 문자열로 저장)
       if (window._fbDb) {
         try {
           await window._fbDb.ref('gkyilDates').remove();
-          await window._fbDb.ref('gkyilDates').set(result);
+          const saves = Object.keys(result).map(function(teacher) {
+            // 날짜 배열을 쉼표로 연결한 문자열로 저장 (Firebase 배열→객체 변환 방지)
+            return window._fbDb.ref('gkyilDates/' + teacher).set(result[teacher].join(','));
+          });
+          await Promise.all(saves);
           console.log('[gkyilDates] Firebase 저장 완료:', Object.keys(result).length, '명');
         } catch(fe) { console.warn('gkyilDates Firebase 저장 실패:', fe); }
       }
@@ -4731,8 +4735,19 @@ function _loadGkyilDatesFromFirebase() {
       const converted = {};
       Object.keys(data).forEach(function(teacher) {
         const raw = data[teacher];
-        const arr = Array.isArray(raw) ? raw.slice() : Object.values(raw || {});
-        converted[teacher] = arr.sort();
+        let arr;
+        if (typeof raw === 'string') {
+          // 쉼표 구분 문자열 → 배열 변환
+          arr = raw.split(',').filter(Boolean).sort();
+        } else if (Array.isArray(raw)) {
+          arr = raw.slice().sort();
+        } else if (raw && typeof raw === 'object') {
+          arr = Object.values(raw).sort();
+        } else {
+          arr = [];
+        }
+        // 날짜 형식(yyyy-mm-dd)인 것만 필터링
+        converted[teacher] = arr.filter(function(d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); });
       });
       window._gkyilDates = converted;
       const st = document.getElementById('gkyilStatus');
@@ -4774,12 +4789,14 @@ async function _getTimetableDates(teacher, startDate, endDate, time) {
     try {
       const snap = await window._fbDb.ref('gkyilDates/' + teacher).once('value');
       const raw = snap.val();
-      // Firebase는 배열을 {0:..., 1:...} 객체로 반환 → 배열로 변환
+      // 문자열(쉼표구분), 배열, 객체 모두 처리
       let allDates = null;
-      if (Array.isArray(raw)) {
-        allDates = raw.slice().sort();
+      if (typeof raw === 'string') {
+        allDates = raw.split(',').filter(function(d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); }).sort();
+      } else if (Array.isArray(raw)) {
+        allDates = raw.filter(function(d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); }).slice().sort();
       } else if (raw && typeof raw === 'object') {
-        allDates = Object.values(raw).sort();
+        allDates = Object.values(raw).filter(function(d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); }).sort();
       }
       if (allDates && allDates.length) {
         if (!window._gkyilDates) window._gkyilDates = {};
