@@ -4710,6 +4710,7 @@ function _loadGkyilDatesFromFirebase() {
 // 우선순위: 1) 메모리 _gkyilDates (개강일~종강일 범위 필터) 2) Firebase timetable.dates
 async function _getTimetableDates(teacher, startDate, endDate, time) {
   // 1) 메모리 격일반 데이터 우선 (강사명 + 개강일~종강일 범위 필터)
+  console.log('[gkyil] 조회:', teacher, startDate, endDate, '/ 로드된 강사:', Object.keys(window._gkyilDates||{}));
   if (window._gkyilDates && window._gkyilDates[teacher]) {
     const allDates = window._gkyilDates[teacher];
     if (allDates.length) {
@@ -4717,9 +4718,9 @@ async function _getTimetableDates(teacher, startDate, endDate, time) {
       const end   = endDate   || '';
       if (start && end) {
         const filtered = allDates.filter(function(d) { return d >= start && d <= end; });
+        console.log('[gkyil] 필터 결과:', filtered.length, '일');
         if (filtered.length) return filtered;
       } else if (start) {
-        // 종강일 없으면 개강일 이후 10일
         const filtered = allDates.filter(function(d) { return d >= start; }).slice(0, 10);
         if (filtered.length) return filtered;
       }
