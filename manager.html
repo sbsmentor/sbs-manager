@@ -4948,9 +4948,9 @@ function notiCalClick(ds) {
   const months = [...moSet].sort();
   document.getElementById('notiCalWrap').innerHTML =
     months.map(mo => renderNotiCalGrid(mo, allDates, _notiCtx.p.startDate, _notiCtx.p.endDate)).join('');
-  // 출석일 목록 업데이트
+  // 출석일 목록 업데이트 (날짜 클릭으로 수정한 최종 날짜 반영)
   const attendEl = document.getElementById('notiAttendList');
-  if (attendEl) attendEl.textContent = allDates.sort().map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
+  if (attendEl) attendEl.textContent = allDates.slice().sort().map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
   // 날짜 변경 시 저장 버튼 표시
   const saveBtn = document.getElementById('notiSaveBtn');
   if (saveBtn) saveBtn.style.display = 'inline-block';
@@ -4968,17 +4968,39 @@ function _notiSanitizeKey(s) {
 async function saveNotiDates() {
   if (!_notiCtx || !_notiCtx._cacheKey) return;
   const key = _notiSanitizeKey(_notiCtx._cacheKey);
+
+  // 현재 최종 날짜 배열 계산
+  const origDates = _notiCtx.origDates || [];
+  const finalDates = [
+    ...origDates.filter(d => !window._notiRemovedDates.has(d)),
+    ...window._notiCustomDates
+  ].sort();
+
   const data = {
     removed: [...window._notiRemovedDates],
     custom:  [...window._notiCustomDates],
     savedAt: new Date().toISOString()
   };
+
   try {
     if (!window._fbDb) throw new Error('Firebase 연결 안됨');
-    await window._fbDb.ref('notiDates/' + key).set(data);
+
+    const saves = [window._fbDb.ref('notiDates/' + key).set(data)];
+
+    // 격일반 데이터도 수정된 날짜로 자동 업데이트
+    const teacher = _notiCtx.p && _notiCtx.p.teacher;
+    if (teacher && finalDates.length) {
+      // 메모리 캐시도 즉시 업데이트
+      if (!window._gkyilDates) window._gkyilDates = {};
+      window._gkyilDates[teacher] = finalDates;
+      // Firebase gkyilDates 업데이트
+      saves.push(window._fbDb.ref('gkyilDates/' + teacher).set(finalDates.join(',')));
+    }
+
+    await Promise.all(saves);
     const btn = document.getElementById('notiSaveBtn');
-    if (btn) { btn.textContent = '✅ 저장됨'; setTimeout(() => { btn.textContent = '💾 저장'; }, 1500); }
-    showToast('✅ 날짜 설정 저장됨');
+    if (btn) { btn.textContent = '✅ 저장됨'; setTimeout(() => { btn.textContent = '💾 저장'; btn.style.display='none'; }, 1500); }
+    showToast('✅ 날짜 저장 완료' + (teacher ? ' (격일반 데이터도 업데이트)' : ''));
   } catch(e) {
     showToast('❌ 저장 실패: ' + e.message);
   }
@@ -5431,20 +5453,9 @@ async function openNotiCardFromBoard(arrName, si, mk){
     (()=>{
       // 수업별 날짜 분리 표시 (연강 시 각 수업 날짜 구분)
       let attendHtml;
-      if(linkedMks.length > 0){
-        // 메인 수업 날짜
-        const mainDates = daysStr ? getClassDatesForNoti(startDate, endDate, daysStr) : classDates;
-        const mainShort = p.cls.replace(/\([^)]*\)/g,'').trim();
-        const parts = [`<span style="color:#64748b;font-weight:700;">${mainShort}:</span> ${mainDates.map(d=>d.slice(5).replace('-','/')).join(', ')}`];
-        for(const {p:pp} of linkedMks){
-          const d2 = getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
-          const short2 = (pp.cls||'').replace(/\([^)]*\)/g,'').trim();
-          parts.push(`<span style="color:#64748b;font-weight:700;">${short2}:</span> ${d2.map(d=>d.slice(5).replace('-','/')).join(', ')}`);
-        }
-        attendHtml = parts.join('<br>');
-      } else {
-        attendHtml = classDates.map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
-      }
+      // 출석일: 항상 classDates(gkyilDates 우선) 기준으로 표시
+      // notiCustom/removed는 달력에만 반영, 출석일은 원본 수업일 기준
+      attendHtml = classDates.map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
       return `<div style="line-height:1.6;margin-top:2px;"><b style="${labelStyle}">출석일 :</b> <span id="notiAttendList" style="font-size:11px;color:#374151;font-family:inherit;">${attendHtml}</span></div>`;
     })(),
   ].join('');
@@ -5470,30 +5481,27 @@ async function openNotiCardFromBoard(arrName, si, mk){
   // 날짜 상태 캐시 키: 강사+개강일+시간 (전체 멘토 공유)
   const _cacheKey = (p.teacher||'') + '|' + startDate + '|' + (p.time||'');
 
-  // 메모리 캐시 우선, 없으면 Firebase 로드
-  if (_notiDateCache[_cacheKey]) {
-    window._notiRemovedDates = _notiDateCache[_cacheKey].removed;
-    window._notiCustomDates  = _notiDateCache[_cacheKey].custom;
-  } else {
-    // Firebase에서 로드
-    const saved = await loadNotiDates(_cacheKey);
-    if (saved) {
-      window._notiRemovedDates = saved.removed;
-      window._notiCustomDates  = saved.custom;
-    } else {
-      window._notiCustomDates  = new Set();
-      window._notiRemovedDates = new Set();
-    }
-    _notiDateCache[_cacheKey] = {removed: window._notiRemovedDates, custom: window._notiCustomDates};
+  // 항상 Firebase에서 fresh 로드 (캐시로 인한 날짜 오염 방지)
+  window._notiRemovedDates = new Set();
+  window._notiCustomDates  = new Set();
+  const saved = await loadNotiDates(_cacheKey);
+  if (saved) {
+    window._notiRemovedDates = saved.removed;
+    window._notiCustomDates  = saved.custom;
   }
+  _notiDateCache[_cacheKey] = {removed: window._notiRemovedDates, custom: window._notiCustomDates};
 
-  // 날짜 상태로 달력 재렌더
+  // 날짜 상태로 달력 재렌더 (removed/custom 반영)
+  // 달력은 removed/custom 포함 allDates2 기준, 출석일은 원본 classDates 기준
   const allDates2 = [...classDates.filter(d => !window._notiRemovedDates.has(d)), ...window._notiCustomDates];
   const moSet2 = new Set(allDates2.map(d => d.slice(0,7)));
   if (!moSet2.size && startDate) moSet2.add(startDate.slice(0,7));
   if (!moSet2.size) moSet2.add(months[0]||new Date().toISOString().slice(0,7));
   document.getElementById('notiCalWrap').innerHTML =
     [...moSet2].sort().map(mo => renderNotiCalGrid(mo, allDates2, startDate, endDate)).join('');
+  // 출석일은 classDates 원본 기준으로 다시 세팅
+  const attendEl2 = document.getElementById('notiAttendList');
+  if(attendEl2) attendEl2.textContent = classDates.map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
 
   _notiCtx._cacheKey = _cacheKey;
   // 저장 버튼 표시
