@@ -4891,12 +4891,8 @@ async function openNotiCardFromBoard(arrName, si, mk){
       const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.endDate, pp.time);
       const d2 = fbD2 || getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
       d2.forEach(d=>{ if(!classDates.includes(d)) classDates.push(d); });
-      // 연강 종강일: 두 수업 중 나중 종강일 사용
-      if(pp.endDate && pp.endDate > endDate) endDate = pp.endDate;
     }
     classDates.sort();
-    // 연강 시 종강일을 합산된 날짜의 마지막 날짜로 확정
-    if(classDates.length > 0) endDate = classDates[classDates.length - 1];
   }
   const holidayHits=classDates.filter(d=>KR_HOLIDAYS_NOTI[d]&&!KR_HOLIDAYS_NOTI[d].includes('대체공휴일'));
   const noClassNote=holidayHits.length
