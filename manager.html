@@ -2172,30 +2172,47 @@ function renderDashboard() {
       </div>`).join('')
     : '<div style="padding:12px;text-align:center;color:var(--text2);font-size:13px;">✅ 미처리 수업이 없습니다</div>';
 
-  // ── 종강 임박 (2개월 이내) ──
+  // ── 추가관리요망: 종강 임박(2개월 이내) + 수강권 2개 이하 ──
   const twoMonLater = new Date(todayD.getFullYear(), todayD.getMonth()+2, todayD.getDate());
   const endingSoon = [];
   [[WEEKDAY,'WEEKDAY'],[WEEKEND,'WEEKEND']].forEach(([arr,arrName])=>{
     arr.forEach((s,idx)=>{
       const scheds = Object.entries(s['수업배정']||{});
-      if(!scheds.length) return;
+      // 수강권 잔여 계산
+      const sugangTotal = parseInt((s['수강권']||'0').toString().replace(/[^0-9]/g,''))||0;
+      const schedKeyCount = Object.keys(s['수업배정']||{}).length;
+      const sugangLeft = sugangTotal > 0 ? sugangTotal - schedKeyCount : null;
+      const lowSugang = sugangLeft !== null && sugangLeft <= 2;
+
+      if(!scheds.length){
+        // 수업배정 없어도 수강권 2개 이하면 표시
+        if(lowSugang) endingSoon.push({name:s['이름']||'-', arrName, idx, lastEnd:null, diff:null, sugangLeft});
+        return;
+      }
       const ends = scheds.map(([,v])=>bdParseVal(v).endDate).filter(Boolean).map(d=>new Date(d+'T00:00:00'));
-      if(!ends.length) return;
+      if(!ends.length){
+        if(lowSugang) endingSoon.push({name:s['이름']||'-', arrName, idx, lastEnd:null, diff:null, sugangLeft});
+        return;
+      }
       const lastEnd = new Date(Math.max(...ends));
-      if(lastEnd <= twoMonLater) {
-        const diff = Math.round((lastEnd-todayD)/86400000);
-        endingSoon.push({name:s['이름']||'-', arrName, idx, lastEnd:lastEnd.toISOString().slice(0,10), diff});
+      const diff = Math.round((lastEnd-todayD)/86400000);
+      // 종강 임박(2개월 이내) 또는 수강권 2개 이하
+      if(lastEnd <= twoMonLater || lowSugang) {
+        endingSoon.push({name:s['이름']||'-', arrName, idx, lastEnd:lastEnd.toISOString().slice(0,10), diff, sugangLeft});
       }
     });
   });
-  endingSoon.sort((a,b)=>a.diff-b.diff);
+  endingSoon.sort((a,b)=>(a.diff??999)-(b.diff??999));
   const endHTML = endingSoon.length
     ? endingSoon.map(f=>`<div class="dash-list-row" onclick="editStudentInDash('${f.arrName}',${f.idx})">
         <span class="dash-name">${f.name}</span>
-        <span class="dash-cls">📅 마지막 종강일: ${f.lastEnd}</span>
-        <span style="font-size:12px;font-weight:700;color:${f.diff<=14?'#dc2626':'#ea580c'};">${f.diff>=0?`D-${f.diff}`:'종강됨'}</span>
+        <span class="dash-cls">${f.lastEnd?`📅 마지막 종강일: ${f.lastEnd}`:'📅 수업 미배정'}</span>
+        <span style="display:flex;gap:6px;align-items:center;">
+          ${f.diff!==null?`<span style="font-size:12px;font-weight:700;color:${f.diff<=14?'#dc2626':'#ea580c'};">${f.diff>=0?`D-${f.diff}`:'종강됨'}</span>`:''}
+          ${f.sugangLeft!==null?`<span style="font-size:11px;font-weight:700;color:${f.sugangLeft<=0?'var(--green)':f.sugangLeft<=2?'var(--orange)':'var(--text2)'};">수강권 ${f.sugangLeft}개 남음</span>`:''}
+        </span>
       </div>`).join('')
-    : '<div style="padding:12px;text-align:center;color:var(--text2);font-size:13px;">✅ 2개월 이내 종강 예정 학생이 없습니다</div>';
+    : '<div style="padding:12px;text-align:center;color:var(--text2);font-size:13px;">✅ 추가관리 요망 학생이 없습니다</div>';
 
   el.innerHTML = `
     <!-- 요약 -->
@@ -2242,7 +2259,7 @@ function renderDashboard() {
     <!-- 종강 임박 -->
     <div class="dash-card">
       <div class="dash-card-header" style="background:#fef2f2;border-left:4px solid #dc2626;">
-        <h3 style="color:#dc2626;">🔴 추가관리 요망 (2개월 이내 종강)</h3>
+        <h3 style="color:#dc2626;">🔴 추가관리 요망 (2개월 이내 종강 · 수강권 2개 이하)</h3>
       </div>
       ${endHTML}
     </div>
@@ -2732,6 +2749,15 @@ function renderBoardTable(){
 
   students.forEach(({s,i,arrName})=>{
     const sched=s['수업배정']||{};
+    // 수강권 잔여 계산
+    const sugangTotal = parseInt((s['수강권']||'0').toString().replace(/[^0-9]/g,''))||0;
+    const usedCount = Object.keys(sched).filter(k=>!k.includes('_')||k.match(/\d+년\s*\d+월_\d+/)).length;
+    // 실제 사용: 수업배정 키 중 유효한 것 (각 월키 + _2, _3 등 포함)
+    const schedKeyCount = Object.keys(sched).length;
+    const sugangLeft = sugangTotal > 0 ? sugangTotal - schedKeyCount : null;
+    const sugangBadge = sugangTotal > 0
+      ? `<div style="font-size:10px;font-weight:700;margin-top:2px;color:${sugangLeft<=0?'var(--green)':sugangLeft<=2?'var(--orange)':'var(--text2)'};">수강권 ${sugangLeft<=0?'0':sugangLeft}개 남음</div>`
+      : '';
     html+=`<tr>
       <td style="padding:8px 12px;font-size:12px;font-weight:700;background:var(--surface2);border-bottom:1px solid var(--border);border-right:1px solid var(--border);position:sticky;left:0;z-index:1;white-space:nowrap;cursor:pointer;transition:background .15s;"
         onclick="bdEditStudent('${arrName}',${i})"
@@ -2739,6 +2765,7 @@ function renderBoardTable(){
         onmouseout="this.style.background='var(--surface2)'">
         <span style="color:var(--accent)">${s['이름']||'-'}</span>
         <div style="font-size:10px;color:var(--text3);font-weight:400;margin-top:2px;">${s['구분']||''} · ${s['과정']||''}</div>
+        ${sugangBadge}
       </td>`;
     months.forEach(({yr,mo})=>{
       const mk=bdMonKey(yr,mo);
@@ -2795,8 +2822,7 @@ function renderBoardTable(){
         allVals.forEach((v,vi)=>{
           const pp=bdParseVal(v);
           if(!pp.cls) return;
-          const alertBadge=(vi===allVals.length-1&&needAlertOnChip)?`<span style="font-size:9px;font-weight:700;color:var(--orange);background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.3);padding:1px 5px;border-radius:3px;margin-left:4px;">⚠</span>`:'';
-          let row=`<span style="font-size:11px;font-weight:600;color:${active?'var(--green)':'var(--text)'};display:flex;align-items:center;gap:2px;line-height:1.4;${vi>0?'margin-top:3px;padding-top:3px;border-top:1px dashed var(--border);':''}">${pp.cls}${alertBadge}</span>`;
+          let row=`<span style="font-size:11px;font-weight:600;color:${active?'var(--green)':'var(--text)'};display:flex;align-items:center;gap:2px;line-height:1.4;${vi>0?'margin-top:3px;padding-top:3px;border-top:1px dashed var(--border);':''}">${pp.cls}</span>`;
           let meta='';
           if(pp.time) meta+=`<span>${pp.time}</span>`;
           if(pp.days) meta+=`<span>${pp.days}</span>`;
@@ -2810,7 +2836,12 @@ function renderBoardTable(){
         });
       } else {
         if(needAlert){
-          chipContent=`<span style="font-size:11px;font-weight:700;color:var(--orange);">수강권 확인</span>`;
+          // 수강권이 남아있으면 수강권 확인 표시 안 함
+          if(sugangLeft !== null && sugangLeft > 0){
+            chipContent=`<span style="font-size:11px;color:var(--text3);">—</span>`;
+          } else {
+            chipContent=`<span style="font-size:11px;font-weight:700;color:var(--orange);">수강권 확인</span>`;
+          }
         } else {
           chipContent=`<span style="font-size:11px;color:var(--text3);">—</span>`;
         }
