@@ -4665,8 +4665,7 @@ window.uploadGkyilDates = async function(event) {
       for (let ri = 3; ri < rows.length; ri++) {
         const row = rows[ri] || [];
         const col0 = row[0];
-        // 개강 마커 행 건너뜀
-        if (col0 && typeof col0 === 'string' && col0.includes('개강')) continue;
+        // 개강 마커 행도 날짜가 있으면 수집 (개강일이 마커 행에 같이 있음)
         let anyDate = false;
         Object.keys(teacherCols).forEach(function(col) {
           const ds = fmtDate(row[parseInt(col)]);
