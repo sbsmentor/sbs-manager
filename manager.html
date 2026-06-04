@@ -1427,7 +1427,7 @@ function openViewModal(item){
     <button class="modal-close" onclick="closeViewModal()">✕</button>
   </div>
   <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-    ${row('수강권', sugang ? sugang+'개' : '')}
+    ${row('수강권', sugang ? (sugang.toString().includes('개') ? sugang : sugang+'개') : '')}
     ${row('나이', age ? age+(birth?` (${birth})`:'') : birth)}
     ${row('연락처', tel ? `<a href="tel:${tel.replace(/[^0-9]/g,'')}" style="color:var(--accent);text-decoration:none;font-weight:700;">${tel}</a>` : '')}
     ${row('보호자연락처', parentTel)}
