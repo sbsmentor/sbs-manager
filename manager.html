@@ -2766,13 +2766,13 @@ function renderBoardTable(){
   }
 
   // 테이블 HTML
-  let html=`<div style="overflow-x:auto;border:1px solid var(--border);border-radius:12px;">
+  let html=`<div style="overflow:auto;border:1px solid var(--border);border-radius:12px;max-height:calc(100vh - 180px);">
   <table style="border-collapse:collapse;width:100%;min-width:${80+months.length*120}px;">
   <thead><tr>
-    <th style="background:var(--surface2);padding:8px 12px;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border);border-right:1px solid var(--border);text-align:left;min-width:80px;position:sticky;left:0;z-index:2;font-family:var(--mono)">이름</th>`;
+    <th style="background:var(--surface2);padding:8px 12px;font-size:11px;font-weight:700;color:var(--text2);border-bottom:2px solid var(--border2);border-right:1px solid var(--border);text-align:left;min-width:80px;position:sticky;left:0;top:0;z-index:4;font-family:var(--mono)">이름</th>`;
   months.forEach(({yr,mo})=>{
     const isCur=yr===now.getFullYear()&&mo===now.getMonth();
-    html+=`<th style="background:${isCur?'rgba(24,169,99,.08)':'var(--surface2)'};padding:8px 10px;font-size:11px;font-weight:700;color:${isCur?'var(--green)':'var(--text2)'};border-bottom:1px solid var(--border);border-right:1px solid var(--border);text-align:center;min-width:120px;font-family:var(--mono);">
+    html+=`<th style="background:${isCur?'rgba(24,169,99,.08)':'var(--surface2)'};padding:8px 10px;font-size:11px;font-weight:700;color:${isCur?'var(--green)':'var(--text2)'};border-bottom:2px solid var(--border2);border-right:1px solid var(--border);text-align:center;min-width:120px;font-family:var(--mono);position:sticky;top:0;z-index:3;">
       ${bdMonLabel(yr,mo)}${isCur?' <span style="font-size:9px;background:var(--green);color:#fff;padding:1px 5px;border-radius:3px;">now</span>':''}
     </th>`;
   });
@@ -2866,13 +2866,15 @@ function renderBoardTable(){
           chipContent+=row;
         });
       } else {
-        if(needAlert){
-          // 수강권이 남아있으면 수강권 확인 표시 안 함
-          if(sugangLeft !== null && sugangLeft > 0){
-            chipContent=`<span style="font-size:11px;color:var(--text3);">—</span>`;
-          } else {
-            chipContent=`<span style="font-size:11px;font-weight:700;color:var(--orange);">수강권 확인</span>`;
-          }
+        // 수강권 0개 또는 미설정 → "수강권 확인 · 추가요망"
+        // 수강권 남아있음 → "—"
+        // needAlert(종강임박 등) + 수강권 없음 → "수강권 확인"
+        const noSugang = sugangTotal === 0; // 수강권 미입력
+        const sugangExhausted = sugangLeft !== null && sugangLeft <= 0; // 수강권 소진
+        if(noSugang || sugangExhausted){
+          chipContent=`<span style="font-size:11px;font-weight:700;color:var(--orange);">수강권 확인</span><span style="font-size:10px;color:var(--text3);margin-top:1px;display:block;">추가요망</span>`;
+        } else if(needAlert && sugangLeft !== null && sugangLeft > 0){
+          chipContent=`<span style="font-size:11px;color:var(--text3);">—</span>`;
         } else {
           chipContent=`<span style="font-size:11px;color:var(--text3);">—</span>`;
         }
@@ -5029,12 +5031,12 @@ async function openNotiCardFromBoard(arrName, si, mk){
 
   const startDate=p.startDate||''; let endDate=p.endDate||''; const daysStr=p.days||'';
 
-  // 연강 포함 전체 수업에서 가장 나중 endDate 먼저 확정 (어떤 버튼 눌러도 동일하게)
-  Object.values(sched).forEach(function(v) {
+  // 연강 포함 전체 수업에서 가장 나중 endDate 확정 (같은 mkBase 범위 내)
+  Object.entries(sched).forEach(function([k,v]) {
+    const kBase2 = k.replace(/_\d+$/, '');
+    if(kBase2 !== mkBase) return;
     const pp = bdParseVal(v);
-    if (!pp.startDate) return;
-    const diffStart = Math.abs(new Date(pp.startDate) - new Date(startDate)) / 86400000;
-    if (diffStart <= 3 && pp.endDate && pp.endDate > endDate) endDate = pp.endDate;
+    if(pp.endDate && pp.endDate > endDate) endDate = pp.endDate;
   });
 
   // ── 격일반 날짜 조회: days 정보가 없는 경우에만 gkyilDates 사용 ──
@@ -5099,9 +5101,9 @@ async function openNotiCardFromBoard(arrName, si, mk){
   const clsNames = [...new Set(allCourses.map(c => c.p.cls).filter(Boolean))];
   const displayCls = clsNames.join(', ');
 
-  // 강사: 중복 제거
-  const teacherNames = [...new Set(allCourses.map(c => (c.p.teacher||'').replace(' 강사','')).filter(Boolean))];
-  const displayTeacher = teacherNames.join(', ');
+  // 강사: 중복 제거 — 단일 강사면 표시, 여러 강사면 빈칸(각 수업마다 강사 다를 수 있음)
+  const teacherNames = [...new Set(allCourses.map(c => (c.p.teacher||'').replace(' 강사','').trim()).filter(Boolean))];
+  const displayTeacher = teacherNames.length === 1 ? teacherNames[0] : '';
 
   // 요일: 중복 제거 후 합산 (월수금 / 화목금 등)
   const allDayLabels = [...new Set(allCourses.map(c => {
@@ -5147,7 +5149,25 @@ async function openNotiCardFromBoard(arrName, si, mk){
     `<div style="line-height:1.5;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" style="${valStyle}${linkedMks.length>1?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
     `<div style="line-height:1.5;"><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /></div>`,
     `<div style="line-height:1.5;"><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /></div>`,
-    `<div style="line-height:1.5;margin-top:2px;"><b style="${labelStyle}">출석일 :</b> <span id="notiAttendList" style="font-size:11px;color:#374151;font-family:inherit;">${classDates.map(d=>d.slice(5).replace('-','/')).join(', ')||'-'}</span></div>`,
+    (()=>{
+      // 수업별 날짜 분리 표시 (연강 시 각 수업 날짜 구분)
+      let attendHtml;
+      if(linkedMks.length > 0){
+        // 메인 수업 날짜
+        const mainDates = daysStr ? getClassDatesForNoti(startDate, endDate, daysStr) : classDates;
+        const mainShort = p.cls.replace(/\([^)]*\)/g,'').trim();
+        const parts = [`<span style="color:#64748b;font-weight:700;">${mainShort}:</span> ${mainDates.map(d=>d.slice(5).replace('-','/')).join(', ')}`];
+        for(const {p:pp} of linkedMks){
+          const d2 = getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
+          const short2 = (pp.cls||'').replace(/\([^)]*\)/g,'').trim();
+          parts.push(`<span style="color:#64748b;font-weight:700;">${short2}:</span> ${d2.map(d=>d.slice(5).replace('-','/')).join(', ')}`);
+        }
+        attendHtml = parts.join('<br>');
+      } else {
+        attendHtml = classDates.map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
+      }
+      return `<div style="line-height:1.6;margin-top:2px;"><b style="${labelStyle}">출석일 :</b> <span id="notiAttendList" style="font-size:11px;color:#374151;font-family:inherit;">${attendHtml}</span></div>`;
+    })(),
   ].join('');
   document.getElementById('notiInfo').innerHTML = linkedBanner + infoRows;
 
