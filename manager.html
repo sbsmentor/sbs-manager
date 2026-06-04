@@ -5324,10 +5324,13 @@ async function openNotiCardFromBoard(arrName, si, mk){
   // ── 날짜 계산: gkyilDates(격일반 업로드) 우선, 없으면 요일 계산 폴백 ──
   let classDates;
   const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time);
+  console.log('[noti] startDate:', startDate, 'endDate:', endDate, 'teacher:', p.teacher);
+  console.log('[noti] fbDates:', fbDates ? fbDates.length + '개' : 'null', fbDates);
   if(fbDates && fbDates.length){
     classDates = fbDates;
   } else {
     classDates = getClassDatesForNoti(startDate, endDate, daysStr);
+    console.log('[noti] days 계산 결과:', classDates.length + '개', classDates);
   }
 
   // 연강이면 날짜 합산 (중복제거) — gkyilDates 우선, 없으면 요일 계산
