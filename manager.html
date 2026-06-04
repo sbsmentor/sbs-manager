@@ -4698,7 +4698,14 @@ function renderNotiCalGrid(yearMonth, classDates, startDate, endDate){
     let cellBg='transparent', numColor=isWeekend?(dow===0?'#ef4444':'#3b82f6'):'#374151';
     let markHtml='';
 
-    if(isFirst||isLast){
+    if(isFirst&&!isClass){
+      // 개강일이 수업일이 아닌 경우 배경만 표시
+      cellBg='#dbeafe'; numColor='#1d4ed8';
+    } else if(isLast&&!isClass){
+      // 종강일이 수업일이 아닌 경우 배경만 표시 (점 없음)
+      cellBg='#f0fdf4'; numColor='#15803d';
+    } else if(isFirst||isLast){
+      // 개강일/종강일이 수업일인 경우 점 표시
       cellBg='#dbeafe'; numColor='#1d4ed8';
       markHtml=`<div style="font-size:9px;font-weight:700;color:#1d4ed8;line-height:1;">●</div>`;
     } else if(isClass&&holiday){
@@ -5177,8 +5184,8 @@ window.uploadGkyilDates = async function(event) {
 };
 
 function _loadGkyilDatesFromFirebase() {
-  if (!window._fbDb) return;
-  window._fbDb.ref('gkyilDates').once('value').then(function(snap) {
+  if (!window._fbDb) return Promise.resolve();
+  return window._fbDb.ref('gkyilDates').once('value').then(function(snap) {
     const data = snap.val();
     if (data && typeof data === 'object' && Object.keys(data).length) {
       const converted = {};
@@ -5215,9 +5222,12 @@ function _loadGkyilDatesFromFirebase() {
 // Firebase timetable에서 해당 강좌의 dates 필드 조회
 // 우선순위: 1) 메모리 _gkyilDates 2) Firebase gkyilDates 직접 조회 3) Firebase timetable.dates
 async function _getTimetableDates(teacher, startDate, endDate, time) {
-  // days 정보가 이미 p.days에 있으면 gkyilDates 불필요 — 요일 기반 계산이 더 정확
-  // (gkyilDates는 days 정보가 없는 격일반 전용)
   if (!teacher || !startDate) return null;
+  // 메모리가 비어있으면 Firebase 로드 완료까지 대기
+  const memEmpty = !window._gkyilDates || Object.keys(window._gkyilDates).length === 0;
+  if (memEmpty && window._fbDb) {
+    await _loadGkyilDatesFromFirebase();
+  }
   console.log('[gkyil] 조회:', teacher, startDate, endDate, '/ 로드된 강사:', Object.keys(window._gkyilDates||{}));
 
   // 날짜 배열에서 개강~종강 범위 필터 헬퍼
