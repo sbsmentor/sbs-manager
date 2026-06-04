@@ -958,11 +958,21 @@ function match(item,q){
 }
 function courseClass(c){
   if(!c) return 'ct-etc';
-  if(['원화','아트웍','그래픽','이펙트','웹툰','이모티콘','3D','배경','FX'].some(k=>c.includes(k))) return 'ct-art';
-  if(['게프','유니티','언리얼','프로그래밍','코딩','AI'].some(k=>c.includes(k))) return 'ct-prog';
-  if(['기획','QA','사업','PM','문예'].some(k=>c.includes(k))) return 'ct-plan';
-  if(['웹소설','소설','PD'].some(k=>c.includes(k))) return 'ct-novel';
+  if(c.includes('원화')||c.includes('아트웍')||c.includes('이펙트')||c.includes('FX')||c.includes('3D')||c.includes('배경')||c.includes('이모티콘')||c.includes('그래픽')) return 'ct-art';
+  if(c.includes('프로그래밍')||c.includes('게프')||c.includes('유니티')||c.includes('언리얼')||c.includes('코딩')||c.includes('AI')||c.includes('UI')) return 'ct-prog';
+  if(c.includes('기획')||c.includes('QA')||c.includes('PM')||c.includes('문예')) return 'ct-plan';
+  if(c.includes('웹소설')||c.includes('소설')||c.includes('웹툰')||c.includes('PD')||c.includes('드로잉')) return 'ct-novel';
   return 'ct-etc';
+}
+function courseColor(c){
+  const cls = courseClass(c);
+  return {
+    'ct-art':   '#c07000',
+    'ct-prog':  'var(--blue)',
+    'ct-plan':  'var(--accent)',
+    'ct-novel': '#7c3aed',
+    'ct-etc':   'var(--red)',
+  }[cls] || 'var(--text)';
 }
 function statusEl(s){
   const m={'재학':'<span class="status-badge s-active">● 재학</span>','휴학':'<span class="status-badge s-leave">◐ 휴학</span>','종강':'<span class="status-badge s-grad">✓ 종강</span>','환불':'<span class="status-badge s-refund">↩ 환불</span>','COD':'<span class="status-badge s-cod">💛 COD</span>','국비':'<span class="status-badge s-natl">🏛 국비</span>'};
@@ -1502,7 +1512,7 @@ function openEditModal(arr,idx){
   const FIELD_DEFS=isStudent?[
     {key:'이름',type:'text'},
     {key:'구분',type:'select',opts:['평일','주말']},
-    {key:'과정',type:'select',opts:['게임원화','게프','게임기획','아트웍','웹툰','웹소설','게임UI','유니티','언리얼','게임이펙트(FX)','문예창작','웹툰PD','웹소설PD','QA','게임원화(주말)','게임기획(주말)','아트웍(주말)','웹툰(주말)','웹소설(주말)','게프(주말)','유니티(주말)','언리얼엔진(주말)','게임그래픽(주말)','게임QA(주말)','웹소설PD(주말)','QA기초']},
+    {key:'과정',type:'select',opts:['게임원화','게임아트웍','게임프로그래밍','게임기획','웹툰','웹소설','기타']},
     {key:'수강목적',type:'select',opts:['취업', '입시', '취미', '데뷔', '창업', '스킬업', '프리랜서']},
     {key:'생년월일',type:'date'},{key:'나이',type:'age_auto'},
     {key:'연락처',type:'text'},{key:'보호자연락처',type:'text'},
