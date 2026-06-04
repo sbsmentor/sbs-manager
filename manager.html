@@ -1552,7 +1552,7 @@ function openEditModal(arr,idx){
     schedSection=`
       <div class="em-section">
         수업 배정 일정
-        <button class="ef-add-sched" onclick="addSchedRow()" id="addSchedBtn">+ 추가</button>
+        <button class="ef-add-sched" onclick="openTimetableSearchNew()" id="addSchedBtn">📅 시간표에서 선택</button>
         <span id="sugang-remain" style="font-size:11px;font-family:var(--mono);margin-left:6px;"></span>
       </div>
       <div style="display:flex;gap:6px;font-size:10px;color:var(--text3);margin-bottom:8px;font-family:var(--mono);padding-left:4px">
@@ -3818,6 +3818,15 @@ window.filterTimetable = function() {
 ;
 ;
 
+// 현재 배정 가능한 남은 수강권 슬롯 계산
+function _ttRemainSlots() {
+  const sugangInp = document.querySelector('#editModal [data-key="수강권"]');
+  const sugang = sugangInp ? parseInt(sugangInp.value)||0 : 0;
+  if (sugang <= 0) return Infinity; // 수강권 미설정 시 제한 없음
+  const existingRows = document.querySelectorAll('#schedRows .ef-sched-row');
+  return sugang - existingRows.length; // 남은 슬롯
+}
+
 window.toggleTtItem = function(el, key) {
   if (_ttSelected.has(key)) {
     _ttSelected.delete(key);
@@ -3826,6 +3835,12 @@ window.toggleTtItem = function(el, key) {
     const cb = el.querySelector('input[type=checkbox]');
     if(cb) cb.checked = false;
   } else {
+    // 남은 슬롯 초과 시 선택 차단
+    const remain = _ttRemainSlots();
+    if (_ttSelected.size >= remain) {
+      showToast(`⚠ 수강권 ${remain}개 슬롯까지만 선택 가능합니다`);
+      return;
+    }
     _ttSelected.add(key);
     el.style.borderColor = 'var(--accent)';
     el.style.background = 'var(--accent-dim)';
@@ -3842,12 +3857,48 @@ window.clearTtSelection = function() {
 
 function updateSelCount() {
   const el = document.getElementById('ttSelCount');
-  if(el) el.textContent = _ttSelected.size + '개 선택';
+  if (!el) return;
+  const remain = _ttRemainSlots();
+  if (remain === Infinity) {
+    el.textContent = _ttSelected.size + '개 선택';
+    el.style.color = 'var(--accent)';
+  } else {
+    const left = remain - _ttSelected.size;
+    el.textContent = `${_ttSelected.size}개 선택 (${left}개 추가 가능)`;
+    el.style.color = left <= 0 ? 'var(--red)' : left <= 1 ? 'var(--orange)' : 'var(--accent)';
+  }
 }
+
+// 헤더 버튼("시간표에서 선택")에서 직접 열기 — 타겟 row 없이 호출
+window.openTimetableSearchNew = function() {
+  _ttTargetRow = null; // null → applySelectedCourses에서 새 행 생성 모드
+  _ttSelected.clear();
+  _ttFilteredMonth = 'all';
+  document.getElementById('ttSearchInp').value = '';
+  document.getElementById('ttSearchBg').style.display = 'flex';
+  setTimeout(function() { document.getElementById('ttSearchInp').focus(); }, 100);
+  if (_ttCourses && _ttCourses.length > 0) {
+    filterTimetable();
+    return;
+  }
+  document.getElementById('ttResults').innerHTML =
+    '<div style="text-align:center;padding:32px;color:var(--text3);">불러오는 중...</div>';
+  if (window._fbDb && firebase && firebase.apps && firebase.apps.length) {
+    firebase.database(firebase.apps[0]).ref('timetable').once('value').then(function(snap) {
+      var data = snap.val();
+      if (data && typeof data === 'object') {
+        _ttCourses = Object.values(data).filter(function(c){ return c && c.name; });
+      }
+      filterTimetable();
+    }).catch(function(){ filterTimetable(); });
+  } else {
+    filterTimetable();
+  }
+};
 
 // 선택한 강좌들 일괄 추가
 window.applySelectedCourses = async function() {
-  if (!_ttTargetRow || _ttSelected.size === 0) {
+  if (_ttSelected.size === 0) {
     showToast('⚠ 강좌를 선택해주세요');
     return;
   }
@@ -3864,15 +3915,20 @@ window.applySelectedCourses = async function() {
     return;
   }
 
-  // 첫 번째는 현재 행에 적용
-  applyCourseToRow(_ttTargetRow, selectedCourses[0]);
-
-  // 2번째부터는 새 행 추가 후 즉시 적용 (setTimeout 제거)
-  for (let i = 1; i < selectedCourses.length; i++) {
-    addSchedRow(); // 새 행 추가
-    const rows = document.querySelectorAll('#schedRows .ef-sched-row');
-    if (rows && rows.length > 0) {
-      applyCourseToRow(rows[rows.length - 1], selectedCourses[i]);
+  if (_ttTargetRow) {
+    // 기존: 행의 🔍 시간표 버튼에서 열린 경우 — 첫 번째를 해당 행에 적용
+    applyCourseToRow(_ttTargetRow, selectedCourses[0]);
+    for (let i = 1; i < selectedCourses.length; i++) {
+      addSchedRow();
+      const rows = document.querySelectorAll('#schedRows .ef-sched-row');
+      if (rows && rows.length > 0) applyCourseToRow(rows[rows.length - 1], selectedCourses[i]);
+    }
+  } else {
+    // 신규: 헤더 "시간표에서 선택" 버튼에서 열린 경우 — 모두 새 행으로 추가
+    for (let i = 0; i < selectedCourses.length; i++) {
+      addSchedRow();
+      const rows = document.querySelectorAll('#schedRows .ef-sched-row');
+      if (rows && rows.length > 0) applyCourseToRow(rows[rows.length - 1], selectedCourses[i]);
     }
   }
 
