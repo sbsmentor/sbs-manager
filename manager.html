@@ -5222,11 +5222,16 @@ async function _getTimetableDates(teacher, startDate, endDate, time) {
       const result = filterDates(window._gkyilDates[exactKey], start, end);
       if (result) { console.log('[gkyil] 메모리(exact) 캐시 적용:', result.length, '일'); return result; }
     }
-    // 강사명만으로 있을 경우: 개강일이 해당 날짜 배열에 포함된 경우만 사용
+    // 강사명만으로 있을 경우: 첫 수업일이 개강일 ±7일 내이면 유효한 데이터로 판단
     if (window._gkyilDates[teacher]) {
       const allDates = window._gkyilDates[teacher];
-      if (start && !allDates.includes(start)) {
-        console.log('[gkyil] 개강일 불일치 — gkyilDates 무시, days 폴백 사용');
+      const firstDate = allDates[0] || '';
+      const startMs = start ? new Date(start).getTime() : 0;
+      const firstMs = firstDate ? new Date(firstDate).getTime() : 0;
+      const diffDays = Math.abs(startMs - firstMs) / 86400000;
+      // 개강일 기준 ±7일 내 첫 수업일이면 이 강사의 데이터로 인정
+      if (start && firstDate && diffDays > 14) {
+        console.log('[gkyil] 첫 수업일 차이 너무 큼(' + Math.round(diffDays) + '일) — days 폴백');
       } else {
         const result = filterDates(allDates, start, end);
         if (result) { console.log('[gkyil] 메모리 캐시 적용:', result.length, '일'); return result; }
@@ -5234,7 +5239,7 @@ async function _getTimetableDates(teacher, startDate, endDate, time) {
     }
   }
 
-  // 2) Firebase gkyilDates 강사별 직접 조회 — 개강일 포함 여부 검증
+  // 2) Firebase gkyilDates 강사별 직접 조회
   if (window._fbDb) {
     try {
       const snap = await window._fbDb.ref('gkyilDates/' + teacher).once('value');
@@ -5250,9 +5255,13 @@ async function _getTimetableDates(teacher, startDate, endDate, time) {
       if (allDates && allDates.length) {
         if (!window._gkyilDates) window._gkyilDates = {};
         window._gkyilDates[teacher] = allDates;
-        // 개강일이 gkyilDates 목록에 없으면 이 강사의 격일 데이터가 아님 → 폴백
-        if (start && !allDates.includes(start)) {
-          console.log('[gkyil] Firebase 개강일 불일치 — gkyilDates 무시:', teacher, start);
+        // 첫 수업일이 개강일 ±14일 내이면 유효
+        const firstDate = allDates[0] || '';
+        const startMs = start ? new Date(start).getTime() : 0;
+        const firstMs = firstDate ? new Date(firstDate).getTime() : 0;
+        const diffDays = Math.abs(startMs - firstMs) / 86400000;
+        if (start && firstDate && diffDays > 14) {
+          console.log('[gkyil] Firebase 첫 수업일 차이 너무 큼 — days 폴백:', teacher, start);
         } else {
           const result = filterDates(allDates, start, end);
           if (result) { console.log('[gkyil] Firebase 직접 조회 적용:', result.length, '일'); return result; }
@@ -5312,26 +5321,20 @@ async function openNotiCardFromBoard(arrName, si, mk){
     if(pp.endDate && pp.endDate > endDate) endDate = pp.endDate;
   });
 
-  // ── 격일반 날짜 조회: days 정보가 없는 경우에만 gkyilDates 사용 ──
-  // days(월수금 등)가 있으면 요일 계산이 더 정확하므로 gkyilDates 스킵
+  // ── 날짜 계산: gkyilDates(격일반 업로드) 우선, 없으면 요일 계산 폴백 ──
   let classDates;
-  if(daysStr){
-    classDates = getClassDatesForNoti(startDate, endDate, daysStr);
+  const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time);
+  if(fbDates && fbDates.length){
+    classDates = fbDates;
   } else {
-    const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time);
-    classDates = fbDates || getClassDatesForNoti(startDate, endDate, daysStr);
+    classDates = getClassDatesForNoti(startDate, endDate, daysStr);
   }
 
-  // 연강이면 두 수업 날짜 합산 (중복제거) — days 있으면 요일 계산 우선
+  // 연강이면 날짜 합산 (중복제거) — gkyilDates 우선, 없으면 요일 계산
   if(linkedMks.length > 0){
     for(const {p:pp} of linkedMks){
-      let d2;
-      if(pp.days){
-        d2 = getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days);
-      } else {
-        const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.endDate, pp.time);
-        d2 = fbD2 || getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
-      }
+      const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.endDate, pp.time);
+      const d2 = (fbD2 && fbD2.length) ? fbD2 : getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
       d2.forEach(d=>{ if(!classDates.includes(d)) classDates.push(d); });
     }
     classDates.sort();
