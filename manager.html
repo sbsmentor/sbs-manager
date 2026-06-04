@@ -3830,8 +3830,8 @@ function applyCourseToRow(row, course) {
     if (m) {
       const yrSel = row.querySelector('.ef-yr-sel');
       const moSel = row.querySelector('.ef-mo-sel');
-      if (yrSel) yrSel.value = parseInt(m[1]);
-      if (moSel) moSel.value = parseInt(m[2]);
+      if (yrSel) yrSel.value = m[1];        // '2026'
+      if (moSel) moSel.value = m[2];        // '05' (2자리 문자열)
     }
   }
   // 강좌명
