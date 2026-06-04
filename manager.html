@@ -3824,6 +3824,16 @@ window.applySelectedCourses = async function() {
 };
 
 function applyCourseToRow(row, course) {
+  // 연도/월 — 개강일 기준으로 세팅
+  if (course.start) {
+    const m = course.start.match(/^(\d{4})-(\d{2})/);
+    if (m) {
+      const yrSel = row.querySelector('.ef-yr-sel');
+      const moSel = row.querySelector('.ef-mo-sel');
+      if (yrSel) yrSel.value = parseInt(m[1]);
+      if (moSel) moSel.value = parseInt(m[2]);
+    }
+  }
   // 강좌명
   const clsSel = row.querySelector('.ef-class-sel');
   const customInp = row.querySelector('.ef-custom-cls');
