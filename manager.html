@@ -4747,7 +4747,6 @@ window.uploadGkyilDates = async function(event) {
   reader.readAsArrayBuffer(file);
 };
 
-// 앱 시작 시 Firebase gkyilDates 로드
 function _loadGkyilDatesFromFirebase() {
   if (!window._fbDb) return;
   window._fbDb.ref('gkyilDates').once('value').then(function(snap) {
@@ -4766,18 +4765,19 @@ function _loadGkyilDatesFromFirebase() {
         } else {
           arr = [];
         }
-        // 날짜 형식(yyyy-mm-dd)인 것만 필터링 (강사명 등 오염 방지)
         converted[teacher] = arr.filter(function(d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); });
       });
-      // 유효한 날짜 데이터가 있는 경우만 메모리 업데이트
-      const hasValidDates = Object.values(converted).some(function(dates) {
-        return dates.length > 0;
-      });
+      // 유효한 날짜 데이터가 있는 경우만 업데이트
+      const hasValidDates = Object.values(converted).some(function(dates) { return dates.length > 0; });
       if (hasValidDates) {
-        window._gkyilDates = converted;
+        // 현재 메모리에 유효한 데이터가 없을 때만 덮어씀 (업로드 직후 타이밍 보호)
+        const memHasData = window._gkyilDates && Object.values(window._gkyilDates).some(function(d){ return Array.isArray(d) && d.length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(d[0]); });
+        if (!memHasData) {
+          window._gkyilDates = converted;
+          console.log('[gkyilDates] Firebase에서 로드됨:', Object.keys(converted).length, '명');
+        }
         const st = document.getElementById('gkyilStatus');
         if (st) { st.style.display='inline'; st.textContent = '✅ ' + Object.keys(converted).length + '명 로드됨'; }
-        console.log('[gkyilDates] Firebase에서 로드됨:', Object.keys(converted).length, '명');
       }
     }
   }).catch(function(e) { console.warn('gkyilDates 로드 실패:', e); });
@@ -4865,7 +4865,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
   Object.entries(sched).forEach(([k,v]) => {
     if(k===mk || k.startsWith(mk+'_')) return; // 자기 자신 제외
     const pp = bdParseVal(v);
-    if(!pp.startDate || !pp.endDate) return;
+    if(!pp.startDate) return;
     const diffStart = Math.abs(new Date(pp.startDate) - new Date(p.startDate)) / 86400000;
     // 개강일 ±3일 이내면 연강으로 판단 (격일반: 월수금/화목금은 개강일이 하루 차이)
     if(diffStart <= 3) {
