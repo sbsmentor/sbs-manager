@@ -4892,7 +4892,11 @@ async function openNotiCardFromBoard(arrName, si, mk){
       const d2 = fbD2 || getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
       d2.forEach(d=>{ if(!classDates.includes(d)) classDates.push(d); });
       // 연강 종강일: 두 수업 중 나중 종강일 사용
-      if(pp.endDate && pp.endDate > endDate) endDate = pp.endDate;
+      console.log('[연강] pp.endDate:', pp.endDate, '현재 endDate:', endDate);
+      if(pp.endDate && pp.endDate > endDate) {
+        endDate = pp.endDate;
+        console.log('[연강] endDate 업데이트:', endDate);
+      }
     }
     classDates.sort();
   }
