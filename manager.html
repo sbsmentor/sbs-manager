@@ -4610,14 +4610,30 @@ window.uploadGkyilDates = async function(event) {
       // index 0: 강의실+강사명(XXXT) 행
       // index 1: 패턴 행
       // index 3~: 날짜 행 (개강 마커 행 섞여있음)
-      const headerRow = rows[0] || [];
+      const headerRow  = rows[0] || [];
+      const patternRow = rows[1] || [];
 
-      // 강사 컬럼 매핑
+      // 강사 컬럼 매핑 (기본: XXXT 헤더)
       const teacherCols = {};
       headerRow.forEach(function(v, i) {
         if (v && typeof v === 'string') {
           const m = v.trim().match(/^([가-힣]{2,5})T$/);
           if (m) teacherCols[i] = m[1];
+        }
+      });
+
+      // 헤더 없고 패턴만 있는 컬럼 → 왼쪽 강사의 두 번째 수업 컬럼으로 매핑
+      // (예: col25=조아라T 월수금, col26=패턴만 화목화목금 → col26도 조아라로)
+      patternRow.forEach(function(pat, i) {
+        if (!pat || !pat.toString().trim()) return;
+        if (headerRow[i]) return; // 헤더 있으면 이미 처리됨
+        // 왼쪽에서 가장 가까운 강사명 컬럼 찾기
+        for (let j = i - 1; j >= 0; j--) {
+          if (teacherCols[j]) {
+            teacherCols[i] = teacherCols[j]; // 같은 강사로 매핑
+            break;
+          }
+          if (headerRow[j]) break; // 다른 헤더 만나면 중단
         }
       });
 
@@ -4639,9 +4655,12 @@ window.uploadGkyilDates = async function(event) {
         return null;
       }
 
-      // 강사별 전체 날짜 수집 (개강 마커 행 건너뜀)
+      // 강사별 전체 날짜 수집 (개강 마커 행 건너뜀, 중복 제거)
       const result = {};
-      Object.keys(teacherCols).forEach(function(col) { result[teacherCols[col]] = []; });
+      Object.keys(teacherCols).forEach(function(col) {
+        const teacher = teacherCols[col];
+        if (!result[teacher]) result[teacher] = [];
+      });
 
       for (let ri = 3; ri < rows.length; ri++) {
         const row = rows[ri] || [];
@@ -4651,7 +4670,11 @@ window.uploadGkyilDates = async function(event) {
         let anyDate = false;
         Object.keys(teacherCols).forEach(function(col) {
           const ds = fmtDate(row[parseInt(col)]);
-          if (ds) { result[teacherCols[col]].push(ds); anyDate = true; }
+          // 중복 날짜 제거 (같은 강사의 두 컬럼에서 같은 날짜가 올 수 있음)
+          if (ds && !result[teacherCols[col]].includes(ds)) {
+            result[teacherCols[col]].push(ds);
+            anyDate = true;
+          }
         });
         // 연속 3행 빈 행이면 종료
         if (!anyDate) {
