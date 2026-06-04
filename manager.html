@@ -4892,11 +4892,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
       const d2 = fbD2 || getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
       d2.forEach(d=>{ if(!classDates.includes(d)) classDates.push(d); });
       // 연강 종강일: 두 수업 중 나중 종강일 사용
-      console.log('[연강] pp.endDate:', pp.endDate, '현재 endDate:', endDate);
-      if(pp.endDate && pp.endDate > endDate) {
-        endDate = pp.endDate;
-        console.log('[연강] endDate 업데이트:', endDate);
-      }
+      if(pp.endDate && pp.endDate > endDate) endDate = pp.endDate;
     }
     classDates.sort();
   }
@@ -4956,8 +4952,8 @@ async function openNotiCardFromBoard(arrName, si, mk){
       const earliest = sorted[0];
       // 종료 시간 = 가장 늦은 시작 + 수업 시간(보통 2~3시간, 과목명에서 추출)
       const latest = sorted[sorted.length - 1];
-      const durMatch = (p.cls || '').match(/(\d+)H/);
-      const durH = durMatch ? parseInt(durMatch[1]) : 2;
+      const durMatch = (p.cls || '').match(/(\d+)[Hh]/);
+      const durH = durMatch ? parseInt(durMatch[1]) : 3;
       const latestMins = toMins(latest) + durH * 60;
       const endH = String(Math.floor(latestMins / 60)).padStart(2, '0');
       const endM = String(latestMins % 60).padStart(2, '0');
