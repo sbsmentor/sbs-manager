@@ -5302,6 +5302,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
   });
 
   const startDate=p.startDate||''; let endDate=p.endDate||''; const daysStr=p.days||'';
+  const mkBase = mk.replace(/_\d+$/, ''); // "2026년 7월_2" → "2026년 7월"
 
   // 연강 포함 전체 수업에서 가장 나중 endDate 확정 (같은 mkBase 범위 내)
   Object.entries(sched).forEach(function([k,v]) {
