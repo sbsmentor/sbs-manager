@@ -4867,9 +4867,8 @@ async function openNotiCardFromBoard(arrName, si, mk){
     const pp = bdParseVal(v);
     if(!pp.startDate || !pp.endDate) return;
     const diffStart = Math.abs(new Date(pp.startDate) - new Date(p.startDate)) / 86400000;
-    const diffEnd   = Math.abs(new Date(pp.endDate)   - new Date(p.endDate))   / 86400000;
-    // 개강일 ±3일 이내 + 종강일 ±3일 이내 → 같은 격일반 그룹(연강)으로 판단
-    if(diffStart <= 3 && diffEnd <= 3) {
+    // 개강일 ±3일 이내면 연강으로 판단 (격일반: 월수금/화목금은 개강일이 하루 차이)
+    if(diffStart <= 3) {
       linkedMks.push({mk:k, p:pp});
     }
   });
