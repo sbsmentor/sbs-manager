@@ -4312,7 +4312,7 @@ function tabBulkAction(tab, action) {
         <div id="notiCalWrap"></div>
 
         <!-- 수업 정보 -->
-        <div id="notiInfo" style="margin-top:7px;background:#f8fafc;border-radius:8px;padding:8px 11px;font-size:11px;line-height:1.75;border:1px solid #e2e8f0;"></div>
+        <div id="notiInfo" style="margin-top:7px;background:#f8fafc;border-radius:8px;padding:6px 11px;font-size:11px;line-height:1.45;border:1px solid #e2e8f0;"></div>
 
         <!-- 공지사항 -->
         <div style="margin-top:6px;background:#f0fdf4;border-radius:8px;padding:7px 11px;font-size:10px;line-height:1.7;color:#374151;border:1px solid #bbf7d0;">
@@ -4919,6 +4919,9 @@ function _loadGkyilDatesFromFirebase() {
 // Firebase timetable에서 해당 강좌의 dates 필드 조회
 // 우선순위: 1) 메모리 _gkyilDates 2) Firebase gkyilDates 직접 조회 3) Firebase timetable.dates
 async function _getTimetableDates(teacher, startDate, endDate, time) {
+  // days 정보가 이미 p.days에 있으면 gkyilDates 불필요 — 요일 기반 계산이 더 정확
+  // (gkyilDates는 days 정보가 없는 격일반 전용)
+  if (!teacher || !startDate) return null;
   console.log('[gkyil] 조회:', teacher, startDate, endDate, '/ 로드된 강사:', Object.keys(window._gkyilDates||{}));
 
   // 날짜 배열에서 개강~종강 범위 필터 헬퍼
@@ -5034,13 +5037,14 @@ async function openNotiCardFromBoard(arrName, si, mk){
     if (diffStart <= 3 && pp.endDate && pp.endDate > endDate) endDate = pp.endDate;
   });
 
-  // ── 격일반 날짜 조회 (메모리 _gkyilDates 우선, Firebase timetable 폴백) ──
-  const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time);
+  // ── 격일반 날짜 조회: days 정보가 없는 경우에만 gkyilDates 사용 ──
+  // days(월수금 등)가 있으면 요일 계산이 더 정확하므로 gkyilDates 스킵
   let classDates;
-  if(fbDates){
-    classDates = fbDates; // 격일반: Firebase 실제 수업일 사용
+  if(daysStr){
+    classDates = getClassDatesForNoti(startDate, endDate, daysStr);
   } else {
-    classDates=getClassDatesForNoti(startDate, endDate, daysStr);
+    const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time);
+    classDates = fbDates || getClassDatesForNoti(startDate, endDate, daysStr);
   }
 
   // 연강이면 두 수업 날짜 합산 (중복제거)
@@ -5125,13 +5129,13 @@ async function openNotiCardFromBoard(arrName, si, mk){
     : '';
   document.getElementById('notiInfo').insertAdjacentHTML('beforebegin', '');
   const infoRows=[
-    `<div><b style="${labelStyle}">과 목 :</b> <input value="${p.cls||''}" style="${valStyle}" onchange="_notiEditField('cls',this.value)" /></div>`,
-    `<div><b style="${labelStyle}">강 사 :</b> <input value="${(p.teacher||'').replace(' 강사','')}" style="${valStyle}" onchange="_notiEditField('teacher',this.value)" /></div>`,
-    `<div><b style="${labelStyle}">요 일 :</b> <input value="${displayDays}" style="${valStyle}${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('daysLabel',this.value)" /></div>`,
-    `<div><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" style="${valStyle}${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
-    `<div><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /></div>`,
-    `<div><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /></div>`,
-    `<div style="margin-top:4px;"><b style="${labelStyle}">출석일 :</b> <span id="notiAttendList" style="font-size:11px;color:#374151;font-family:inherit;line-height:1.7;">${classDates.map(d=>d.slice(5).replace('-','/')).join(', ')||'-'}</span></div>`,
+    `<div style="line-height:1.9;"><b style="${labelStyle}">과 목 :</b> <input value="${p.cls||''}" style="${valStyle}" onchange="_notiEditField('cls',this.value)" /></div>`,
+    `<div style="line-height:1.9;"><b style="${labelStyle}">강 사 :</b> <input value="${(p.teacher||'').replace(' 강사','')}" style="${valStyle}" onchange="_notiEditField('teacher',this.value)" /></div>`,
+    `<div style="line-height:1.9;"><b style="${labelStyle}">요 일 :</b> <input value="${displayDays}" style="${valStyle}${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('daysLabel',this.value)" /></div>`,
+    `<div style="line-height:1.9;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" style="${valStyle}${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
+    `<div style="line-height:1.9;"><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /></div>`,
+    `<div style="line-height:1.9;"><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /></div>`,
+    `<div style="line-height:1.6;margin-top:2px;"><b style="${labelStyle}">출석일 :</b> <span id="notiAttendList" style="font-size:11px;color:#374151;font-family:inherit;">${classDates.map(d=>d.slice(5).replace('-','/')).join(', ')||'-'}</span></div>`,
   ].join('');
   document.getElementById('notiInfo').innerHTML = linkedBanner + infoRows;
 
