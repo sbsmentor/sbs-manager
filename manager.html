@@ -1395,32 +1395,46 @@ function toggleOpenNoticeCell(arr,idx,monKey){
 // 상세보기
 // ════════════════════════════════════════════
 function openViewModal(item){
-  const skip=['수업배정'];
-  const fields=Object.keys(item).filter(k=>!skip.includes(k));
-  let html=`<div class="modal-header">
+  const name = item['이름']||'(이름 없음)';
+  const course = item['과정']||'';
+  const gubn = item['구분']||'';
+  const ddazua = item['따즈아']||'';
+  const sugang = item['수강권']||'';
+  const purpose = item['수강목적']||'';
+  const birth = item['생년월일']||'';
+  const age = calcAge(birth)||item['나이']||'';
+  const tel = rawPhone(item['연락처']||'');
+  const parentTel = rawPhone(item['보호자연락처']||'');
+  const addr = item['주소']||'';
+  const manager = item['이관자']||'';
+
+  const row = (label, val, full) => val
+    ? `<div style="display:flex;flex-direction:column;gap:3px;padding:10px 14px;background:#f8fafc;border-radius:10px;${full?'grid-column:span 2;':''}">
+        <span style="font-size:10px;color:#94a3b8;font-weight:600;letter-spacing:.5px;text-transform:uppercase;">${label}</span>
+        <span style="font-size:13px;color:#1e293b;font-weight:500;">${val}</span>
+       </div>` : '';
+
+  let html = `<div class="modal-header">
     <div>
-      <div class="modal-name">${item['이름']||'(이름 없음)'}</div>
-      <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
-        ${item['상태']?statusEl(item['상태']):''}
-        ${item['과정']?`<span class="course-tag ${courseClass(item['과정'])}">${item['과정']}</span>`:''}
-        ${item['따즈아']?`<span class="ddazua-badge">따즈아 ${item['따즈아']}</span>`:''}
+      <div class="modal-name">${name}</div>
+      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        ${course?`<span class="course-tag ${courseClass(course)}">${course}</span>`:''}
+        ${gubn?`<span style="font-size:11px;padding:2px 8px;border-radius:12px;background:#e0e7ff;color:#3730a3;font-weight:700;">${gubn}</span>`:''}
+        ${ddazua?`<span class="ddazua-badge">따즈아 ${ddazua}</span>`:''}
+        ${purpose?`<span style="font-size:11px;padding:2px 8px;border-radius:12px;background:#f0fdf4;color:#15803d;font-weight:600;">${purpose}</span>`:''}
       </div>
     </div>
     <button class="modal-close" onclick="closeViewModal()">✕</button>
-  </div><div class="modal-grid">`;
-  fields.forEach(k=>{
-    if(k==='나이'&&item['생년월일']) return;
-    let v;
-    if(k==='연락처') {
-      const tel = item[k] || '';
-      const raw = rawPhone(tel);
-      v = raw ? `<a href="tel:${raw.replace(/[^0-9]/g,'')}" style="color:var(--accent);text-decoration:none;font-weight:700;">${raw}</a>` : '-';
-    } else {
-      v = k==='나이'?(calcAge(item['생년월일'])||item[k]||'-'):(item[k]||'-');
-    }
-    html+=`<div class="modal-field"><div class="modal-label">${k}</div><div class="modal-value">${v}</div></div>`;
-  });
-  html+=`</div>`;
+  </div>
+  <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    ${row('수강권', sugang ? sugang+'개' : '')}
+    ${row('나이', age ? age+(birth?` (${birth})`:'') : birth)}
+    ${row('연락처', tel ? `<a href="tel:${tel.replace(/[^0-9]/g,'')}" style="color:var(--accent);text-decoration:none;font-weight:700;">${tel}</a>` : '')}
+    ${row('보호자연락처', parentTel)}
+    ${row('이관자', manager)}
+    ${row('주소', addr, true)}
+  </div>`;
+
   if(item['수업배정']&&Object.keys(item['수업배정']).length>0){
     html+=`<div class="modal-sched"><div class="modal-sched-title">📆 수업 배정 일정</div>`;
     Object.entries(item['수업배정']).forEach(([mon,txt])=>{
@@ -1488,7 +1502,7 @@ function openEditModal(arr,idx){
   const FIELD_DEFS=isStudent?[
     {key:'이름',type:'text'},
     {key:'구분',type:'select',opts:['평일','주말']},
-    {key:'과정',type:'select',opts:['게프', '원화', '기획', '그래픽', '웹툰', '웹소설', 'QA', '웹툰PD', '웹소설PD']},
+    {key:'과정',type:'select',opts:['게임원화','게프','게임기획','아트웍','웹툰','웹소설','게임UI','유니티','언리얼','게임이펙트(FX)','문예창작','웹툰PD','웹소설PD','QA','게임원화(주말)','게임기획(주말)','아트웍(주말)','웹툰(주말)','웹소설(주말)','게프(주말)','유니티(주말)','언리얼엔진(주말)','게임그래픽(주말)','게임QA(주말)','웹소설PD(주말)','QA기초']},
     {key:'수강목적',type:'select',opts:['취업', '입시', '취미', '데뷔', '창업', '스킬업', '프리랜서']},
     {key:'생년월일',type:'date'},{key:'나이',type:'age_auto'},
     {key:'연락처',type:'text'},{key:'보호자연락처',type:'text'},
