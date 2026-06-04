@@ -3786,7 +3786,7 @@ function updateSelCount() {
 }
 
 // 선택한 강좌들 일괄 추가
-window.applySelectedCourses = function() {
+window.applySelectedCourses = async function() {
   if (!_ttTargetRow || _ttSelected.size === 0) {
     showToast('⚠ 강좌를 선택해주세요');
     return;
@@ -3795,22 +3795,29 @@ window.applySelectedCourses = function() {
   const selectedCourses = _ttCourses.filter(c => _ttSelected.has((c.name+'|'+c.start+'|'+(c.time||''))));
   if (selectedCourses.length === 0) return;
 
+  // 수강권 체크
+  const sugangInp = document.querySelector('#editModal [data-key="수강권"]');
+  const sugang = sugangInp ? parseInt(sugangInp.value)||0 : 0;
+  const existingRows = document.querySelectorAll('#schedRows .ef-sched-row');
+  if (sugang > 0 && existingRows.length + selectedCourses.length > sugang) {
+    showToast(`⚠ 수강권 ${sugang}개 초과 — ${sugang - existingRows.length}개까지만 추가 가능합니다`);
+    return;
+  }
+
   // 첫 번째는 현재 행에 적용
   applyCourseToRow(_ttTargetRow, selectedCourses[0]);
 
-  // 2번째부터는 새 수업배정 행 추가
+  // 2번째부터는 새 행 추가 후 즉시 적용 (setTimeout 제거)
   for (let i = 1; i < selectedCourses.length; i++) {
-    // 수업배정 추가 버튼 클릭 (ef-add-sched)
-    const addBtn = _ttTargetRow.closest('.ef-body')?.querySelector('.ef-add-sched');
-    if (addBtn) {
-      addBtn.click();
-      // 마지막으로 추가된 행에 적용
-      setTimeout((course => () => {
-        const rows = _ttTargetRow.closest('.ef-body')?.querySelectorAll('.ef-sched-row');
-        if (rows && rows.length > 0) applyCourseToRow(rows[rows.length-1], course);
-      })(selectedCourses[i]), 50 * i);
+    addSchedRow(); // 새 행 추가
+    const rows = document.querySelectorAll('#schedRows .ef-sched-row');
+    if (rows && rows.length > 0) {
+      applyCourseToRow(rows[rows.length - 1], selectedCourses[i]);
     }
   }
+
+  // 수강권 사용량 업데이트
+  if (window.updateSugangRemain) window.updateSugangRemain();
 
   closeTimetableSearch();
   showToast(`✅ ${selectedCourses.length}개 수업이 추가되었습니다!`);
