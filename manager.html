@@ -4289,12 +4289,9 @@ function renderNotiCalGrid(yearMonth, classDates, startDate, endDate){
     let cellBg='transparent', numColor=isWeekend?(dow===0?'#ef4444':'#3b82f6'):'#374151';
     let markHtml='';
 
-    if(isFirst){
-      cellBg='#2563eb'; numColor='#fff';
-      markHtml=`<div style="font-size:9px;font-weight:700;color:#bfdbfe;line-height:1;">●</div>`;
-    } else if(isLast){
-      cellBg='#7c3aed'; numColor='#fff';
-      markHtml=`<div style="font-size:9px;font-weight:700;color:#ddd6fe;line-height:1;">●</div>`;
+    if(isFirst||isLast){
+      cellBg='#dbeafe'; numColor='#1d4ed8';
+      markHtml=`<div style="font-size:9px;font-weight:700;color:#1d4ed8;line-height:1;">●</div>`;
     } else if(isClass&&holiday){
       cellBg='#fee2e2'; numColor='#dc2626';
       markHtml=`<div style="font-size:7px;color:#dc2626;line-height:1.15;margin-top:1px;word-break:keep-all;white-space:normal;text-align:center;">${shortHoliday(holiday)}</div>`;
@@ -4355,12 +4352,9 @@ function renderNotiCalendar(yearMonth, classDates, startDate, endDate){
       const isWeekend=dow===0||dow===6;
       let cellBg='transparent', numColor=isWeekend?(dow===0?'#ef4444':'#3b82f6'):'#374151', mark='';
 
-      if(isFirst){
-        cellBg='#2563eb'; numColor='#fff';
-        mark=`<div style="font-size:9px;font-weight:700;color:#bfdbfe;line-height:1;">●</div>`;
-      } else if(isLast){
-        cellBg='#7c3aed'; numColor='#fff';
-        mark=`<div style="font-size:9px;font-weight:700;color:#ddd6fe;line-height:1;">●</div>`;
+      if(isFirst||isLast){
+        cellBg='#dbeafe'; numColor='#1d4ed8';
+        mark=`<div style="font-size:9px;font-weight:700;color:#1d4ed8;line-height:1;">●</div>`;
       } else if(isClass&&holiday){
         cellBg='#fee2e2'; numColor='#dc2626';
         mark=`<div style="font-size:7.5px;color:#dc2626;line-height:1.1;margin-top:1px;white-space:nowrap;">${shortHoliday(holiday)}</div>`;
