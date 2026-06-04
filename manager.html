@@ -2353,7 +2353,9 @@ function renderStudents(data){
       const sc=getCurrentSched(s['수업배정']||{});
       const age=calcAge(s['생년월일'])||s['나이']||'-';
       const hasNoSched=!s['수업배정']||Object.keys(s['수업배정']).length===0;
-      const schedHtml=hasNoSched?`<span class="sb-prospect">추가가망</span>`:sc.html;
+      const _sugangTotal=parseInt((s['수강권']||'0').toString().replace(/[^0-9]/g,''))||0;
+      const _sugangLow=_sugangTotal>0&&_sugangTotal<=2;
+      const schedHtml=hasNoSched?(_sugangLow||_sugangTotal===0?`<span class="sb-prospect">추가가망</span>`:`-`):sc.html;
       const oniceHtml=getCurrentNotice(s['수업배정']||{},realArr,realIdx);
       const isChk = selectedRows.has(i);
       html+=`<tr onclick="openViewModal(window['${realArr}'][${realIdx}])" style="cursor:pointer;${isChk?'background:var(--accent-dim);outline:1.5px solid var(--accent);':''}">
