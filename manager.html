@@ -5047,11 +5047,16 @@ async function openNotiCardFromBoard(arrName, si, mk){
     classDates = fbDates || getClassDatesForNoti(startDate, endDate, daysStr);
   }
 
-  // 연강이면 두 수업 날짜 합산 (중복제거)
+  // 연강이면 두 수업 날짜 합산 (중복제거) — days 있으면 요일 계산 우선
   if(linkedMks.length > 0){
     for(const {p:pp} of linkedMks){
-      const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.endDate, pp.time);
-      const d2 = fbD2 || getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
+      let d2;
+      if(pp.days){
+        d2 = getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days);
+      } else {
+        const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.endDate, pp.time);
+        d2 = fbD2 || getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
+      }
       d2.forEach(d=>{ if(!classDates.includes(d)) classDates.push(d); });
     }
     classDates.sort();
@@ -5087,55 +5092,62 @@ async function openNotiCardFromBoard(arrName, si, mk){
   const labelStyle = 'display:inline-block;width:52px;font-weight:700;color:#64748b;';
   const valStyle = 'border:none;border-bottom:none;background:transparent;font-size:11px;font-family:inherit;color:inherit;cursor:text;outline:none;min-width:80px;text-decoration:none;';
 
-  // 연강 시 요일/시간 합산
-  let displayDays = daysLabel || '';
-  let displayTime = p.time || '';
-  if (linkedMks.length > 0) {
-    // 요일 합산: 월수금 / 화목금
-    const allDayLabels = [daysLabel];
-    linkedMks.forEach(function(l) {
-      if (l.p.days) {
-        const dd = [...new Set(l.p.days.split('').filter(c => '월화수목금토일'.includes(c)))].join('');
-        if (dd && !allDayLabels.includes(dd)) allDayLabels.push(dd);
-      }
-    });
-    if (allDayLabels.filter(Boolean).length > 1) displayDays = allDayLabels.filter(Boolean).join(' / ');
+  // ── 연강 포함 모든 수업 정보 합산 ──
+  const allCourses = [{p}].concat(linkedMks); // 현재 + 연강 수업 전체
 
-    // 시간 합산: 가장 빠른 시작 ~ 가장 늦은 종료
-    const times = [p.time].concat(linkedMks.map(function(l){ return l.p.time; })).filter(Boolean);
-    if (times.length > 1) {
-      const toMins = function(t) {
-        const m = t.match(/(\d+):(\d+)/);
-        return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : 0;
-      };
-      const sorted = times.slice().sort(function(a,b){ return toMins(a)-toMins(b); });
-      const earliest = sorted[0];
-      // 종료 시간 = 가장 늦은 시작 + 수업 시간(보통 2~3시간, 과목명에서 추출)
-      const latest = sorted[sorted.length - 1];
-      const durMatch = (p.cls || '').match(/(\d+)[Hh]/);
-      const durH = durMatch ? parseInt(durMatch[1]) : 3;
-      const latestMins = toMins(latest) + durH * 60;
-      const endH = String(Math.floor(latestMins / 60)).padStart(2, '0');
-      const endM = String(latestMins % 60).padStart(2, '0');
-      displayTime = earliest + ' ~ ' + endH + ':' + endM;
-    }
+  // 과목: 중복 제거, 과목명 짧게 정리 (괄호 안 동일하면 기본 과목명만)
+  const clsNames = [...new Set(allCourses.map(c => c.p.cls).filter(Boolean))];
+  const displayCls = clsNames.join(', ');
+
+  // 강사: 중복 제거
+  const teacherNames = [...new Set(allCourses.map(c => (c.p.teacher||'').replace(' 강사','')).filter(Boolean))];
+  const displayTeacher = teacherNames.join(', ');
+
+  // 요일: 중복 제거 후 합산 (월수금 / 화목금 등)
+  const allDayLabels = [...new Set(allCourses.map(c => {
+    const d = c.p.days || '';
+    if (!d) return '';
+    if (/[월화수목금토일]~[월화수목금토일]/.test(d) || d.indexOf('/')>0) return d;
+    return [...new Set(d.split('').filter(ch=>'월화수목금토일'.includes(ch)))].join('');
+  }).filter(Boolean))];
+  // 요일이 동일하면 하나만, 다르면 / 로 구분
+  let displayDays = allDayLabels.length > 1 ? allDayLabels.join(' / ') : (allDayLabels[0] || daysLabel || '');
+
+  // 시간: 시간 오름차순 정렬 후 "12:00 채색특강 / 14:00 면접특강 / 16:00 게임원화" 형식
+  const toMins = function(t) {
+    const m = t ? t.match(/(\d+):(\d+)/) : null;
+    return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : 9999;
+  };
+  const timeEntries = allCourses
+    .filter(c => c.p.time)
+    .map(c => ({ time: c.p.time, cls: c.p.cls || '' }))
+    .sort((a,b) => toMins(a.time) - toMins(b.time));
+  // 시간이 모두 같으면 단순 표시, 다르면 시간별 과목 표시
+  const uniqueTimes = [...new Set(timeEntries.map(e=>e.time))];
+  let displayTime;
+  if (uniqueTimes.length <= 1) {
+    displayTime = p.time || '';
+  } else {
+    // "12:00 채색특강 / 14:00 면접특강 / 16:00 게임원화" — 과목명에서 괄호 앞 부분만
+    displayTime = timeEntries.map(e => {
+      const shortCls = e.cls.replace(/\([^)]*\)/g,'').trim();
+      return e.time + ' ' + shortCls;
+    }).join(' / ');
   }
 
   // 연강 안내 배너
   const linkedBanner = linkedMks.length > 0
-    ? `<div style="margin-bottom:8px;padding:5px 10px;background:rgba(91,79,255,.08);border-radius:8px;font-size:11px;color:#5b4fff;font-weight:700;border:0.5px solid rgba(91,79,255,.2);">
-        🔗 연강 수업 포함 (${linkedMks.map(l=>l.p.cls).join(' + ')}) — 수업일 합산 표시
-       </div>`
+    ? `<div style="margin-bottom:6px;padding:4px 10px;background:rgba(91,79,255,.08);border-radius:6px;font-size:11px;color:#5b4fff;font-weight:700;border:0.5px solid rgba(91,79,255,.2);">🔗 연강 수업 포함 (${clsNames.join(' + ')}) — 수업일 합산 표시</div>`
     : '';
   document.getElementById('notiInfo').insertAdjacentHTML('beforebegin', '');
   const infoRows=[
-    `<div style="line-height:1.9;"><b style="${labelStyle}">과 목 :</b> <input value="${p.cls||''}" style="${valStyle}" onchange="_notiEditField('cls',this.value)" /></div>`,
-    `<div style="line-height:1.9;"><b style="${labelStyle}">강 사 :</b> <input value="${(p.teacher||'').replace(' 강사','')}" style="${valStyle}" onchange="_notiEditField('teacher',this.value)" /></div>`,
-    `<div style="line-height:1.9;"><b style="${labelStyle}">요 일 :</b> <input value="${displayDays}" style="${valStyle}${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('daysLabel',this.value)" /></div>`,
-    `<div style="line-height:1.9;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" style="${valStyle}${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
-    `<div style="line-height:1.9;"><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /></div>`,
-    `<div style="line-height:1.9;"><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /></div>`,
-    `<div style="line-height:1.6;margin-top:2px;"><b style="${labelStyle}">출석일 :</b> <span id="notiAttendList" style="font-size:11px;color:#374151;font-family:inherit;">${classDates.map(d=>d.slice(5).replace('-','/')).join(', ')||'-'}</span></div>`,
+    `<div style="line-height:1.5;"><b style="${labelStyle}">과 목 :</b> <input value="${displayCls}" style="${valStyle}" onchange="_notiEditField('cls',this.value)" /></div>`,
+    `<div style="line-height:1.5;"><b style="${labelStyle}">강 사 :</b> <input value="${displayTeacher}" style="${valStyle}" onchange="_notiEditField('teacher',this.value)" /></div>`,
+    `<div style="line-height:1.5;"><b style="${labelStyle}">요 일 :</b> <input value="${displayDays}" style="${valStyle}${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('daysLabel',this.value)" /></div>`,
+    `<div style="line-height:1.5;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" style="${valStyle}${linkedMks.length>1?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
+    `<div style="line-height:1.5;"><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /></div>`,
+    `<div style="line-height:1.5;"><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /></div>`,
+    `<div style="line-height:1.5;margin-top:2px;"><b style="${labelStyle}">출석일 :</b> <span id="notiAttendList" style="font-size:11px;color:#374151;font-family:inherit;">${classDates.map(d=>d.slice(5).replace('-','/')).join(', ')||'-'}</span></div>`,
   ].join('');
   document.getElementById('notiInfo').innerHTML = linkedBanner + infoRows;
 
