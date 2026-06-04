@@ -2196,9 +2196,14 @@ function renderDashboard() {
       }
       const lastEnd = new Date(Math.max(...ends));
       const diff = Math.round((lastEnd-todayD)/86400000);
-      // 종강 임박(2개월 이내) 또는 수강권 2개 이하
-      if(lastEnd <= twoMonLater || lowSugang) {
+      // 종강 임박(2개월 이내)이면서 수강권도 2개 이하일 때만 표시
+      // 수강권이 3개 이상 남아있으면 표시 안 함
+      const isEndingSoon = lastEnd <= twoMonLater;
+      if(isEndingSoon && lowSugang) {
         endingSoon.push({name:s['이름']||'-', arrName, idx, lastEnd:lastEnd.toISOString().slice(0,10), diff, sugangLeft});
+      } else if(isEndingSoon && sugangLeft === null) {
+        // 수강권 정보 없는 경우 종강 임박만으로 표시
+        endingSoon.push({name:s['이름']||'-', arrName, idx, lastEnd:lastEnd.toISOString().slice(0,10), diff, sugangLeft:null});
       }
     });
   });
