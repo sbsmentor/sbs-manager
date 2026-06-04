@@ -4876,6 +4876,14 @@ async function openNotiCardFromBoard(arrName, si, mk){
 
   const startDate=p.startDate||''; let endDate=p.endDate||''; const daysStr=p.days||'';
 
+  // 연강 포함 전체 수업에서 가장 나중 endDate 먼저 확정 (어떤 버튼 눌러도 동일하게)
+  Object.values(sched).forEach(function(v) {
+    const pp = bdParseVal(v);
+    if (!pp.startDate) return;
+    const diffStart = Math.abs(new Date(pp.startDate) - new Date(startDate)) / 86400000;
+    if (diffStart <= 3 && pp.endDate && pp.endDate > endDate) endDate = pp.endDate;
+  });
+
   // ── 격일반 날짜 조회 (메모리 _gkyilDates 우선, Firebase timetable 폴백) ──
   const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time);
   let classDates;
@@ -4887,10 +4895,6 @@ async function openNotiCardFromBoard(arrName, si, mk){
 
   // 연강이면 두 수업 날짜 합산 (중복제거)
   if(linkedMks.length > 0){
-    // 먼저 모든 endDate 중 가장 나중 날짜로 확정
-    linkedMks.forEach(function({p:pp}){
-      if(pp.endDate && pp.endDate > endDate) endDate = pp.endDate;
-    });
     for(const {p:pp} of linkedMks){
       const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.endDate, pp.time);
       const d2 = fbD2 || getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
