@@ -4863,7 +4863,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
   // 격일반: 월수금(월 개강)과 화목금(화 개강)처럼 개강일이 ±3일 차이날 수 있음
   const linkedMks = [];
   Object.entries(sched).forEach(([k,v]) => {
-    if(k===mk || k.startsWith(mk+'_')) return; // 자기 자신 제외
+    if(k===mk) return; // 자기 자신만 제외 (같은 월의 _2, _3 수업은 연강 후보)
     const pp = bdParseVal(v);
     if(!pp.startDate) return;
     const diffStart = Math.abs(new Date(pp.startDate) - new Date(p.startDate)) / 86400000;
