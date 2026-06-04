@@ -4674,6 +4674,9 @@ function notiCalClick(ds) {
   const months = [...moSet].sort();
   document.getElementById('notiCalWrap').innerHTML =
     months.map(mo => renderNotiCalGrid(mo, allDates, _notiCtx.p.startDate, _notiCtx.p.endDate)).join('');
+  // 출석일 목록 업데이트
+  const attendEl = document.getElementById('notiAttendList');
+  if (attendEl) attendEl.textContent = allDates.sort().map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
   // 날짜 변경 시 저장 버튼 표시
   const saveBtn = document.getElementById('notiSaveBtn');
   if (saveBtn) saveBtn.style.display = 'inline-block';
@@ -4934,18 +4937,31 @@ async function _getTimetableDates(teacher, startDate, endDate, time) {
   const start = startDate || '';
   const end   = endDate   || '';
 
-  // 1) 메모리 캐시 우선
-  if (window._gkyilDates && window._gkyilDates[teacher]) {
-    const result = filterDates(window._gkyilDates[teacher], start, end);
-    if (result) { console.log('[gkyil] 메모리 캐시 적용:', result.length, '일'); return result; }
+  // 1) 메모리 캐시 우선 — 강사+개강일로 정확히 매칭 (다른 기수 날짜 혼입 방지)
+  if (window._gkyilDates) {
+    // 강사명_개강일 키 우선 시도
+    const exactKey = teacher + '_' + start;
+    if (window._gkyilDates[exactKey]) {
+      const result = filterDates(window._gkyilDates[exactKey], start, end);
+      if (result) { console.log('[gkyil] 메모리(exact) 캐시 적용:', result.length, '일'); return result; }
+    }
+    // 강사명만으로 있을 경우: 개강일이 해당 날짜 배열에 포함된 경우만 사용
+    if (window._gkyilDates[teacher]) {
+      const allDates = window._gkyilDates[teacher];
+      if (start && !allDates.includes(start)) {
+        console.log('[gkyil] 개강일 불일치 — gkyilDates 무시, days 폴백 사용');
+      } else {
+        const result = filterDates(allDates, start, end);
+        if (result) { console.log('[gkyil] 메모리 캐시 적용:', result.length, '일'); return result; }
+      }
+    }
   }
 
-  // 2) Firebase gkyilDates 강사별 직접 조회 (메모리 미적재 시)
+  // 2) Firebase gkyilDates 강사별 직접 조회 — 개강일 포함 여부 검증
   if (window._fbDb) {
     try {
       const snap = await window._fbDb.ref('gkyilDates/' + teacher).once('value');
       const raw = snap.val();
-      // 문자열(쉼표구분), 배열, 객체 모두 처리
       let allDates = null;
       if (typeof raw === 'string') {
         allDates = raw.split(',').filter(function(d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); }).sort();
@@ -4957,8 +4973,13 @@ async function _getTimetableDates(teacher, startDate, endDate, time) {
       if (allDates && allDates.length) {
         if (!window._gkyilDates) window._gkyilDates = {};
         window._gkyilDates[teacher] = allDates;
-        const result = filterDates(allDates, start, end);
-        if (result) { console.log('[gkyil] Firebase 직접 조회 적용:', result.length, '일'); return result; }
+        // 개강일이 gkyilDates 목록에 없으면 이 강사의 격일 데이터가 아님 → 폴백
+        if (start && !allDates.includes(start)) {
+          console.log('[gkyil] Firebase 개강일 불일치 — gkyilDates 무시:', teacher, start);
+        } else {
+          const result = filterDates(allDates, start, end);
+          if (result) { console.log('[gkyil] Firebase 직접 조회 적용:', result.length, '일'); return result; }
+        }
       }
     } catch(e) { console.warn('[gkyil] Firebase 직접 조회 실패:', e); }
   }
@@ -5110,6 +5131,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
     `<div><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" style="${valStyle}${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
     `<div><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /></div>`,
     `<div><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /></div>`,
+    `<div style="margin-top:4px;"><b style="${labelStyle}">출석일 :</b> <span id="notiAttendList" style="font-size:11px;color:#374151;font-family:inherit;line-height:1.7;">${classDates.map(d=>d.slice(5).replace('-','/')).join(', ')||'-'}</span></div>`,
   ].join('');
   document.getElementById('notiInfo').innerHTML = linkedBanner + infoRows;
 
