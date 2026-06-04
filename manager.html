@@ -2013,7 +2013,7 @@ function saveBulk(){
 function renderTabs(){
   document.getElementById('tabBar').innerHTML=TABS.map(t=>
     `<button class="tab-btn ${t.id===currentTab?'active':''}" onclick="switchTab('${t.id}')">
-      ${t.icon} ${t.label}<span class="tc">${countFor(t.id)}</span>
+      ${t.icon} ${t.label}${(t.id==='dashboard'||t.id==='board')?'':'<span class="tc">'+countFor(t.id)+'</span>'}
     </button>`).join('');
 }
 
@@ -4291,10 +4291,10 @@ function renderNotiCalGrid(yearMonth, classDates, startDate, endDate){
 
     if(isFirst){
       cellBg='#2563eb'; numColor='#fff';
-      markHtml=`<div style="font-size:8px;font-weight:800;color:#bfdbfe;line-height:1;margin-top:1px;">개강</div>`;
+      markHtml=`<div style="font-size:9px;font-weight:700;color:#bfdbfe;line-height:1;">●</div>`;
     } else if(isLast){
       cellBg='#7c3aed'; numColor='#fff';
-      markHtml=`<div style="font-size:8px;font-weight:800;color:#ddd6fe;line-height:1;margin-top:1px;">종강</div>`;
+      markHtml=`<div style="font-size:9px;font-weight:700;color:#ddd6fe;line-height:1;">●</div>`;
     } else if(isClass&&holiday){
       cellBg='#fee2e2'; numColor='#dc2626';
       markHtml=`<div style="font-size:7px;color:#dc2626;line-height:1.15;margin-top:1px;word-break:keep-all;white-space:normal;text-align:center;">${shortHoliday(holiday)}</div>`;
@@ -4357,10 +4357,10 @@ function renderNotiCalendar(yearMonth, classDates, startDate, endDate){
 
       if(isFirst){
         cellBg='#2563eb'; numColor='#fff';
-        mark=`<div style="font-size:8px;font-weight:800;color:#bfdbfe;line-height:1;margin-top:1px;">개강</div>`;
+        mark=`<div style="font-size:9px;font-weight:700;color:#bfdbfe;line-height:1;">●</div>`;
       } else if(isLast){
         cellBg='#7c3aed'; numColor='#fff';
-        mark=`<div style="font-size:8px;font-weight:800;color:#ddd6fe;line-height:1;margin-top:1px;">종강</div>`;
+        mark=`<div style="font-size:9px;font-weight:700;color:#ddd6fe;line-height:1;">●</div>`;
       } else if(isClass&&holiday){
         cellBg='#fee2e2'; numColor='#dc2626';
         mark=`<div style="font-size:7.5px;color:#dc2626;line-height:1.1;margin-top:1px;white-space:nowrap;">${shortHoliday(holiday)}</div>`;
