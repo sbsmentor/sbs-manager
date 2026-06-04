@@ -4697,37 +4697,70 @@ function _loadGkyilDatesFromFirebase() {
   if (!window._fbDb) return;
   window._fbDb.ref('gkyilDates').once('value').then(function(snap) {
     const data = snap.val();
-    if (data && Object.keys(data).length) {
-      window._gkyilDates = data;
+    if (data && typeof data === 'object' && Object.keys(data).length) {
+      // 각 강사별 날짜 배열이 Firebase에서 객체로 올 수 있으므로 변환
+      const converted = {};
+      Object.keys(data).forEach(function(teacher) {
+        const raw = data[teacher];
+        converted[teacher] = Array.isArray(raw) ? raw : Object.values(raw || {});
+      });
+      window._gkyilDates = converted;
       const st = document.getElementById('gkyilStatus');
-      if (st) { st.style.display='inline'; st.textContent = '✅ ' + Object.keys(data).length + '명 로드됨'; }
-      console.log('[gkyilDates] Firebase에서 로드됨:', Object.keys(data).length, '명');
+      if (st) { st.style.display='inline'; st.textContent = '✅ ' + Object.keys(converted).length + '명 로드됨'; }
+      console.log('[gkyilDates] Firebase에서 로드됨:', Object.keys(converted).length, '명');
     }
   }).catch(function(e) { console.warn('gkyilDates 로드 실패:', e); });
 }
 
 // Firebase timetable에서 해당 강좌의 dates 필드 조회
-// 우선순위: 1) 메모리 _gkyilDates (개강일~종강일 범위 필터) 2) Firebase timetable.dates
+// 우선순위: 1) 메모리 _gkyilDates 2) Firebase gkyilDates 직접 조회 3) Firebase timetable.dates
 async function _getTimetableDates(teacher, startDate, endDate, time) {
-  // 1) 메모리 격일반 데이터 우선 (강사명 + 개강일~종강일 범위 필터)
   console.log('[gkyil] 조회:', teacher, startDate, endDate, '/ 로드된 강사:', Object.keys(window._gkyilDates||{}));
-  if (window._gkyilDates && window._gkyilDates[teacher]) {
-    const allDates = window._gkyilDates[teacher];
-    if (allDates.length) {
-      const start = startDate || '';
-      const end   = endDate   || '';
-      if (start && end) {
-        const filtered = allDates.filter(function(d) { return d >= start && d <= end; });
-        console.log('[gkyil] 필터 결과:', filtered.length, '일');
-        if (filtered.length) return filtered;
-      } else if (start) {
-        const filtered = allDates.filter(function(d) { return d >= start; }).slice(0, 10);
-        if (filtered.length) return filtered;
-      }
+
+  // 날짜 배열에서 개강~종강 범위 필터 헬퍼
+  function filterDates(allDates, start, end) {
+    if (!allDates || !allDates.length) return null;
+    if (start && end) {
+      const f = allDates.filter(function(d) { return d >= start && d <= end; });
+      return f.length ? f : null;
+    } else if (start) {
+      const f = allDates.filter(function(d) { return d >= start; }).slice(0, 10);
+      return f.length ? f : null;
     }
+    return null;
   }
 
-  // 2) Firebase timetable.dates 폴백
+  const start = startDate || '';
+  const end   = endDate   || '';
+
+  // 1) 메모리 캐시 우선
+  if (window._gkyilDates && window._gkyilDates[teacher]) {
+    const result = filterDates(window._gkyilDates[teacher], start, end);
+    if (result) { console.log('[gkyil] 메모리 캐시 적용:', result.length, '일'); return result; }
+  }
+
+  // 2) Firebase gkyilDates 강사별 직접 조회 (메모리 미적재 시)
+  if (window._fbDb) {
+    try {
+      const snap = await window._fbDb.ref('gkyilDates/' + teacher).once('value');
+      const raw = snap.val();
+      // Firebase는 배열을 {0:..., 1:...} 객체로 반환 → 배열로 변환
+      let allDates = null;
+      if (Array.isArray(raw)) {
+        allDates = raw;
+      } else if (raw && typeof raw === 'object') {
+        allDates = Object.values(raw);
+      }
+      if (allDates && allDates.length) {
+        if (!window._gkyilDates) window._gkyilDates = {};
+        window._gkyilDates[teacher] = allDates;
+        const result = filterDates(allDates, start, end);
+        if (result) { console.log('[gkyil] Firebase 직접 조회 적용:', result.length, '일'); return result; }
+      }
+    } catch(e) { console.warn('[gkyil] Firebase 직접 조회 실패:', e); }
+  }
+
+  // 3) Firebase timetable.dates 폴백
   if (!window._fbDb) return null;
   try {
     const snap = await window._fbDb.ref('timetable').once('value');
