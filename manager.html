@@ -4956,9 +4956,17 @@ function notiCalClick(ds) {
   const months = [...moSet].sort();
   document.getElementById('notiCalWrap').innerHTML =
     months.map(mo => renderNotiCalGrid(mo, allDates, _notiCtx.p.startDate, _notiCtx.p.endDate)).join('');
-  // 출석일 목록 업데이트 (날짜 클릭으로 수정한 최종 날짜 반영)
+  // 출석일 목록 업데이트 — 달력 수정 시 메인 수업 날짜 기준으로 갱신
   const attendEl = document.getElementById('notiAttendList');
-  if (attendEl) attendEl.textContent = allDates.slice().sort().map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
+  if (attendEl) {
+    const mainOnly = allDates.filter(function(d){
+      // 메인 수업 startDate~endDate 범위만
+      const s = _notiCtx && _notiCtx.p && _notiCtx.p.startDate;
+      const e = _notiCtx && _notiCtx.p && _notiCtx.p.endDate;
+      return (!s||d>=s) && (!e||d<=e);
+    }).sort();
+    attendEl.textContent = mainOnly.map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
+  }
   // 날짜 변경 시 저장 버튼 표시
   const saveBtn = document.getElementById('notiSaveBtn');
   if (saveBtn) saveBtn.style.display = 'inline-block';
@@ -5497,17 +5505,42 @@ async function openNotiCardFromBoard(arrName, si, mk){
   document.getElementById('notiInfo').insertAdjacentHTML('beforebegin', '');
   const infoRows=[
     `<div style="line-height:1.5;"><b style="${labelStyle}">과 목 :</b> <input value="${displayCls}" style="${valStyle}" onchange="_notiEditField('cls',this.value)" /></div>`,
-    `<div style="line-height:1.5;"><b style="${labelStyle}">강 사 :</b> <input value="${displayTeacher}" style="${valStyle}" onchange="_notiEditField('teacher',this.value)" /></div>`,
+    `<div style="line-height:1.5;"><b style="${labelStyle}">강 사 :</b> <input value="${displayTeacher}" placeholder="강사명 입력" style="${valStyle}" onchange="_notiEditField('teacher',this.value)" /></div>`,
     `<div style="line-height:1.5;"><b style="${labelStyle}">요 일 :</b> <input value="${displayDays}" style="${valStyle}${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('daysLabel',this.value)" /></div>`,
     `<div style="line-height:1.5;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" style="${valStyle}${linkedMks.length>1?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
     `<div style="line-height:1.5;"><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /></div>`,
     `<div style="line-height:1.5;"><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /></div>`,
     (()=>{
-      // 수업별 날짜 분리 표시 (연강 시 각 수업 날짜 구분)
+      // 출석일: 수업별 분리 표시 (달력은 합산, 텍스트만 분리)
       let attendHtml;
-      // 출석일: 항상 classDates(gkyilDates 우선) 기준으로 표시
-      // notiCustom/removed는 달력에만 반영, 출석일은 원본 수업일 기준
-      attendHtml = classDates.map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
+      if(linkedMks.length > 0){
+        // 메인 수업 날짜
+        const mainShort = p.cls.replace(/\([^)]*\)/g,'').trim();
+        const parts = [`<span style="color:#475569;font-weight:700;">${mainShort}:</span> ${classDates.map(d=>d.slice(5).replace('-','/')).join(', ')}`];
+        // 연강 수업별 날짜 (이미 계산된 d2 재계산)
+        for(const {p:pp} of linkedMks){
+          const ppShort = (pp.cls||'').replace(/\([^)]*\)/g,'').trim();
+          // gkyilDates에서 패턴키로 조회, 없으면 days 계산
+          let ppDates = [];
+          if(window._gkyilDates){
+            const allKeys2 = Object.keys(window._gkyilDates);
+            const ppDays = pp.days||'';
+            const patKey2 = allKeys2.find(function(k){
+              if(!k.startsWith(pp.teacher+'_')) return false;
+              const pat2 = k.slice(pp.teacher.length+1);
+              const dc = ppDays.replace(/[^월화수목금토일]/g,'');
+              return dc.split('').every(function(c){ return pat2.includes(c); });
+            });
+            if(patKey2) ppDates = (window._gkyilDates[patKey2]||[]).filter(function(d){ return d>=(pp.startDate||'') && d<=(pp.endDate||'9999'); });
+            else if(window._gkyilDates[pp.teacher]) ppDates = (window._gkyilDates[pp.teacher]||[]).filter(function(d){ return d>=(pp.startDate||'') && d<=(pp.endDate||'9999'); });
+          }
+          if(!ppDates.length) ppDates = getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
+          parts.push(`<span style="color:#475569;font-weight:700;">${ppShort}:</span> ${ppDates.map(d=>d.slice(5).replace('-','/')).join(', ')}`);
+        }
+        attendHtml = parts.join('<br>');
+      } else {
+        attendHtml = classDates.map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
+      }
       return `<div style="line-height:1.6;margin-top:2px;"><b style="${labelStyle}">출석일 :</b> <span id="notiAttendList" style="font-size:11px;color:#374151;font-family:inherit;">${attendHtml}</span></div>`;
     })(),
   ].join('');
