@@ -5324,25 +5324,24 @@ async function openNotiCardFromBoard(arrName, si, mk){
   const startDate=p.startDate||''; let endDate=p.endDate||''; const daysStr=p.days||'';
   const mkBase = mk.replace(/_\d+$/, ''); // "2026년 7월_2" → "2026년 7월"
 
-  // 연강 감지: 같은 달 + 같은 강사 + 개강일이 ±7일 이내인 수업만 합산
-  // (월수금+화목금처럼 개강일이 1~2일 차이, 16시+19시처럼 같은 날 개강)
-  // 개강일이 크게 다른 수업(다른 기수)은 별도 카드
-  const isBaseKey = !mk.match(/_\d+$/);
+  // 연강 감지: 같은 달 + 같은 강사 + 개강일 ±7일 이내
+  // 기본키/_2 상관없이 항상 수집 (중복 방지: 현재 mk보다 개강일이 이른 수업만 포함)
+  // → 가장 빠른 개강일 수업을 기준으로 항상 합산됨
   const linkedMks = [];
-  if(isBaseKey){
-    Object.entries(sched).forEach(([k,v]) => {
-      if(k===mk) return;
-      const kBase = k.replace(/_\d+$/, '');
-      if(kBase !== mkBase) return;
-      const pp = bdParseVal(v);
-      if(!pp.cls || !pp.startDate) return;
-      if(pp.teacher !== p.teacher) return;
-      // 개강일 차이가 ±7일 이내인 경우만 연강으로 묶음
-      const diffDays = Math.abs(new Date(pp.startDate) - new Date(p.startDate)) / 86400000;
-      if(diffDays > 7) return;
-      linkedMks.push({mk:k, p:pp});
-    });
-  }
+  Object.entries(sched).forEach(([k,v]) => {
+    if(k===mk) return;
+    const kBase = k.replace(/_\d+$/, '');
+    if(kBase !== mkBase) return;
+    const pp = bdParseVal(v);
+    if(!pp.cls || !pp.startDate) return;
+    if(pp.teacher !== p.teacher) return;
+    const diffDays = Math.abs(new Date(pp.startDate) - new Date(p.startDate)) / 86400000;
+    if(diffDays > 7) return;
+    // 중복 계산 방지: 더 이른 개강일(또는 같은 개강일이면 더 앞선 키)의 수업이 있으면 제외
+    if(pp.startDate < p.startDate) return;
+    if(pp.startDate === p.startDate && k < mk) return; // 같은 개강일이면 키 순서로 기본키 우선
+    linkedMks.push({mk:k, p:pp});
+  });
 
   // endDate는 메인 수업 자체의 값만 사용 (연강 수업의 endDate로 늘리지 않음)
   // 각 연강 수업은 자신의 endDate 범위에서 날짜를 가져옴
