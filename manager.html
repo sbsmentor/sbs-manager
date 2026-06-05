@@ -5484,14 +5484,15 @@ async function openNotiCardFromBoard(arrName, si, mk){
   const teacherNames = [...new Set(allCourses.map(c => (c.p.teacher||'').replace(' 강사','').trim()).filter(Boolean))];
   const displayTeacher = teacherNames.length === 1 ? teacherNames[0] : '';
 
-  // 요일: 중복 제거 후 합산 (월수금 / 화목금 등)
-  const allDayLabels = [...new Set(allCourses.map(c => {
-    const d = c.p.days || '';
-    if (!d) return '';
-    if (/[월화수목금토일]~[월화수목금토일]/.test(d) || d.indexOf('/')>0) return d;
-    return [...new Set(d.split('').filter(ch=>'월화수목금토일'.includes(ch)))].join('');
-  }).filter(Boolean))];
-  // 요일이 동일하면 하나만, 다르면 / 로 구분
+  // 요일: 같은 달 모든 수업 요일 합산 (강사 무관)
+  const allDayLabels = [...new Set(Object.entries(sched)
+    .filter(function([k]){ return k.replace(/_\d+$/,'')===mkBase; })
+    .map(function([,v]){
+      const d = bdParseVal(v).days || '';
+      if(!d) return '';
+      if(/[월화수목금토일]~[월화수목금토일]/.test(d)||d.indexOf('/')>0) return d;
+      return [...new Set(d.split('').filter(ch=>'월화수목금토일'.includes(ch)))].join('');
+    }).filter(Boolean))];
   let displayDays = allDayLabels.length > 1 ? allDayLabels.join(' / ') : (allDayLabels[0] || daysLabel || '');
 
   // 시간: 시간 오름차순 정렬 후 "12:00 채색특강 / 14:00 면접특강 / 16:00 게임원화" 형식
@@ -5525,7 +5526,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
     `<div style="line-height:1.7;"><b style="${labelStyle}">과 목 :</b> <input value="${displayCls}" style="${valStyle}" onchange="_notiEditField('cls',this.value)" /></div>`,
     `<div style="line-height:1.7;"><b style="${labelStyle}">강 사 :</b> <input value="${displayTeacher}" placeholder="강사명 입력" style="${valStyle}" onchange="_notiEditField('teacher',this.value)" /></div>`,
     `<div style="line-height:1.7;"><b style="${labelStyle}">요 일 :</b> <input value="${displayDays}" style="${valStyle}${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('daysLabel',this.value)" /></div>`,
-    `<div style="line-height:1.7;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" title="${displayTime}" style="${valStyle}${linkedMks.length>1?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
+    `<div style="line-height:1.7;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" title="${displayTime}" size="${Math.max(displayTime.length,10)}" style="${valStyle}${linkedMks.length>1?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
     `<div style="line-height:1.7;"><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /></div>`,
     `<div style="line-height:1.7;"><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /></div>`,
     (()=>{
@@ -5622,9 +5623,20 @@ async function openNotiCardFromBoard(arrName, si, mk){
   }
   _notiDateCache[_cacheKey] = {removed: window._notiRemovedDates, custom: window._notiCustomDates};
 
+  // 달력용 전체 날짜 = 메인 + linkedMks 합산
+  const allClassDates = [...classDates];
+  if(linkedMks.length > 0){
+    for(const {p:pp2} of linkedMks){
+      const fbD3 = await _getTimetableDates(pp2.teacher, pp2.startDate, pp2.endDate, pp2.time, pp2.days);
+      let d3;
+      if(fbD3 && fbD3.length) d3 = fbD3;
+      else d3 = getClassDatesForNoti(pp2.startDate||'', pp2.endDate||'', pp2.days||'');
+      d3.forEach(function(d){ if(!allClassDates.includes(d)) allClassDates.push(d); });
+    }
+    allClassDates.sort();
+  }
   // 날짜 상태로 달력 재렌더 (removed/custom 반영)
-  // 달력은 removed/custom 포함 allDates2 기준, 출석일은 원본 classDates 기준
-  const allDates2 = [...classDates.filter(d => !window._notiRemovedDates.has(d)), ...window._notiCustomDates];
+  const allDates2 = [...allClassDates.filter(d => !window._notiRemovedDates.has(d)), ...window._notiCustomDates];
   const moSet2 = new Set(allDates2.map(d => d.slice(0,7)));
   if (!moSet2.size && startDate) moSet2.add(startDate.slice(0,7));
   if (!moSet2.size) moSet2.add(months[0]||new Date().toISOString().slice(0,7));
