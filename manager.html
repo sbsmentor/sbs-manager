@@ -3089,7 +3089,8 @@ function renderBoardTable(){
       // 개강안내 버튼 (개강일이 있는 수업에만)
       const hasDate=allVals.some(v=>bdParseVal(v).startDate);
       const isNoticed=allVals.some(v=>v&&v.includes('[O]'));
-       const notiBtnHtml=hasDate?`<div class="noti-open-btn" data-arr="${arrName}" data-idx="${i}" data-mk="${mk.replace(/"/g,'&quot;')}" style="padding:3px 8px 4px;border-top:1px solid ${isNoticed?'rgba(22,163,74,.25)':'rgba(124,58,237,.12)'};background:${isNoticed?'rgba(22,163,74,.07)':'rgba(124,58,237,.05)'};color:${isNoticed?'var(--green)':'#7c3aed'};cursor:pointer;font-size:10px;font-weight:700;font-family:'Noto Sans KR',sans-serif;user-select:none;">${isNoticed?'✅ 안내완료':'📬 개강안내'}</div>`:'';
+       const _safeMk = mk.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+       const notiBtnHtml=hasDate?`<div class="noti-open-btn" data-arr="${arrName}" data-idx="${i}" data-mk="${_safeMk}" style="padding:3px 8px 4px;border-top:1px solid ${isNoticed?'rgba(22,163,74,.25)':'rgba(124,58,237,.12)'};background:${isNoticed?'rgba(22,163,74,.07)':'rgba(124,58,237,.05)'};color:${isNoticed?'var(--green)':'#7c3aed'};cursor:pointer;font-size:10px;font-weight:700;font-family:'Noto Sans KR',sans-serif;user-select:none;">${isNoticed?'✅ 안내완료':'📬 개강안내'}</div>`:'';
        html+=`<td style="padding:0;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:top;">
          <button class="bd-chip-btn" data-arr="${arrName}" data-idx="${i}" data-mk="${mk.replace(/"/g,'\x22')}" 
            style="width:100%;min-height:52px;padding:6px 8px;background:${bg};border:none;text-align:left;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;gap:2px;transition:background .1s;box-sizing:border-box;" 
@@ -3110,7 +3111,8 @@ function renderBoardTable(){
   document.querySelectorAll('.noti-open-btn').forEach(function(el){
     el.addEventListener('click', function(e){
       e.stopPropagation();
-      window.openNotiCardFromBoard(el.dataset.arr, parseInt(el.dataset.idx), el.dataset.mk);
+      var mk = el.dataset.mk.replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+      window.openNotiCardFromBoard(el.dataset.arr, parseInt(el.dataset.idx), mk);
     });
   });
 }
