@@ -5614,8 +5614,8 @@ async function openNotiCardFromBoard(arrName, si, mk){
   document.getElementById('notiCalWrap').innerHTML =
     [...moSet2].sort().map(mo => renderNotiCalGrid(mo, allDates2, startDate, endDate)).join('');
   // 출석일은 classDates 원본 기준으로 다시 세팅
-  const attendEl2 = document.getElementById('notiAttendList');
-  if(attendEl2) attendEl2.textContent = classDates.map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
+  // 출석일은 분리 표시가 적용돼 있으므로 notiDates 로드 후 덮어쓰지 않음
+  // (달력 수정 시에는 notiCalClick에서 업데이트)
 
   _notiCtx._cacheKey = _cacheKey;
   // 저장 버튼 표시
