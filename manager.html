@@ -5371,9 +5371,11 @@ async function _getTimetableDates(teacher, startDate, endDate, time, days) {
 }
 
 async function openNotiCardFromBoard(arrName, si, mk){
+  console.log('[noti] 시작:', arrName, si, mk);
   const arr=window[arrName];
-  if(!arr||!arr[si]) return;
+  if(!arr||!arr[si]){ console.log('[noti] arr 없음'); return; }
   const sched=arr[si]['수업배정']||{};
+  console.log('[noti] sched keys:', Object.keys(sched));
 
   // ── 연강 감지: 같은 개강일을 가진 모든 수업 묶기 ──
   // mk 기준 수업 파싱
