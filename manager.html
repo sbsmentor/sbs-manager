@@ -5419,7 +5419,6 @@ async function openNotiCardFromBoard(arrName, si, mk){
   } else {
     classDates = getClassDatesForNoti(startDate, endDate, daysStr);
   }
-  console.log('[noti3] classDates:', classDates.length, '/ startDate:', startDate, 'endDate:', endDate);
 
   // 연강이면 날짜 합산 (중복제거)
   if(linkedMks.length > 0){
@@ -5532,7 +5531,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
     (()=>{
       // 출석일: 같은 달 같은 강사 모든 수업을 수업명별로 분리 표시
       // linkedMks 여부와 관계없이 sched에서 직접 수집
-      function getAttendDates(pp2) {
+      const getAttendDates = function(pp2) {
         let dates2 = [];
         if(window._gkyilDates){
           const allKeys2 = Object.keys(window._gkyilDates);
@@ -5548,7 +5547,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
         }
         if(!dates2.length) dates2 = getClassDatesForNoti(pp2.startDate||'', pp2.endDate||'', pp2.days||'');
         return dates2;
-      }
+      };
 
       // 같은 달 모든 수업 수집 (강사 무관 - 수업별 출석일 분리)
       const allSameMk = [];
@@ -5593,7 +5592,6 @@ async function openNotiCardFromBoard(arrName, si, mk){
   ].join('');
   document.getElementById('notiInfo').innerHTML = linkedBanner + infoRows;
 
-  console.log('[noti4] _notiCtx 저장');
     _notiCtx={arrName,si,mk,val,p,noClassNote,sy,sm,startDow,endDow,daysLabel,origDates:classDates};
 
   document.getElementById('notiImgCopyBtn').onclick=()=>saveNotiImage(p.cls,startDate);
