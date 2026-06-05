@@ -5207,12 +5207,9 @@ function _loadGkyilDatesFromFirebase() {
       // 유효한 날짜 데이터가 있는 경우만 업데이트
       const hasValidDates = Object.values(converted).some(function(dates) { return dates.length > 0; });
       if (hasValidDates) {
-        // 현재 메모리에 유효한 데이터가 없을 때만 덮어씀 (업로드 직후 타이밍 보호)
-        const memHasData = window._gkyilDates && Object.values(window._gkyilDates).some(function(d){ return Array.isArray(d) && d.length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(d[0]); });
-        if (!memHasData) {
-          window._gkyilDates = converted;
-          console.log('[gkyilDates] Firebase에서 로드됨:', Object.keys(converted).length, '명');
-        }
+        // 항상 Firebase 데이터로 갱신 (메모리 부분 업데이트로 인한 누락 방지)
+        window._gkyilDates = converted;
+        console.log('[gkyilDates] Firebase에서 로드됨:', Object.keys(converted).length, '명');
         const st = document.getElementById('gkyilStatus');
         if (st) { st.style.display='inline'; st.textContent = '✅ ' + Object.keys(converted).length + '명 로드됨'; }
       }
@@ -5224,9 +5221,9 @@ function _loadGkyilDatesFromFirebase() {
 // 우선순위: 1) 메모리 _gkyilDates 2) Firebase gkyilDates 직접 조회 3) Firebase timetable.dates
 async function _getTimetableDates(teacher, startDate, endDate, time) {
   if (!teacher || !startDate) return null;
-  // 메모리가 비어있으면 Firebase 로드 완료까지 대기
-  const memEmpty = !window._gkyilDates || Object.keys(window._gkyilDates).length === 0;
-  if (memEmpty && window._fbDb) {
+  // 메모리가 비어있거나 해당 강사가 없으면 Firebase 전체 재로드
+  const teacherMissing = !window._gkyilDates || !window._gkyilDates[teacher];
+  if (teacherMissing && window._fbDb) {
     await _loadGkyilDatesFromFirebase();
   }
   console.log('[gkyil] 조회:', teacher, startDate, endDate, '/ 로드된 강사:', Object.keys(window._gkyilDates||{}));
@@ -5337,23 +5334,35 @@ async function openNotiCardFromBoard(arrName, si, mk){
     if(pp.endDate && pp.endDate > endDate) endDate = pp.endDate;
   });
 
-  // ── 날짜 계산: gkyilDates(격일반 업로드) 우선, 없으면 요일 계산 폴백 ──
+  // ── 날짜 계산: gkyilDates 우선 ──
+  // 강사가 gkyilDates에 있으면 days 폴백 절대 안 함
   let classDates;
   const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time);
-  console.log('[noti] startDate:', startDate, 'endDate:', endDate, 'teacher:', p.teacher);
-  console.log('[noti] fbDates:', fbDates ? fbDates.length + '개' : 'null', fbDates);
+  const teacherInGkyil = window._gkyilDates && (window._gkyilDates[p.teacher] || window._gkyilDates[p.teacher+'_'+startDate]);
   if(fbDates && fbDates.length){
     classDates = fbDates;
+  } else if(teacherInGkyil){
+    // gkyilDates에 강사는 있지만 해당 기간 데이터 없음 → 빈 배열 (days 폴백 차단)
+    classDates = [];
+    showToast('⚠ ' + p.teacher + ' 격일반 데이터에 해당 기간 날짜가 없습니다');
   } else {
+    // gkyilDates에 없는 강사 → 일반 수업, days로 계산
     classDates = getClassDatesForNoti(startDate, endDate, daysStr);
-    console.log('[noti] days 계산 결과:', classDates.length + '개', classDates);
   }
 
-  // 연강이면 날짜 합산 (중복제거) — gkyilDates 우선, 없으면 요일 계산
+  // 연강이면 날짜 합산 (중복제거)
   if(linkedMks.length > 0){
     for(const {p:pp} of linkedMks){
       const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.endDate, pp.time);
-      const d2 = (fbD2 && fbD2.length) ? fbD2 : getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
+      const ppInGkyil = window._gkyilDates && (window._gkyilDates[pp.teacher] || window._gkyilDates[pp.teacher+'_'+(pp.startDate||'')]);
+      let d2;
+      if(fbD2 && fbD2.length){
+        d2 = fbD2;
+      } else if(ppInGkyil){
+        d2 = []; // gkyilDates 강사인데 해당 기간 없음 → 빈 배열
+      } else {
+        d2 = getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
+      }
       d2.forEach(d=>{ if(!classDates.includes(d)) classDates.push(d); });
     }
     classDates.sort();
