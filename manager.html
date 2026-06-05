@@ -4625,7 +4625,7 @@ const KR_HOLIDAYS_NOTI = {
   '2026-01-01':'신정','2026-02-16':'설날연휴','2026-02-17':'설날','2026-02-18':'설날연휴',
   '2026-03-01':'삼일절','2026-03-02':'대체공휴일',
   '2026-05-05':'어린이날','2026-05-24':'부처님오신날','2026-05-25':'대체공휴일',
-  '2026-06-06':'현충일','2026-08-15':'광복절',
+  '2026-06-06':'현충일','2026-07-17':'제헌절','2026-08-15':'광복절','2026-08-17':'대체공휴일',
   '2026-09-24':'추석연휴','2026-09-25':'추석','2026-09-26':'추석연휴',
   '2026-10-03':'개천절','2026-10-09':'한글날','2026-12-25':'성탄절',
   '2027-01-01':'신정','2027-02-06':'설날연휴','2027-02-07':'설날','2027-02-08':'설날연휴',
@@ -4665,7 +4665,11 @@ function getClassDatesForNoti(startDate, endDate, daysStr){
   const cur=new Date(startDate+'T00:00:00');
   const end=new Date(endDate+'T00:00:00');
   while(cur<=end){
-    if(days.includes(cur.getDay())) dates.push(_localDateN(cur));
+    const ds=_localDateN(cur);
+    // 공휴일은 수업 없음 (대체공휴일은 수업 있을 수 있으므로 제외 안 함)
+    const holiday=KR_HOLIDAYS_NOTI[ds];
+    const isHoliday=holiday&&!holiday.includes('대체공휴일');
+    if(days.includes(cur.getDay())&&!isHoliday) dates.push(ds);
     cur.setDate(cur.getDate()+1);
   }
   return dates;
@@ -5264,11 +5268,16 @@ async function _getTimetableDates(teacher, startDate, endDate, time, days) {
 
   function filterDates(allDates, start, end) {
     if (!allDates || !allDates.length) return null;
+    // 공휴일(대체공휴일 제외) 제거
+    function notHoliday(d) {
+      const h = KR_HOLIDAYS_NOTI[d];
+      return !h || h.includes('대체공휴일');
+    }
     if (start && end) {
-      const f = allDates.filter(function(d) { return d >= start && d <= end; });
+      const f = allDates.filter(function(d) { return d >= start && d <= end && notHoliday(d); });
       return f.length ? f : null;
     } else if (start) {
-      const f = allDates.filter(function(d) { return d >= start; }).slice(0, 10);
+      const f = allDates.filter(function(d) { return d >= start && notHoliday(d); }).slice(0, 10);
       return f.length ? f : null;
     }
     return null;
@@ -5904,7 +5913,7 @@ const KR_HOLIDAYS_FALLBACK = {
   '2026-01-01':'신정','2026-02-16':'설날연휴','2026-02-17':'설날','2026-02-18':'설날연휴',
   '2026-03-01':'삼일절','2026-03-02':'대체공휴일',
   '2026-05-05':'어린이날','2026-05-24':'부처님오신날','2026-05-25':'대체공휴일',
-  '2026-06-06':'현충일','2026-08-15':'광복절',
+  '2026-06-06':'현충일','2026-07-17':'제헌절','2026-08-15':'광복절','2026-08-17':'대체공휴일',
   '2026-09-24':'추석연휴','2026-09-25':'추석','2026-09-26':'추석연휴',
   '2026-10-03':'개천절','2026-10-09':'한글날','2026-12-25':'성탄절',
   '2027-01-01':'신정','2027-02-06':'설날연휴','2027-02-07':'설날','2027-02-08':'설날연휴',
