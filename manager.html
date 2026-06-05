@@ -5519,7 +5519,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
 
   // 연강 안내 배너
   const linkedBanner = linkedMks.length > 0
-    ? `<div style="margin-bottom:6px;padding:4px 10px;background:rgba(91,79,255,.08);border-radius:6px;font-size:11px;color:#5b4fff;font-weight:700;border:0.5px solid rgba(91,79,255,.2);">🔗 연강 수업 포함 (${clsNames.join(' + ')}) — 수업일 합산 표시</div>`
+    ? `<div style="margin-bottom:6px;padding:4px 10px;background:rgba(91,79,255,.08);border-radius:6px;font-size:11px;color:#5b4fff;font-weight:700;border:0.5px solid rgba(91,79,255,.2);">🔗 연강 수업 포함 (${p.cls||''}) — 수업일 합산 표시</div>`
     : '';
   document.getElementById('notiInfo').insertAdjacentHTML('beforebegin', '');
   const infoRows=[
