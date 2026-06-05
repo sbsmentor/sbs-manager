@@ -5531,7 +5531,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
         return dates2;
       }
 
-      // 같은 달 같은 강사 수업 전체 수집 (중복 방지: mk 기준)
+      // 같은 달 모든 수업 수집 (강사 무관 - 수업별 출석일 분리)
       const allSameMk = [];
       Object.entries(sched).forEach(function([k,v]){
         const kb = k.replace(/_\d+$/,'');
@@ -5540,6 +5540,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
         if(!pp2.cls) return;
         allSameMk.push({mk:k, p:pp2});
       });
+      console.log('[attend] mkBase:', mkBase, '/ allSameMk:', allSameMk.length, allSameMk.map(function(x){return x.mk+':'+x.p.cls;}));
 
       let attendHtml;
       if(allSameMk.length > 1){
