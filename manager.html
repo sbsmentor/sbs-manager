@@ -5462,14 +5462,20 @@ async function openNotiCardFromBoard(arrName, si, mk){
 
   // 수업 정보 (편집 가능)
   const labelStyle = 'display:inline-block;width:52px;font-weight:700;color:#64748b;';
-  const valStyle = 'border:none;border-bottom:none;background:transparent;font-size:11px;font-family:inherit;color:inherit;cursor:text;outline:none;min-width:80px;text-decoration:none;';
+  const valStyle = 'border:none;border-bottom:none;background:transparent;font-size:11px;font-family:inherit;color:inherit;cursor:text;outline:none;min-width:20px;text-decoration:none;';
 
   // ── 연강 포함 모든 수업 정보 합산 ──
   const allCourses = [{p}].concat(linkedMks); // 현재 + 연강 수업 전체
 
-  // 과목: 중복 제거, 과목명 짧게 정리 (괄호 안 동일하면 기본 과목명만)
-  const clsNames = [...new Set(allCourses.map(c => c.p.cls).filter(Boolean))];
-  const displayCls = clsNames.join(', ');
+  // 과목: 같은 달 전체 수업명 (중복 제거)
+  const allClsNames = [];
+  Object.entries(sched).forEach(function([k,v]){
+    const kb = k.replace(/_\d+$/,'');
+    if(kb !== mkBase) return;
+    const pp2 = bdParseVal(v);
+    if(pp2.cls && !allClsNames.includes(pp2.cls)) allClsNames.push(pp2.cls);
+  });
+  const displayCls = allClsNames.length ? allClsNames.join(', ') : (p.cls||'');
 
   // 강사: 중복 제거 — 단일 강사면 표시, 여러 강사면 빈칸(각 수업마다 강사 다를 수 있음)
   const teacherNames = [...new Set(allCourses.map(c => (c.p.teacher||'').replace(' 강사','').trim()).filter(Boolean))];
