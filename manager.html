@@ -4587,7 +4587,7 @@ function tabBulkAction(tab, action) {
         <div id="notiCalWrap"></div>
 
         <!-- 수업 정보 -->
-        <div id="notiInfo" style="margin-top:7px;background:#f8fafc;border-radius:8px;padding:6px 11px;font-size:11px;line-height:1.45;border:1px solid #e2e8f0;"></div>
+        <div id="notiInfo" style="margin-top:7px;background:#f8fafc;border-radius:8px;padding:8px 12px;font-size:11px;line-height:1.6;border:1px solid #e2e8f0;"></div>
 
         <!-- 공지사항 -->
         <div style="margin-top:6px;background:#f0fdf4;border-radius:8px;padding:7px 11px;font-size:10px;line-height:1.7;color:#374151;border:1px solid #bbf7d0;">
@@ -5385,7 +5385,6 @@ async function openNotiCardFromBoard(arrName, si, mk){
   }
   const val=sched[resolvedMk]||'';
   const p=bdParseVal(val);
-  console.log('[noti2] resolvedMk:', resolvedMk, 'val:', val.slice(0,30), 'p.cls:', p.cls);
   if(!p.cls){ showToast('⚠ 수업 정보가 없습니다. 먼저 수업을 배정해주세요.'); return; }
 
   const startDate=p.startDate||''; let endDate=p.endDate||''; const daysStr=p.days||'';
@@ -5416,11 +5415,11 @@ async function openNotiCardFromBoard(arrName, si, mk){
   let classDates;
   const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time, p.days);
   if(fbDates && fbDates.length){
-    classDates = fbDates; // gkyilDates에서 해당 범위 날짜 있음
+    classDates = fbDates;
   } else {
-    // gkyilDates에 없거나 해당 범위 없음 → days로 계산 (화목금처럼 별도 열 없는 경우)
     classDates = getClassDatesForNoti(startDate, endDate, daysStr);
   }
+  console.log('[noti3] classDates:', classDates.length, '/ startDate:', startDate, 'endDate:', endDate);
 
   // 연강이면 날짜 합산 (중복제거)
   if(linkedMks.length > 0){
@@ -5524,12 +5523,12 @@ async function openNotiCardFromBoard(arrName, si, mk){
     : '';
   document.getElementById('notiInfo').insertAdjacentHTML('beforebegin', '');
   const infoRows=[
-    `<div style="line-height:1.5;"><b style="${labelStyle}">과 목 :</b> <input value="${displayCls}" style="${valStyle}" onchange="_notiEditField('cls',this.value)" /></div>`,
-    `<div style="line-height:1.5;"><b style="${labelStyle}">강 사 :</b> <input value="${displayTeacher}" placeholder="강사명 입력" style="${valStyle}" onchange="_notiEditField('teacher',this.value)" /></div>`,
-    `<div style="line-height:1.5;"><b style="${labelStyle}">요 일 :</b> <input value="${displayDays}" style="${valStyle}${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('daysLabel',this.value)" /></div>`,
-    `<div style="line-height:1.5;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" style="${valStyle}${linkedMks.length>1?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
-    `<div style="line-height:1.5;"><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /></div>`,
-    `<div style="line-height:1.5;"><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /></div>`,
+    `<div style="line-height:1.7;"><b style="${labelStyle}">과 목 :</b> <input value="${displayCls}" style="${valStyle}" onchange="_notiEditField('cls',this.value)" /></div>`,
+    `<div style="line-height:1.7;"><b style="${labelStyle}">강 사 :</b> <input value="${displayTeacher}" placeholder="강사명 입력" style="${valStyle}" onchange="_notiEditField('teacher',this.value)" /></div>`,
+    `<div style="line-height:1.7;"><b style="${labelStyle}">요 일 :</b> <input value="${displayDays}" style="${valStyle}${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('daysLabel',this.value)" /></div>`,
+    `<div style="line-height:1.7;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" style="${valStyle}${linkedMks.length>1?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
+    `<div style="line-height:1.7;"><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /></div>`,
+    `<div style="line-height:1.7;"><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /></div>`,
     (()=>{
       // 출석일: 같은 달 같은 강사 모든 수업을 수업명별로 분리 표시
       // linkedMks 여부와 관계없이 sched에서 직접 수집
@@ -5589,12 +5588,13 @@ async function openNotiCardFromBoard(arrName, si, mk){
       } else {
         attendHtml = classDates.map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
       }
-      return `<div style="line-height:1.6;margin-top:2px;"><b style="${labelStyle}">출석일 :</b> <span id="notiAttendList" style="font-size:11px;color:#374151;font-family:inherit;">${attendHtml}</span></div>`;
+      return `<div style="line-height:1.7;margin-top:3px;"><b style="${labelStyle}">출석일 :</b> <span id="notiAttendList" style="font-size:11px;color:#374151;font-family:inherit;">${attendHtml}</span></div>`;
     })(),
   ].join('');
   document.getElementById('notiInfo').innerHTML = linkedBanner + infoRows;
 
-  _notiCtx={arrName,si,mk,val,p,noClassNote,sy,sm,startDow,endDow,daysLabel,origDates:classDates};
+  console.log('[noti4] _notiCtx 저장');
+    _notiCtx={arrName,si,mk,val,p,noClassNote,sy,sm,startDow,endDow,daysLabel,origDates:classDates};
 
   document.getElementById('notiImgCopyBtn').onclick=()=>saveNotiImage(p.cls,startDate);
   document.getElementById('notiTxtCopyBtn').onclick=()=>copyNotiText();
@@ -5726,14 +5726,32 @@ function copyNotiText(){
   if(!_notiCtx) return;
   const {p,sy,sm,noClassNote,startDow,endDow,daysLabel}=_notiCtx;
   const startDate=p.startDate||''; const endDate=p.endDate||'';
+  // 카드에서 실제 편집된 input 값 읽기
+  const infoEl=document.getElementById('notiInfo');
+  function getVal(label){
+    if(!infoEl) return null;
+    const inputs=infoEl.querySelectorAll('input');
+    for(const inp of inputs){ if(inp.previousElementSibling&&inp.previousElementSibling.textContent.includes(label)) return inp.value||null; }
+    return null;
+  }
+  const cls=getVal('과 목')||p.cls;
+  const teacher=getVal('강 사')||(p.teacher?(p.teacher.replace(' 강사','')):null);
+  const days=getVal('요 일')||daysLabel;
+  const time=getVal('시 간')||p.time;
+  const sDate=getVal('개 강')||startDate;
+  const eDate=getVal('종 강')||endDate;
+  // 출석일 텍스트
+  const attendEl=document.getElementById('notiAttendList');
+  const attendText=attendEl?attendEl.innerText.replace(/<br>/g,'\n'):'';
   const lines=[
     `● ${sy}년 ${parseInt(sm)}월 개강안내 ●`, '',
-    `과 목 : ${p.cls}`,
-    p.teacher?`강 사 : ${p.teacher} 강사`:null,
-    daysLabel?`요 일 : ${daysLabel}`:null,
-    p.time?`시 간 : ${p.time}`:null,
-    startDate?`개 강 : ${startDate} (${startDow})`:null,
-    endDate?`종 강 : ${endDate} (${endDow})`:null,
+    cls?`과 목 : ${cls}`:null,
+    teacher?`강 사 : ${teacher} 강사`:null,
+    days?`요 일 : ${days}`:null,
+    time?`시 간 : ${time}`:null,
+    sDate?`개 강 : ${sDate}`:null,
+    eDate?`종 강 : ${eDate}`:null,
+    attendText?`출석일 : ${attendText}`:null,
     '',
     '▼ 공 지 사 항 ▼',
     '📢 과목변경/휴학신청은 개강 3일전까지 가능합니다.',
