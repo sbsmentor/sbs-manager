@@ -5623,18 +5623,19 @@ async function openNotiCardFromBoard(arrName, si, mk){
   }
   _notiDateCache[_cacheKey] = {removed: window._notiRemovedDates, custom: window._notiCustomDates};
 
-  // 달력용 전체 날짜 = 메인 + linkedMks 합산
+  // 달력용 전체 날짜 = 같은 달 모든 수업 합산 (강사 무관)
   const allClassDates = [...classDates];
-  if(linkedMks.length > 0){
-    for(const {p:pp2} of linkedMks){
-      const fbD3 = await _getTimetableDates(pp2.teacher, pp2.startDate, pp2.endDate, pp2.time, pp2.days);
-      let d3;
-      if(fbD3 && fbD3.length) d3 = fbD3;
-      else d3 = getClassDatesForNoti(pp2.startDate||'', pp2.endDate||'', pp2.days||'');
-      d3.forEach(function(d){ if(!allClassDates.includes(d)) allClassDates.push(d); });
-    }
-    allClassDates.sort();
+  const allSchedEntries = Object.entries(sched).filter(function([k]){ return k.replace(/_\d+$/,'')===mkBase && k!==mk; });
+  for(const [,v2] of allSchedEntries){
+    const pp2 = bdParseVal(v2);
+    if(!pp2.cls || !pp2.startDate) continue;
+    const fbD3 = await _getTimetableDates(pp2.teacher, pp2.startDate, pp2.endDate, pp2.time, pp2.days);
+    let d3;
+    if(fbD3 && fbD3.length) d3 = fbD3;
+    else d3 = getClassDatesForNoti(pp2.startDate||'', pp2.endDate||'', pp2.days||'');
+    d3.forEach(function(d){ if(!allClassDates.includes(d)) allClassDates.push(d); });
   }
+  allClassDates.sort();
   // 날짜 상태로 달력 재렌더 (removed/custom 반영)
   const allDates2 = [...allClassDates.filter(d => !window._notiRemovedDates.has(d)), ...window._notiCustomDates];
   const moSet2 = new Set(allDates2.map(d => d.slice(0,7)));
