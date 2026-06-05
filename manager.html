@@ -5511,32 +5511,44 @@ async function openNotiCardFromBoard(arrName, si, mk){
     `<div style="line-height:1.5;"><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /></div>`,
     `<div style="line-height:1.5;"><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /></div>`,
     (()=>{
-      // 출석일: 수업별 분리 표시 (달력은 합산, 텍스트만 분리)
-      let attendHtml;
-      if(linkedMks.length > 0){
-        // 메인 수업 날짜
-        const mainShort = p.cls.replace(/\([^)]*\)/g,'').trim();
-        const parts = [`<span style="color:#475569;font-weight:700;">${mainShort}:</span> ${classDates.map(d=>d.slice(5).replace('-','/')).join(', ')}`];
-        // 연강 수업별 날짜 (이미 계산된 d2 재계산)
-        for(const {p:pp} of linkedMks){
-          const ppShort = (pp.cls||'').replace(/\([^)]*\)/g,'').trim();
-          // gkyilDates에서 패턴키로 조회, 없으면 days 계산
-          let ppDates = [];
-          if(window._gkyilDates){
-            const allKeys2 = Object.keys(window._gkyilDates);
-            const ppDays = pp.days||'';
-            const patKey2 = allKeys2.find(function(k){
-              if(!k.startsWith(pp.teacher+'_')) return false;
-              const pat2 = k.slice(pp.teacher.length+1);
-              const dc = ppDays.replace(/[^월화수목금토일]/g,'');
-              return dc.split('').every(function(c){ return pat2.includes(c); });
-            });
-            if(patKey2) ppDates = (window._gkyilDates[patKey2]||[]).filter(function(d){ return d>=(pp.startDate||'') && d<=(pp.endDate||'9999'); });
-            else if(window._gkyilDates[pp.teacher]) ppDates = (window._gkyilDates[pp.teacher]||[]).filter(function(d){ return d>=(pp.startDate||'') && d<=(pp.endDate||'9999'); });
-          }
-          if(!ppDates.length) ppDates = getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
-          parts.push(`<span style="color:#475569;font-weight:700;">${ppShort}:</span> ${ppDates.map(d=>d.slice(5).replace('-','/')).join(', ')}`);
+      // 출석일: 같은 달 같은 강사 모든 수업을 수업명별로 분리 표시
+      // linkedMks 여부와 관계없이 sched에서 직접 수집
+      function getAttendDates(pp2) {
+        let dates2 = [];
+        if(window._gkyilDates){
+          const allKeys2 = Object.keys(window._gkyilDates);
+          const ppDays2 = pp2.days||'';
+          const patKey2 = allKeys2.find(function(k){
+            if(!k.startsWith(pp2.teacher+'_')) return false;
+            const pat2 = k.slice(pp2.teacher.length+1);
+            const dc = ppDays2.replace(/[^월화수목금토일]/g,'');
+            return dc && dc.split('').every(function(c){ return pat2.includes(c); });
+          });
+          if(patKey2) dates2 = (window._gkyilDates[patKey2]||[]).filter(function(d){ return d>=(pp2.startDate||'') && d<=(pp2.endDate||'9999'); });
+          else if(window._gkyilDates[pp2.teacher]) dates2 = (window._gkyilDates[pp2.teacher]||[]).filter(function(d){ return d>=(pp2.startDate||'') && d<=(pp2.endDate||'9999'); });
         }
+        if(!dates2.length) dates2 = getClassDatesForNoti(pp2.startDate||'', pp2.endDate||'', pp2.days||'');
+        return dates2;
+      }
+
+      // 같은 달 같은 강사 수업 전체 수집 (중복 방지: mk 기준)
+      const allSameMk = [];
+      Object.entries(sched).forEach(function([k,v]){
+        const kb = k.replace(/_\d+$/,'');
+        if(kb !== mkBase) return;
+        const pp2 = bdParseVal(v);
+        if(!pp2.cls) return;
+        allSameMk.push({mk:k, p:pp2});
+      });
+
+      let attendHtml;
+      if(allSameMk.length > 1){
+        // 수업별 분리
+        const parts = allSameMk.map(function(item){
+          const short2 = (item.p.cls||'').replace(/\([^)]*\)/g,'').trim();
+          const dates2 = getAttendDates(item.p);
+          return '<span style="color:#475569;font-weight:700;">' + short2 + ':</span> ' + dates2.map(function(d){ return d.slice(5).replace('-','/'); }).join(', ');
+        });
         attendHtml = parts.join('<br>');
       } else {
         attendHtml = classDates.map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
