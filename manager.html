@@ -5036,11 +5036,17 @@ window.uploadGkyilDates = async function(event) {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
 
-      // index 0: 강의실+강사명(XXXT) 행
-      // index 1: 패턴 행
-      // index 3~: 날짜 행 (개강 마커 행 섞여있음)
-      const headerRow  = rows[0] || [];
-      const patternRow = rows[1] || [];
+      // 행 구조: 0=빈행, 1=강사명행, 2=패턴행, 3=빈행, 4~=날짜행
+      // 빈 첫 행을 건너뛰고 실제 강사명/패턴 행 찾기
+      let headerRowIdx = 0;
+      for (let ri = 0; ri < Math.min(rows.length, 5); ri++) {
+        if (rows[ri] && rows[ri].some(function(v){ return v && typeof v === 'string' && v.includes('T'); })) {
+          headerRowIdx = ri; break;
+        }
+      }
+      const headerRow  = rows[headerRowIdx] || [];
+      const patternRow = rows[headerRowIdx + 1] || [];
+      const dateStartIdx = headerRowIdx + 3; // 날짜 시작 행
 
       // 강사 컬럼 매핑 (기본: XXXT 헤더)
       const teacherCols = {};
@@ -5123,7 +5129,7 @@ window.uploadGkyilDates = async function(event) {
         if (!result[teacher]) result[teacher] = [];
       });
 
-      for (let ri = 3; ri < rows.length; ri++) {
+      for (let ri = dateStartIdx; ri < rows.length; ri++) {
         const row = rows[ri] || [];
         const col0 = row[0];
         // 개강 마커 행도 날짜가 있으면 수집 (개강일이 마커 행에 같이 있음)
