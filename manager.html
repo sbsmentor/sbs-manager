@@ -3106,6 +3106,13 @@ function renderBoardTable(){
   });
   html+=`</tbody></table></div>`;
   document.getElementById('boardTable').innerHTML=html;
+  // 개강안내 버튼 직접 이벤트 바인딩
+  document.querySelectorAll('.noti-open-btn').forEach(function(el){
+    el.addEventListener('click', function(e){
+      e.stopPropagation();
+      window.openNotiCardFromBoard(el.dataset.arr, parseInt(el.dataset.idx), el.dataset.mk);
+    });
+  });
 }
 
 
