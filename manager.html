@@ -4995,20 +4995,10 @@ async function saveNotiDates() {
 
     const saves = [window._fbDb.ref('notiDates/' + key).set(data)];
 
-    // 격일반 데이터도 수정된 날짜로 자동 업데이트
-    const teacher = _notiCtx.p && _notiCtx.p.teacher;
-    if (teacher && finalDates.length) {
-      // 메모리 캐시도 즉시 업데이트
-      if (!window._gkyilDates) window._gkyilDates = {};
-      window._gkyilDates[teacher] = finalDates;
-      // Firebase gkyilDates 업데이트
-      saves.push(window._fbDb.ref('gkyilDates/' + teacher).set(finalDates.join(',')));
-    }
-
     await Promise.all(saves);
     const btn = document.getElementById('notiSaveBtn');
     if (btn) { btn.textContent = '✅ 저장됨'; setTimeout(() => { btn.textContent = '💾 저장'; btn.style.display='none'; }, 1500); }
-    showToast('✅ 날짜 저장 완료' + (teacher ? ' (격일반 데이터도 업데이트)' : ''));
+    showToast('✅ 날짜 설정 저장됨');
   } catch(e) {
     showToast('❌ 저장 실패: ' + e.message);
   }
