@@ -5550,10 +5550,9 @@ async function openNotiCardFromBoard(arrName, si, mk){
           const short2 = (item.p.cls||'').replace(/\([^)]*\)/g,'').trim();
           if(!clsGroups[short2]){ clsGroups[short2] = []; clsOrder.push(short2); }
           const dates2 = getAttendDates(item.p);
-          console.log('[attend2]', short2, item.p.startDate, '→', dates2.length, '개');
+
           dates2.forEach(function(d){ if(!clsGroups[short2].includes(d)) clsGroups[short2].push(d); });
         });
-        console.log('[attend2] uniqueCls:', clsOrder, '/ groups:', Object.keys(clsGroups).map(function(k){return k+':'+clsGroups[k].length;}));
         // 수업 종류가 2개 이상이면 분리 표시, 1개(같은 수업 월수금+화목금)면 합산
         const uniqueCls = clsOrder;
         if(uniqueCls.length > 1){
