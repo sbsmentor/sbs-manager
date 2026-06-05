@@ -5312,20 +5312,22 @@ async function openNotiCardFromBoard(arrName, si, mk){
   const startDate=p.startDate||''; let endDate=p.endDate||''; const daysStr=p.days||'';
   const mkBase = mk.replace(/_\d+$/, ''); // "2026년 7월_2" → "2026년 7월"
 
-  // 연강 감지: 같은 달 + 같은 강사인 수업을 하나의 카드로 합산
-  // (월수금+화목금, 16시+19시 등 동일 강사의 여러 수업 → 날짜 합산)
-  // 단, 기본키("2026년 7월")를 열었을 때만 _2, _3을 포함 (중복 방지)
+  // 연강 감지: 같은 달 + 같은 강사 + 개강일이 ±7일 이내인 수업만 합산
+  // (월수금+화목금처럼 개강일이 1~2일 차이, 16시+19시처럼 같은 날 개강)
+  // 개강일이 크게 다른 수업(다른 기수)은 별도 카드
   const isBaseKey = !mk.match(/_\d+$/);
   const linkedMks = [];
-  if(isBaseKey){ // 기본키일 때만 연강 수집
+  if(isBaseKey){
     Object.entries(sched).forEach(([k,v]) => {
       if(k===mk) return;
       const kBase = k.replace(/_\d+$/, '');
-      if(kBase !== mkBase) return; // 다른 달이면 제외
+      if(kBase !== mkBase) return;
       const pp = bdParseVal(v);
-      if(!pp.cls) return;
-      // 같은 강사인 수업만 합산 (다른 강사 수업은 별도 카드)
+      if(!pp.cls || !pp.startDate) return;
       if(pp.teacher !== p.teacher) return;
+      // 개강일 차이가 ±7일 이내인 경우만 연강으로 묶음
+      const diffDays = Math.abs(new Date(pp.startDate) - new Date(p.startDate)) / 86400000;
+      if(diffDays > 7) return;
       linkedMks.push({mk:k, p:pp});
     });
   }
