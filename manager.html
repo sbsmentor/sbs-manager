@@ -5540,17 +5540,31 @@ async function openNotiCardFromBoard(arrName, si, mk){
         if(!pp2.cls) return;
         allSameMk.push({mk:k, p:pp2});
       });
-      console.log('[attend] mkBase:', mkBase, '/ allSameMk:', allSameMk.length, allSameMk.map(function(x){return x.mk+':'+x.p.cls;}));
 
       let attendHtml;
       if(allSameMk.length > 1){
-        // 수업별 분리
-        const parts = allSameMk.map(function(item){
+        // 수업명별로 그룹화해서 날짜 합산
+        const clsGroups = {};
+        const clsOrder = [];
+        allSameMk.forEach(function(item){
           const short2 = (item.p.cls||'').replace(/\([^)]*\)/g,'').trim();
+          if(!clsGroups[short2]){ clsGroups[short2] = []; clsOrder.push(short2); }
           const dates2 = getAttendDates(item.p);
-          return '<span style="color:#475569;font-weight:700;">' + short2 + ':</span> ' + dates2.map(function(d){ return d.slice(5).replace('-','/'); }).join(', ');
+          dates2.forEach(function(d){ if(!clsGroups[short2].includes(d)) clsGroups[short2].push(d); });
         });
-        attendHtml = parts.join('<br>');
+        // 수업 종류가 2개 이상이면 분리 표시, 1개(같은 수업 월수금+화목금)면 합산
+        const uniqueCls = clsOrder;
+        if(uniqueCls.length > 1){
+          const parts = uniqueCls.map(function(cls){
+            const sorted = clsGroups[cls].slice().sort();
+            return '<span style="color:#475569;font-weight:700;">' + cls + ':</span> ' + sorted.map(function(d){ return d.slice(5).replace('-','/'); }).join(', ');
+          });
+          attendHtml = parts.join('<br>');
+        } else {
+          // 같은 수업 여러 요일 → 합산 표시
+          const allMerged = clsGroups[uniqueCls[0]].slice().sort();
+          attendHtml = allMerged.map(function(d){ return d.slice(5).replace('-','/'); }).join(', ') || '-';
+        }
       } else {
         attendHtml = classDates.map(d=>d.slice(5).replace('-','/')).join(', ') || '-';
       }
