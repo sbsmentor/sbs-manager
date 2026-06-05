@@ -5370,7 +5370,7 @@ async function _getTimetableDates(teacher, startDate, endDate, time, days) {
   } catch(e) { return null; }
 }
 
-async function openNotiCardFromBoard(arrName, si, mk){
+window.openNotiCardFromBoard = async function openNotiCardFromBoard(arrName, si, mk){
   const arr=window[arrName];
   if(!arr||!arr[si]) return;
   const sched=arr[si]['수업배정']||{};
