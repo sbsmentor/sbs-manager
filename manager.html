@@ -5419,7 +5419,6 @@ async function openNotiCardFromBoard(arrName, si, mk){
   } else {
     classDates = getClassDatesForNoti(startDate, endDate, daysStr);
   }
-  console.log('[noti3] classDates:', classDates.length, '/ startDate:', startDate, 'endDate:', endDate);
 
   // 연강이면 날짜 합산 (중복제거)
   if(linkedMks.length > 0){
@@ -5529,7 +5528,6 @@ async function openNotiCardFromBoard(arrName, si, mk){
     `<div style="line-height:1.7;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" style="${valStyle}${linkedMks.length>1?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
     `<div style="line-height:1.7;"><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /></div>`,
     `<div style="line-height:1.7;"><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /></div>`,
-    `<div style="line-height:1.7;margin-top:2px;"><b style="${labelStyle}">출석일 :</b> <span id="notiAttendList" style="font-size:11px;color:#374151;font-family:inherit;">${classDates.map(d=>d.slice(5).replace('-','\/')).join(', ')||'- '}</span></div>`,
     (()=>{
       // 출석일: 같은 달 같은 강사 모든 수업을 수업명별로 분리 표시
       // linkedMks 여부와 관계없이 sched에서 직접 수집
@@ -5594,7 +5592,6 @@ async function openNotiCardFromBoard(arrName, si, mk){
   ].join('');
   document.getElementById('notiInfo').innerHTML = linkedBanner + infoRows;
 
-  console.log('[noti4] _notiCtx 저장');
     _notiCtx={arrName,si,mk,val,p,noClassNote,sy,sm,startDow,endDow,daysLabel,origDates:classDates};
 
   document.getElementById('notiImgCopyBtn').onclick=()=>saveNotiImage(p.cls,startDate);
