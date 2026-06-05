@@ -5057,32 +5057,33 @@ window.uploadGkyilDates = async function(event) {
         }
       });
 
-      // 강의실 블록 분석: 같은 강의실 블록 내 강사가 1명이면 단일컬럼(패턴열 매핑 금지)
-      const roomBlocks = {};
-      let curRoom = null;
-      headerRow.forEach(function(v, i) {
-        if (v && typeof v === 'string' && /강의장|비대면|강의실/.test(v)) {
-          curRoom = i; roomBlocks[i] = [];
-        } else if (v && typeof v === 'string' && v.trim()) {
-          const mR = v.trim().match(/^([가-힣]{2,5})T$/);
-          if (mR && curRoom !== null) roomBlocks[curRoom].push(i);
-        }
-      });
-      const singleTeachers = new Set();
-      Object.keys(roomBlocks).forEach(function(rc) {
-        if (roomBlocks[rc].length === 1) singleTeachers.add(roomBlocks[rc][0]);
-      });
-
-      // 패턴 컬럼 매핑: 단일컬럼 강사(같은 블록에 혼자) 바로 옆 패턴열은 매핑 안 함
+      // 패턴 컬럼 매핑:
+      // 강사T 바로 다음 연속된 패턴열 → 같은 강사로 매핑
+      // 다른 강사T나 강의실 헤더를 만나면 중단
       patternRow.forEach(function(pat, i) {
         if (!pat || !pat.toString().trim()) return;
         if (headerRow[i]) return;
-        for (let j = i - 1; j >= 0; j--) {
-          if (teacherCols[j]) {
-            if (!singleTeachers.has(j)) teacherCols[i] = teacherCols[j];
-            break;
+        // 바로 왼쪽이 강사T면 매핑, 아니면 건너뜀
+        const leftH = (i > 0) ? headerRow[i - 1] : null;
+        if (leftH && typeof leftH === 'string' && leftH.trim()) {
+          // 바로 왼쪽이 강사T 헤더인 경우만 매핑
+          if (teacherCols[i - 1]) {
+            teacherCols[i] = teacherCols[i - 1];
           }
-          if (headerRow[j] && typeof headerRow[j] === 'string' && headerRow[j].trim()) break;
+          // 다른 헤더(강의실명 등)면 매핑 안 함
+        }
+        // 바로 왼쪽이 빈 헤더면: 그 왼쪽의 패턴열과 같은 강사일 수 있음
+        // → 연속된 패턴열 그룹에서 가장 왼쪽 강사T를 찾음
+        else {
+          for (let j = i - 1; j >= 0; j--) {
+            const h = headerRow[j];
+            if (h && typeof h === 'string' && h.trim()) {
+              if (teacherCols[j]) teacherCols[i] = teacherCols[j];
+              break;
+            }
+            // 이미 매핑된 패턴열이면 같은 강사
+            if (teacherCols[j]) { teacherCols[i] = teacherCols[j]; break; }
+          }
         }
       });
 
@@ -5122,23 +5123,26 @@ window.uploadGkyilDates = async function(event) {
         return null;
       }
 
-      // 강사별 전체 날짜 수집 (개강 마커 행 건너뜀, 중복 제거)
+      // 강사+패턴별로 날짜 수집: "조아라_월수금", "조아라_화목금" 형태로 분리 저장
       const result = {};
+      const colPatternKey = {}; // col → "강사명_패턴"
       Object.keys(teacherCols).forEach(function(col) {
         const teacher = teacherCols[col];
-        if (!result[teacher]) result[teacher] = [];
+        const pat = (patternRow[parseInt(col)] || '').toString().trim().replace(/\s/g,'');
+        const key = pat ? teacher + '_' + pat : teacher;
+        colPatternKey[col] = key;
+        if (!result[key]) result[key] = [];
       });
 
       for (let ri = dateStartIdx; ri < rows.length; ri++) {
         const row = rows[ri] || [];
         const col0 = row[0];
-        // 개강 마커 행도 날짜가 있으면 수집 (개강일이 마커 행에 같이 있음)
         let anyDate = false;
         Object.keys(teacherCols).forEach(function(col) {
           const ds = fmtDate(row[parseInt(col)]);
-          // 중복 날짜 제거 (같은 강사의 두 컬럼에서 같은 날짜가 올 수 있음)
-          if (ds && !result[teacherCols[col]].includes(ds)) {
-            result[teacherCols[col]].push(ds);
+          const key = colPatternKey[col];
+          if (ds && !result[key].includes(ds)) {
+            result[key].push(ds);
             anyDate = true;
           }
         });
@@ -5231,7 +5235,7 @@ function _loadGkyilDatesFromFirebase() {
 
 // Firebase timetable에서 해당 강좌의 dates 필드 조회
 // 우선순위: 1) 메모리 _gkyilDates 2) Firebase gkyilDates 직접 조회 3) Firebase timetable.dates
-async function _getTimetableDates(teacher, startDate, endDate, time) {
+async function _getTimetableDates(teacher, startDate, endDate, time, days) {
   if (!teacher || !startDate) return null;
   // 아직 한 번도 로드 안 됐으면 Firebase에서 로드
   if (!window._gkyilDatesLoaded && window._fbDb) {
@@ -5241,6 +5245,15 @@ async function _getTimetableDates(teacher, startDate, endDate, time) {
   console.log('[gkyil] 조회:', teacher, startDate, endDate, '/ 로드된 강사:', Object.keys(window._gkyilDates||{}));
 
   // 날짜 배열에서 개강~종강 범위 필터 헬퍼
+  // 요일 파싱 헬퍼
+  function parseDayNums(daysStr) {
+    if (!daysStr) return null;
+    const map = {'월':1,'화':2,'수':3,'목':4,'금':5,'토':6,'일':0};
+    const nums = [];
+    for (const ch of daysStr) { if (map[ch] !== undefined && !nums.includes(map[ch])) nums.push(map[ch]); }
+    return nums.length ? nums : null;
+  }
+
   function filterDates(allDates, start, end) {
     if (!allDates || !allDates.length) return null;
     if (start && end) {
@@ -5251,6 +5264,18 @@ async function _getTimetableDates(teacher, startDate, endDate, time) {
       return f.length ? f : null;
     }
     return null;
+  }
+
+  // 요일 검증: days가 있으면 결과 날짜의 요일이 days와 맞는지 확인
+  function validateDays(dates, daysStr) {
+    if (!daysStr || !dates || !dates.length) return true;
+    const dayNums = parseDayNums(daysStr);
+    if (!dayNums) return true;
+    // 첫 3개 날짜의 요일이 모두 dayNums에 포함되면 일치
+    const sample = dates.slice(0, 3);
+    return sample.every(function(d) {
+      return dayNums.includes(new Date(d + 'T00:00:00').getDay());
+    });
   }
 
   const start = startDate || '';
@@ -5264,11 +5289,28 @@ async function _getTimetableDates(teacher, startDate, endDate, time) {
       const result = filterDates(window._gkyilDates[exactKey], start, end);
       if (result) { console.log('[gkyil] 메모리(exact) 캐시 적용:', result.length, '일'); return result; }
     }
-    // 강사명만으로 있을 경우: startDate 이후 날짜가 있으면 바로 사용
-    if (window._gkyilDates[teacher]) {
-      const allDates = window._gkyilDates[teacher];
-      const result = filterDates(allDates, start, end);
-      if (result) { console.log('[gkyil] 메모리 캐시 적용:', result.length, '일'); return result; }
+    // 강사+패턴 키 조회: "조아라_월수금월수", "조아라_화목화목금" 등
+    // days로 매칭되는 키 우선 탐색
+    if (window._gkyilDates) {
+      // 1) 패턴 키 매칭: days의 각 글자가 키에 포함되면 매칭
+      const allKeys = Object.keys(window._gkyilDates);
+      const patternKey = allKeys.find(function(k) {
+        if (!k.startsWith(teacher + '_')) return false;
+        const pat = k.slice(teacher.length + 1); // "월수금월수" 등
+        if (!days) return false;
+        // days의 요일 글자들이 패턴에 포함되어 있는지 확인
+        const dayChars = days.replace(/[^월화수목금토일]/g,'');
+        return dayChars.split('').every(function(c){ return pat.includes(c); });
+      });
+      if (patternKey && window._gkyilDates[patternKey]) {
+        const result = filterDates(window._gkyilDates[patternKey], start, end);
+        if (result) { console.log('[gkyil] 패턴키 캐시 적용:', patternKey, result.length, '일'); return result; }
+      }
+      // 2) 강사명만으로 폴백 (단일 패턴 강사)
+      if (window._gkyilDates[teacher]) {
+        const result = filterDates(window._gkyilDates[teacher], start, end);
+        if (result) { console.log('[gkyil] 메모리 캐시 적용:', result.length, '일'); return result; }
+      }
     }
   }
 
@@ -5290,7 +5332,9 @@ async function _getTimetableDates(teacher, startDate, endDate, time) {
         window._gkyilDates[teacher] = allDates;
         // startDate~endDate 범위 날짜 필터 — 여러 기수 데이터가 있어도 범위로 정확히 추출
         const result = filterDates(allDates, start, end);
-        if (result) { console.log('[gkyil] Firebase 직접 조회 적용:', result.length, '일'); return result; }
+        if (result && validateDays(result, days)) {
+          console.log('[gkyil] Firebase 직접 조회 적용:', result.length, '일'); return result;
+        }
       }
     } catch(e) { console.warn('[gkyil] Firebase 직접 조회 실패:', e); }
   }
@@ -5343,36 +5387,28 @@ async function openNotiCardFromBoard(arrName, si, mk){
     linkedMks.push({mk:k, p:pp});
   });
 
-  // endDate는 메인 수업 자체의 값만 사용 (연강 수업의 endDate로 늘리지 않음)
-  // 각 연강 수업은 자신의 endDate 범위에서 날짜를 가져옴
+  // endDate는 메인 수업 자체 값 사용
+  // 연강 수업은 각자의 startDate~endDate 범위로 따로 조회 후 합산
 
-  // ── 날짜 계산: gkyilDates 우선 ──
-  // 강사가 gkyilDates에 있으면 days 폴백 절대 안 함
+  // ── 날짜 계산: gkyilDates 우선, 없으면 days 계산 ──
   let classDates;
-  const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time);
-  const teacherInGkyil = window._gkyilDates && (window._gkyilDates[p.teacher] || window._gkyilDates[p.teacher+'_'+startDate]);
+  const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time, p.days);
   if(fbDates && fbDates.length){
-    classDates = fbDates;
-  } else if(teacherInGkyil){
-    // gkyilDates에 강사는 있지만 해당 기간 데이터 없음 → 빈 배열 (days 폴백 차단)
-    classDates = [];
-    showToast('⚠ ' + p.teacher + ' 격일반 데이터에 해당 기간 날짜가 없습니다');
+    classDates = fbDates; // gkyilDates에서 해당 범위 날짜 있음
   } else {
-    // gkyilDates에 없는 강사 → 일반 수업, days로 계산
+    // gkyilDates에 없거나 해당 범위 없음 → days로 계산 (화목금처럼 별도 열 없는 경우)
     classDates = getClassDatesForNoti(startDate, endDate, daysStr);
   }
 
   // 연강이면 날짜 합산 (중복제거)
   if(linkedMks.length > 0){
     for(const {p:pp} of linkedMks){
-      // 각 연강 수업은 자신의 startDate~endDate 범위로만 날짜 조회
-      const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.endDate, pp.time);
-      const ppInGkyil = window._gkyilDates && (window._gkyilDates[pp.teacher] || window._gkyilDates[pp.teacher+'_'+(pp.startDate||'')]);
+      // 각 연강 수업은 자신의 startDate~endDate 범위로 조회 (다음 기수 날짜 혼입 방지)
+      const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.endDate, pp.time, pp.days);
       let d2;
       if(fbD2 && fbD2.length){
-        d2 = fbD2;
-      } else if(ppInGkyil){
-        d2 = [];
+        // gkyilDates 결과를 pp.endDate로 한 번 더 필터 (월수금 날짜가 섞여있을 수 있음)
+        d2 = fbD2.filter(function(d){ return d >= (pp.startDate||'') && d <= (pp.endDate||'9999'); });
       } else {
         d2 = getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
       }
