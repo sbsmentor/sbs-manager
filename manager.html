@@ -5635,7 +5635,9 @@ async function openNotiCardFromBoard(arrName, si, mk){
   // 저장 버튼 표시
   const saveBtn = document.getElementById('notiSaveBtn');
   if (saveBtn) saveBtn.style.display = 'none'; // 변경 없으면 숨김
+  console.log('[noti] 팝업 표시 직전');
   document.getElementById('notiCardBg').style.display='flex';
+  console.log('[noti] 팝업 표시 완료');
 }
 
 function closeNotiCard(){
