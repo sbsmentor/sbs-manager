@@ -5385,6 +5385,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
   }
   const val=sched[resolvedMk]||'';
   const p=bdParseVal(val);
+  console.log('[noti2] resolvedMk:', resolvedMk, 'val:', val.slice(0,30), 'p.cls:', p.cls);
   if(!p.cls){ showToast('⚠ 수업 정보가 없습니다. 먼저 수업을 배정해주세요.'); return; }
 
   const startDate=p.startDate||''; let endDate=p.endDate||''; const daysStr=p.days||'';
