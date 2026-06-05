@@ -5140,8 +5140,9 @@ window.uploadGkyilDates = async function(event) {
         result[teacher].sort();
       });
 
-      // 메모리에 즉시 저장
+      // 메모리에 즉시 저장 + 로드 플래그 갱신
       window._gkyilDates = result;
+      window._gkyilDatesLoaded = true;
 
       // Firebase: 강사별로 개별 저장 (배열→객체 변환 문제 방지를 위해 JSON 문자열로 저장)
       if (window._fbDb) {
@@ -5199,6 +5200,7 @@ function _loadGkyilDatesFromFirebase() {
       if (hasValidDates) {
         // 항상 Firebase 데이터로 갱신 (메모리 부분 업데이트로 인한 누락 방지)
         window._gkyilDates = converted;
+        window._gkyilDatesLoaded = true; // 로드 완료 플래그
         console.log('[gkyilDates] Firebase에서 로드됨:', Object.keys(converted).length, '명');
         const st = document.getElementById('gkyilStatus');
         if (st) { st.style.display='inline'; st.textContent = '✅ ' + Object.keys(converted).length + '명 로드됨'; }
@@ -5211,10 +5213,10 @@ function _loadGkyilDatesFromFirebase() {
 // 우선순위: 1) 메모리 _gkyilDates 2) Firebase gkyilDates 직접 조회 3) Firebase timetable.dates
 async function _getTimetableDates(teacher, startDate, endDate, time) {
   if (!teacher || !startDate) return null;
-  // 메모리가 비어있거나 해당 강사가 없으면 Firebase 전체 재로드
-  const teacherMissing = !window._gkyilDates || !window._gkyilDates[teacher];
-  if (teacherMissing && window._fbDb) {
+  // 아직 한 번도 로드 안 됐으면 Firebase에서 로드
+  if (!window._gkyilDatesLoaded && window._fbDb) {
     await _loadGkyilDatesFromFirebase();
+    window._gkyilDatesLoaded = true;
   }
   console.log('[gkyil] 조회:', teacher, startDate, endDate, '/ 로드된 강사:', Object.keys(window._gkyilDates||{}));
 
