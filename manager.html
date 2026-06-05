@@ -5260,6 +5260,10 @@ function _loadGkyilDatesFromFirebase() {
         console.log('[gkyilDates] Firebase에서 로드됨:', Object.keys(converted).length, '명');
         const st = document.getElementById('gkyilStatus');
         if (st) { st.style.display='inline'; st.textContent = '✅ ' + Object.keys(converted).length + '명 로드됨'; }
+        // 배정표가 이미 렌더링됐으면 개강안내 버튼 다시 바인딩
+        if (document.getElementById('boardTable') && document.getElementById('boardTable').innerHTML) {
+          renderBoardTable();
+        }
       }
     }
   }).catch(function(e) { console.warn('gkyilDates 로드 실패:', e); });
