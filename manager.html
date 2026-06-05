@@ -5344,13 +5344,8 @@ async function openNotiCardFromBoard(arrName, si, mk){
     });
   }
 
-  // 연강 포함 전체 수업에서 가장 나중 endDate 확정 (같은 mkBase 범위 내)
-  Object.entries(sched).forEach(function([k,v]) {
-    const kBase2 = k.replace(/_\d+$/, '');
-    if(kBase2 !== mkBase) return;
-    const pp = bdParseVal(v);
-    if(pp.endDate && pp.endDate > endDate) endDate = pp.endDate;
-  });
+  // endDate는 메인 수업 자체의 값만 사용 (연강 수업의 endDate로 늘리지 않음)
+  // 각 연강 수업은 자신의 endDate 범위에서 날짜를 가져옴
 
   // ── 날짜 계산: gkyilDates 우선 ──
   // 강사가 gkyilDates에 있으면 days 폴백 절대 안 함
@@ -5371,13 +5366,14 @@ async function openNotiCardFromBoard(arrName, si, mk){
   // 연강이면 날짜 합산 (중복제거)
   if(linkedMks.length > 0){
     for(const {p:pp} of linkedMks){
+      // 각 연강 수업은 자신의 startDate~endDate 범위로만 날짜 조회
       const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.endDate, pp.time);
       const ppInGkyil = window._gkyilDates && (window._gkyilDates[pp.teacher] || window._gkyilDates[pp.teacher+'_'+(pp.startDate||'')]);
       let d2;
       if(fbD2 && fbD2.length){
         d2 = fbD2;
       } else if(ppInGkyil){
-        d2 = []; // gkyilDates 강사인데 해당 기간 없음 → 빈 배열
+        d2 = [];
       } else {
         d2 = getClassDatesForNoti(pp.startDate||'', pp.endDate||'', pp.days||'');
       }
