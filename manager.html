@@ -5465,7 +5465,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
 
   // 수업 정보 (편집 가능)
   const labelStyle = 'display:inline-block;width:38px;font-weight:700;color:#64748b;font-size:10.5px;';
-  const valStyle = 'border:none;border-bottom:none;background:transparent;font-size:11px;font-family:inherit;color:inherit;cursor:text;outline:none;text-decoration:none;';
+  const valStyle = 'border:none;border-bottom:none;background:transparent;font-size:11px;font-family:inherit;color:inherit;cursor:text;outline:none;text-decoration:none;width:100%;box-sizing:border-box;';
 
   // ── 연강 포함 모든 수업 정보 합산 ──
   const allCourses = [{p}].concat(linkedMks); // 현재 + 연강 수업 전체
@@ -5526,10 +5526,10 @@ async function openNotiCardFromBoard(arrName, si, mk){
     : '';
   document.getElementById('notiInfo').insertAdjacentHTML('beforebegin', '');
   const infoRows=[
-    `<div style="line-height:1.7;"><b style="${labelStyle}">과 목 :</b> <input value="${displayCls}" size="${Math.max(displayCls.length,10)}" title="${displayCls}" style="${valStyle}" onchange="_notiEditField('cls',this.value)" /></div>`,
-    `<div style="line-height:1.7;"><b style="${labelStyle}">강 사 :</b> <input value="${displayTeacher}" size="${Math.max(displayTeacher.length,10)}" placeholder="강사명 입력" style="${valStyle}" onchange="_notiEditField('teacher',this.value)" /></div>`,
-    `<div style="line-height:1.7;"><b style="${labelStyle}">요 일 :</b> <input value="${displayDays}" style="${valStyle}${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('daysLabel',this.value)" /></div>`,
-    `<div style="line-height:1.7;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" title="${displayTime}" size="${Math.max(displayTime.length,10)}" style="${valStyle}${linkedMks.length>1?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
+    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">과 목 :</b> <input value="${displayCls}" title="${displayCls}" style="${valStyle}flex:1;" onchange="_notiEditField('cls',this.value)" /></div>`,
+    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">강 사 :</b> <input value="${displayTeacher}" placeholder="강사명 입력" title="${displayTeacher}" style="${valStyle}flex:1;" onchange="_notiEditField('teacher',this.value)" /></div>`,
+    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">요 일 :</b> <input value="${displayDays}" style="${valStyle}flex:1;${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('daysLabel',this.value)" /></div>`,
+    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" title="${displayTime}" style="${valStyle}flex:1;${linkedMks.length>1?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
     `<div style="line-height:1.7;"><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}" onchange="_notiEditField('startDate',this.value)" /></div>`,
     `<div style="line-height:1.7;"><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}" onchange="_notiEditField('endDate',this.value)" /></div>`,
     (()=>{
