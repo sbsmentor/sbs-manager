@@ -5506,7 +5506,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
   // 시간: 같은 달 모든 수업 기준
   const timeEntries = Object.entries(sched)
     .filter(function([k]){ return k.replace(/_\d+$/,'')===mkBase; })
-    .map(function([,v]){ const pp=bdParseVal(v); return {time:pp.time||'', cls:pp.cls||''}; })
+    .map(function([,v]){ const pp=bdParseVal(v); return {time:pp.time||'', cls:pp.cls||'', days:pp.days||''}; })
     .filter(function(e){ return e.time; })
     .sort(function(a,b){ return toMins(a.time)-toMins(b.time); });
   const uniqueTimes = [...new Set(timeEntries.map(e=>e.time))];
@@ -5528,7 +5528,13 @@ async function openNotiCardFromBoard(arrName, si, mk){
     `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">과 목 :</b> <input value="${displayCls}" title="${displayCls}" style="${valStyle}flex:1;" onchange="_notiEditField('cls',this.value)" /></div>`,
     `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">강 사 :</b> <input value="${displayTeacher}" placeholder="강사명 입력" title="${displayTeacher}" style="${valStyle}flex:1;" onchange="_notiEditField('teacher',this.value)" /></div>`,
     `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">요 일 :</b> <input value="${displayDays}" style="${valStyle}flex:1;${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('daysLabel',this.value)" /></div>`,
-    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" title="${displayTime}" style="${valStyle}flex:1;${linkedMks.length>1?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('time',this.value)" /></div>`,
+    uniqueTimes.length > 1
+      ? `<div style="line-height:1.7;"><b style="${labelStyle}">시 간 :</b><br>${timeEntries.map(e=>{
+          const shortCls = e.cls.replace(/\([^)]*\)/g,'').trim();
+          const dStr = e.days ? (' ('+e.days+')') : '';
+          return `<span style="font-size:11px;color:#374151;padding-left:4px;">${e.time} ${shortCls}${dStr}</span>`;
+        }).join('<br>')}</div>`
+      : `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" style="${valStyle}flex:1;" onchange="_notiEditField('time',this.value)" /></div>`,
     `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}flex:1;" onchange="_notiEditField('startDate',this.value)" /></div>`,
     `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}flex:1;" onchange="_notiEditField('endDate',this.value)" /></div>`,
     (()=>{
