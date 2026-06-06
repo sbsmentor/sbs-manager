@@ -1098,6 +1098,7 @@ var REFUND_DATA = [];
 let currentTab = 'students';
 let searchQ = '';
 let filterStatus = 'all';
+let filterGubn = 'all';
 let filterPurpose = 'all';
 let editTarget = null;
 let selectedRows = new Set(); // 체크박스 선택된 인덱스
@@ -2506,6 +2507,7 @@ function renderStudents(data){
   const arrName='STUDENTS_MERGED'; // 통합모드
   let items=data.map((s,i)=>({s,i})).filter(({s})=>match(s,searchQ));
   if(filterStatus!=='all') items=items.filter(({s})=>s['상태']===filterStatus);
+  if(filterGubn!=='all') items=items.filter(({s})=>s['구분']===filterGubn);
   if(filterPurpose!=='all') items=items.filter(({s})=>s['수강목적']===filterPurpose);
   const active=items.filter(({s})=>s['상태']==='재학').length;
   const leave=items.filter(({s})=>s['상태']==='휴학').length;
@@ -2519,9 +2521,9 @@ function renderStudents(data){
       <div class="sum-card"><div class="sum-label">배정필요</div><div class="sum-val" style="color:var(--red)">${needN}</div></div>
     </div>
     <div class="filter-row">
-      <button class="filter-btn ${filterStatus==='all'?'active':''}" onclick="setStatus('all')">전체</button>
-      <button class="filter-btn ${filterStatus==='재학'?'active':''}" onclick="setStatus('재학')">재학</button>
-      <button class="filter-btn ${filterStatus==='휴학'?'active':''}" onclick="setStatus('휴학')">휴학</button>
+      <button class="filter-btn ${filterStatus==='all'&&filterGubn==='all'?'active':''}" onclick="setStatus('all');setGubn('all')">전체</button>
+      <button class="filter-btn ${filterGubn==='평일'?'active':''}" onclick="setGubn('평일')">평일</button>
+      <button class="filter-btn ${filterGubn==='주말'?'active':''}" onclick="setGubn('주말')">주말</button>
       <div style="width:1px;background:var(--border);height:18px;margin:0 2px"></div>
       ${purposes.map(p=>`<button class="filter-btn ${filterPurpose===p?'active':''}" onclick="setPurpose('${p}')">${p}</button>`).join('')}
       ${filterPurpose!=='all'?`<button class="filter-btn active" onclick="setPurpose('all')">✕</button>`:''}
@@ -3171,9 +3173,10 @@ function switchTab(id){
     const el=document.getElementById('bdBaseM');
     if(el) el.value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   }
-  currentTab=id;filterStatus='all';filterPurpose='all';renderTabs();renderContent();
+  currentTab=id;filterStatus='all';filterPurpose='all';filterGubn='all';renderTabs();renderContent();
 }
 function setStatus(s){filterStatus=s;renderContent();}
+function setGubn(g){filterGubn=g;renderContent();}
 function setPurpose(p){filterPurpose=p;renderContent();}
 function applyFilters(){searchQ=document.getElementById('searchInput').value;renderContent();}
 
