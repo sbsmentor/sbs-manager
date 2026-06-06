@@ -5604,7 +5604,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
   ].join('');
   document.getElementById('notiInfo').innerHTML = linkedBanner + infoRows;
 
-    _notiCtx={arrName,si,mk,val,p,noClassNote,sy,sm,startDow,endDow,daysLabel,origDates:classDates};
+    _notiCtx={arrName,si,mk:resolvedMk,val,p,noClassNote,sy,sm,startDow,endDow,daysLabel,origDates:classDates};
 
   document.getElementById('notiImgCopyBtn').onclick=()=>saveNotiImage(p.cls,startDate);
   document.getElementById('notiTxtCopyBtn').onclick=()=>copyNotiText();
@@ -5707,8 +5707,8 @@ async function saveNotiImage(courseName, startDate){
       backgroundColor:'#ffffff',
       useCORS:true,
       logging:false,
-      width:el.offsetWidth,
-      height:el.offsetHeight
+      width:el.scrollWidth,
+      height:el.scrollHeight
     });
 
     // 클립보드에 복사 시도 (카카오톡 바로 붙여넣기)
@@ -5791,7 +5791,8 @@ function copyNotiText(){
 
 function markNotiDone(){
   if(!_notiCtx) return;
-  const {arrName,si,mk}=_notiCtx;
+  const {arrName,si}=_notiCtx;
+  const mk=_notiCtx.mk; // resolvedMk로 저장됨
   const arr=window[arrName]; if(!arr||!arr[si]) return;
   if(!arr[si]['수업배정']) arr[si]['수업배정']={};
   const cur=arr[si]['수업배정'][mk]||'';
@@ -5803,6 +5804,7 @@ function markNotiDone(){
     // 버튼 텍스트 변경
     const btn=document.getElementById('notiDoneBtn');
     if(btn){ btn.style.background='#7c3aed'; btn.innerHTML='📬<br><span style="font-size:10px;font-weight:500;opacity:.85;">안내완료</span>'; }
+    renderContent();
     showToast(`↩ ${arr[si]['이름']} 개강안내 완료 취소됨`);
   } else {
     // 안내완료 처리
