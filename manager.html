@@ -3797,7 +3797,7 @@ async function quickCopyNotiCard(arrName, si, mk, btn) {
         
         // 6. 카드 닫기
         setTimeout(() => {
-          const modal = document.getElementById('notiCardModalBg');
+          const modal = document.getElementById('notiCardBg');
           if (modal) modal.style.display = 'none';
         }, 300);
         
@@ -5610,7 +5610,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
   document.getElementById('notiTxtCopyBtn').onclick=()=>copyNotiText();
   document.getElementById('notiDoneBtn').onclick=()=>markNotiDone();
   // 이미 안내완료 상태면 버튼 색상/텍스트 변경
-  const _isDone = (arr[si]['수업배정']?.[mk]||'').includes('[O]');
+  const _isDone = (arr[si]['수업배정']?.[resolvedMk]||'').includes('[O]');
   const _doneBtn = document.getElementById('notiDoneBtn');
   if(_doneBtn){
     if(_isDone){
@@ -5801,10 +5801,9 @@ function markNotiDone(){
     // 안내완료 → 취소
     arr[si]['수업배정'][mk]=cur.replace(' [O]','').replace('[O]','').trim();
     saveToLocal(); renderContent();
-    // 버튼 텍스트 변경
+    // 버튼을 "안내완료 대기" 상태로 원복
     const btn=document.getElementById('notiDoneBtn');
-    if(btn){ btn.style.background='#7c3aed'; btn.innerHTML='📬<br><span style="font-size:10px;font-weight:500;opacity:.85;">안내완료</span>'; }
-    renderContent();
+    if(btn){ btn.style.background='#18a963'; btn.innerHTML='✅<br><span style="font-size:10px;font-weight:500;opacity:.85;">안내완료</span>'; }
     showToast(`↩ ${arr[si]['이름']} 개강안내 완료 취소됨`);
   } else {
     // 안내완료 처리
