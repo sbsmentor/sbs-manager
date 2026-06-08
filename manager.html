@@ -501,7 +501,8 @@ table{overflow:visible!important;}
   .monthly-tbl td:first-child{text-align:left;font-weight:600;color:var(--text);}
   .monthly-tbl tr:hover td{background:var(--surface2);}
   .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
-  .stat-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;text-align:center;}
+  .stat-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;text-align:center;transition:all .15s;}
+  .stat-box:hover{border-color:var(--accent);background:var(--accent-dim);transform:translateY(-1px);box-shadow:0 4px 12px rgba(91,79,255,.1);}
   .stat-box .sv{font-size:26px;font-weight:800;font-family:var(--mono);}
   .stat-box .sl{font-size:11px;color:var(--text2);margin-top:3px;}
   @media(max-width:600px){.stat-row{grid-template-columns:repeat(2,1fr);}}
@@ -1710,7 +1711,7 @@ function openEditModal(arr,idx){
   const FIELD_DEFS=isStudent?[
     {key:'이름',type:'text'},
     {key:'구분',type:'select',opts:['평일','주말']},
-    {key:'과정',type:'select',opts:['게임원화','게임아트웍','게임그래픽','게임프로그래밍','게임기획','웹툰','웹소설','기타']},
+    {key:'과정',type:'select',opts:['게임원화','게임그래픽','게임프로그래밍','게임기획','이모티콘','게임QA','웹툰','웹소설','기타']},
     {key:'수강목적',type:'select',opts:['취업', '입시', '취미', '데뷔', '창업', '스킬업', '프리랜서']},
     {key:'생년월일',type:'date'},{key:'나이',type:'age_auto'},
     {key:'연락처',type:'text'},{key:'보호자연락처',type:'text'},
@@ -2444,10 +2445,10 @@ function renderDashboard() {
   el.innerHTML = `
     <!-- 요약 -->
     <div class="stat-row">
-      <div class="stat-box"><div class="sv" style="color:var(--accent)">${totalStu}</div><div class="sl">전체 학생</div></div>
-      <div class="stat-box"><div class="sv" style="color:var(--orange)">${pendAssign}</div><div class="sl">배정 대기</div></div>
-      <div class="stat-box"><div class="sv" style="color:#a21caf">${pendNoti}</div><div class="sl">개강안내 대기</div></div>
-      <div class="stat-box"><div class="sv" style="color:#dc2626">${d7List.length}</div><div class="sl">D-7 이내 개강</div></div>
+      <div class="stat-box" onclick="switchTab('students')" style="cursor:pointer;" title="수강생 목록으로 이동"><div class="sv" style="color:var(--accent)">${totalStu}</div><div class="sl">전체 학생</div></div>
+      <div class="stat-box" onclick="switchTab('students')" style="cursor:pointer;" title="수강생 목록으로 이동"><div class="sv" style="color:var(--orange)">${pendAssign}</div><div class="sl">배정 대기</div></div>
+      <div class="stat-box" onclick="switchTab('board')" style="cursor:pointer;" title="배정표로 이동"><div class="sv" style="color:#a21caf">${pendNoti}</div><div class="sl">개강안내 대기</div></div>
+      <div class="stat-box" onclick="switchTab('board')" style="cursor:pointer;" title="배정표로 이동"><div class="sv" style="color:#dc2626">${d7List.length}</div><div class="sl">D-7 이내 개강</div></div>
     </div>
 
     <!-- 월별 현황표 -->
