@@ -5427,6 +5427,21 @@ async function openNotiCardFromBoard(arrName, si, mk){
   // endDate는 메인 수업 자체 값 사용
   // 연강 수업은 각자의 startDate~endDate 범위로 따로 조회 후 합산
 
+  // ── 교육부 휴가 기간 처리 ──
+  // 휴가 적용 제외 학생 (이 이름들은 정상 수업)
+  const VACATION_EXEMPT = new Set(['최해광','장덕윤','노용선','박찬주','최영길','강예은','신은진','노광필','이혜영']);
+  const VACATION_DATES = ['2026-07-09','2026-07-10','2026-07-11','2026-07-12','2026-07-13'];
+  const studentName = arr[si]['이름'] || '';
+  const vacationApplied = []; // 임시로 추가한 키 (복원용)
+  if (!VACATION_EXEMPT.has(studentName)) {
+    for (const vd of VACATION_DATES) {
+      if (!KR_HOLIDAYS_NOTI[vd]) {
+        KR_HOLIDAYS_NOTI[vd] = '교육부휴가';
+        vacationApplied.push(vd);
+      }
+    }
+  }
+
   // ── 날짜 계산: gkyilDates 우선, 없으면 days 계산 ──
   let classDates;
   const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time, p.days);
@@ -5452,9 +5467,21 @@ async function openNotiCardFromBoard(arrName, si, mk){
     }
     classDates.sort();
   }
-  const holidayHits=classDates.filter(d=>KR_HOLIDAYS_NOTI[d]&&!KR_HOLIDAYS_NOTI[d].includes('대체공휴일'));
+
+  // 휴가 날짜 포함 holidayHits 캡처 (복원 전)
+  const vacationHits = vacationApplied.filter(d => classDates.includes(d));
+
+  // 임시 등록한 휴가 날짜 복원
+  for (const vd of vacationApplied) delete KR_HOLIDAYS_NOTI[vd];
+  const holidayHits=[
+    ...classDates.filter(d=>KR_HOLIDAYS_NOTI[d]&&!KR_HOLIDAYS_NOTI[d].includes('대체공휴일')),
+    ...vacationHits
+  ].filter((d,i,a)=>a.indexOf(d)===i).sort();
   const noClassNote=holidayHits.length
-    ?holidayHits.map(d=>`${KR_HOLIDAYS_NOTI[d]}(${d.slice(5).replace('-','/')})`).join(', ')
+    ?holidayHits.map(d=>{
+      const name=KR_HOLIDAYS_NOTI[d]||(vacationHits.includes(d)?'교육부휴가':'');
+      return `${name}(${d.slice(5).replace('-','/')})`;
+    }).join(', ')
     :'x';
 
   const moSet=new Set(classDates.map(d=>d.slice(0,7)));
