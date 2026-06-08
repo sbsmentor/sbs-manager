@@ -2745,6 +2745,12 @@ function renderBoard(){
         <input type="file" accept=".xlsx" style="display:none" onchange="uploadGkyilDates(event)">
       </label>
       <span id="gkyilStatus" style="font-size:11px;color:var(--green);font-family:var(--mono);display:none;">✅ 격일반 로드됨</span>
+      <div style="margin-left:auto;position:relative;">
+        <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="bdNameSearch" type="text" placeholder="이름 검색..." oninput="renderBoardTable()"
+          style="padding:5px 10px 5px 30px;border:1px solid var(--border2);border-radius:7px;font-size:12px;font-family:'Noto Sans KR',sans-serif;width:160px;outline:none;background:var(--surface);color:var(--text);transition:border-color .15s;"
+          onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'" onkeydown="if(event.key==='Escape'){this.value='';renderBoardTable();}">
+      </div>
     </div>
     <div id="boardTable"></div>
   </div>`;
@@ -2931,8 +2937,14 @@ function renderBoardTable(){
   if(target==='all'||target==='weekday') WEEKDAY.forEach((s,i)=>students.push({s,i,arrName:'WEEKDAY'}));
   if(target==='all'||target==='weekend') WEEKEND.forEach((s,i)=>students.push({s,i,arrName:'WEEKEND'}));
 
+  // 이름 검색 필터
+  const bdSearch=(document.getElementById('bdNameSearch')?.value||'').trim();
+  if(bdSearch) students=students.filter(({s})=>(s['이름']||'').includes(bdSearch));
+
   if(students.length===0){
-    document.getElementById('boardTable').innerHTML=`<div style="padding:48px;text-align:center;color:var(--text3)">등록된 학생이 없습니다</div>`;
+    document.getElementById('boardTable').innerHTML=bdSearch
+      ? `<div style="padding:48px;text-align:center;color:var(--text3)">"\${bdSearch}" 검색 결과가 없습니다</div>`
+      : `<div style="padding:48px;text-align:center;color:var(--text3)">등록된 학생이 없습니다</div>`;
     return;
   }
 
