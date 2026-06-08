@@ -3767,17 +3767,17 @@ async function quickCopyNotiCard(arrName, si, mk, btn) {
   btn.disabled = true;
 
   try {
-    // 1. 카드 열기 (백그라운드)
-    openNotiCardFromBoard(arrName, si, mk);
+    // 1. 카드 열기 (async 완료까지 대기)
+    await openNotiCardFromBoard(arrName, si, mk);
     
-    // 2. 렌더링 대기 (500ms)
-    await new Promise(r => setTimeout(r, 500));
+    // 2. DOM 렌더링 대기 (300ms)
+    await new Promise(r => setTimeout(r, 300));
     
     // 3. html2canvas 로드
     await _loadH2C();
     
-    // 4. 이미지 캡처
-    const el = document.getElementById('notiCardBody');
+    // 4. 이미지 캡처 (캡처 대상: notiPrintable)
+    const el = document.getElementById('notiPrintable');
     if (!el) throw new Error('카드 없음');
     
     const canvas = await html2canvas(el, {
