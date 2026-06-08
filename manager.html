@@ -2353,12 +2353,12 @@ function renderDashboard() {
       + d7Sorted.map(c => {
           const diff = Math.round((new Date(c.startDate+'T00:00:00')-todayD)/86400000);
           return `<div class="dash-list-row" style="background:#faf5ff;gap:6px;">
-            <span class="dash-name" style="cursor:pointer;" onclick="openNotiCardFromBoard('${c._arrName}',${c._si},'${c._mk}')">${c.studentName}</span>
+            <span class="dash-name" style="cursor:pointer;" onclick="openNotiCardFromBoard('${c.arrName}',${c.idx},'${c.key}')">${c.studentName}</span>
             <span class="dash-cls">📚 ${c.cls}</span>
             <span class="dash-date">${c.startDate}</span>
             <span class="db-d7">D-${diff}</span>
-            <button onclick="openNotiCardFromBoard('${c._arrName}',${c._si},'${c._mk}')" style="padding:4px 8px;border-radius:6px;border:none;background:#7c3aed;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">📋 카드보기</button>
-            <button onclick="quickCopyNotiCard('${c._arrName}',${c._si},'${c._mk}',this)" style="padding:4px 8px;border-radius:6px;border:none;background:#0f172a;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">📸 이미지복사</button>
+            <button onclick="openNotiCardFromBoard('${c.arrName}',${c.idx},'${c.key}')" style="padding:4px 8px;border-radius:6px;border:none;background:#7c3aed;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">📋 카드보기</button>
+            <button onclick="quickCopyNotiCard('${c.arrName}',${c.idx},'${c.key}',this)" style="padding:4px 8px;border-radius:6px;border:none;background:#0f172a;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">📸 이미지복사</button>
           </div>`;
         }).join('')
     : '';
