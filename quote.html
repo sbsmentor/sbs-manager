@@ -547,19 +547,18 @@ function renderCourses() {
     inFee.addEventListener('input', function() { courses[i].fee = this.value; updateCalc(); });
     tdFee.appendChild(inFee); tr.appendChild(tdFee);
 
-    // 유형
+    // 유형 select
     const tdType = document.createElement('td');
     const sel = document.createElement('select');
     sel.style.color = isFree ? '#E85800' : 'inherit';
     sel.style.fontWeight = isFree ? '700' : '400';
-    ['유료', '무료수강권'].forEach(v => {
+    [['유료','유료'], ['무료','무료수강권']].forEach(([val, label]) => {
       const opt = document.createElement('option');
-      opt.value = v === '유료' ? '유료' : '무료';
-      opt.textContent = v;
-      if ((v === '유료' && c.type === '유료') || (v === '무료수강권' && c.type === '무료')) opt.selected = true;
+      opt.value = val; opt.textContent = label;
+      if (c.type === val) opt.selected = true;
       sel.appendChild(opt);
     });
-    sel.addEventListener('change', function() { courses[i].type = this.value; renderCourses(); });
+    sel.addEventListener('change', function() { courses[i].type = this.value; renderCourses(); updateCalc(); });
     tdType.appendChild(sel); tr.appendChild(tdType);
 
     // 삭제
@@ -611,13 +610,59 @@ function addMonths(dateStr, n) {
 function renderScholars() {
   const tbody = document.getElementById('scholarBody');
   tbody.innerHTML = '';
+  const noteOptions = ['1과목 지원', '2과목 지원', '3과목 지원', '교육상품권', '기타'];
   scholarships.forEach((s, i) => {
     const tr = document.createElement('tr');
-    tr.innerHTML =
-      '<td><input class="left-align" type="text" value="' + s.name + '" placeholder="장학 내역" oninput="scholarships[' + i + '].name=this.value" /></td>' +
-      '<td><input type="text" value="' + s.note + '" placeholder="비고" oninput="scholarships[' + i + '].note=this.value;updateCalc()" /></td>' +
-      '<td><input type="text" value="' + s.amt + '" placeholder="600,000" oninput="scholarships[' + i + '].amt=this.value;updateCalc()" /></td>' +
-      '<td><button class="del-row-btn" onclick="delScholar(' + i + ')">✕</button></td>';
+
+    // 지원내역
+    const tdName = document.createElement('td');
+    const inName = document.createElement('input');
+    inName.className = 'left-align'; inName.type = 'text'; inName.value = s.name; inName.placeholder = '장학 내역';
+    inName.addEventListener('input', function() { scholarships[i].name = this.value; });
+    tdName.appendChild(inName); tr.appendChild(tdName);
+
+    // 비고 (드롭다운)
+    const tdNote = document.createElement('td');
+    const selNote = document.createElement('select');
+    selNote.style.cssText = 'width:100%;border:1.5px solid transparent;border-radius:6px;padding:4px 6px;font-family:inherit;font-size:13px;background:transparent;outline:none;cursor:pointer;';
+    selNote.addEventListener('focus', function() { this.style.borderColor = 'var(--sbs-accent)'; this.style.background = 'white'; });
+    selNote.addEventListener('blur', function() { this.style.borderColor = 'transparent'; this.style.background = 'transparent'; });
+    // 빈 옵션
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = ''; emptyOpt.textContent = '선택';
+    selNote.appendChild(emptyOpt);
+    noteOptions.forEach(opt => {
+      const o = document.createElement('option');
+      o.value = opt; o.textContent = opt;
+      if (s.note === opt) o.selected = true;
+      selNote.appendChild(o);
+    });
+    // 기존값이 옵션에 없으면 직접입력값 추가
+    if (s.note && !noteOptions.includes(s.note)) {
+      const custom = document.createElement('option');
+      custom.value = s.note; custom.textContent = s.note; custom.selected = true;
+      selNote.appendChild(custom);
+    }
+    selNote.addEventListener('change', function() {
+      scholarships[i].note = this.value;
+      updateCalc();
+    });
+    tdNote.appendChild(selNote); tr.appendChild(tdNote);
+
+    // 지원금액
+    const tdAmt = document.createElement('td');
+    const inAmt = document.createElement('input');
+    inAmt.type = 'text'; inAmt.value = s.amt; inAmt.placeholder = '600,000';
+    inAmt.addEventListener('input', function() { scholarships[i].amt = this.value; updateCalc(); });
+    tdAmt.appendChild(inAmt); tr.appendChild(tdAmt);
+
+    // 삭제
+    const tdDel = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.className = 'del-row-btn'; btn.textContent = '✕';
+    btn.addEventListener('click', function() { delScholar(i); });
+    tdDel.appendChild(btn); tr.appendChild(tdDel);
+
     tbody.appendChild(tr);
   });
 }
@@ -671,46 +716,16 @@ function parseFee(str) { if (!str) return 0; return parseInt(str.replace(/[^0-9]
 function fmtNum(n) { return n.toLocaleString('ko-KR'); }
 
 function updateCalc() {
-  // 유료 과목 수강료 합
+  // 모든 과목 수강료 합산 (무료 포함)
   let totalFee = 0;
-  courses.forEach(c => { if (c.type !== '무료') totalFee += parseFee(c.fee); });
+  courses.forEach(c => { totalFee += parseFee(c.fee); });
   const totalCount = courses.length;
   document.getElementById('totalCount').textContent = totalCount;
   document.getElementById('totalFee').innerHTML = fmtNum(totalFee) + '<span>원</span>';
 
-  // 무료 과목 수강료 목록 (수강료 입력된 것, 높은 순)
-  // 수강료가 없으면 유료 과목 수강료 중 높은 것 활용
-  const freeCourses = courses.filter(c => c.type === '무료');
-  const paidFees = courses
-    .filter(c => c.type !== '무료' && parseFee(c.fee) > 0)
-    .map(c => parseFee(c.fee))
-    .sort((a, b) => b - a);
-
-  // 무료 과목에 수강료가 직접 입력된 경우 우선, 없으면 유료 과목 수강료 참조
-  const freeFeesForCalc = freeCourses.map((c, idx) => {
-    const f = parseFee(c.fee);
-    return f > 0 ? f : (paidFees[idx] || paidFees[0] || 0);
-  }).sort((a, b) => b - a);
-
-  // 장학 합계
+  // 장학 지원금 합계 — 비고 패턴 자동계산 제거, 입력값 그대로 사용
   let scholarTotal = 0;
-  scholarships.forEach((s, idx) => {
-    const noteMatch = s.note.match(/([0-9]+)\s*과목\s*지원/);
-    if (noteMatch && freeCourses.length > 0) {
-      const cnt = parseInt(noteMatch[1]);
-      const autoAmt = freeFeesForCalc.slice(0, cnt).reduce((sum, v) => sum + v, 0);
-      scholarships[idx].amt = String(autoAmt);
-      scholarTotal += autoAmt;
-    } else {
-      scholarTotal += parseFee(s.amt);
-    }
-  });
-
-  // amt 변경됐으면 테이블 input 값 동기화
-  const amtInputs = document.querySelectorAll('#scholarBody tr td:nth-child(3) input');
-  amtInputs.forEach((inp, idx) => {
-    if (scholarships[idx]) inp.value = scholarships[idx].amt ? fmtNum(parseInt(scholarships[idx].amt)) : '';
-  });
+  scholarships.forEach(s => { scholarTotal += parseFee(s.amt); });
 
   const textbookFee = parseInt(document.getElementById('textbookSelect').value) || 0;
   const finalPay = Math.max(0, totalFee - scholarTotal + textbookFee);
