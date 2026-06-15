@@ -2781,16 +2781,16 @@ function bdGoToday(){
 }
 
 function bdParseVal(val){
-  if(!val) return {time:'',cls:'',teacher:'',days:'',startDate:'',endDate:'',assigned:false,noticed:false,fee:''};
+  if(!val) return {time:'',cls:'',teacher:'',days:'',startDate:'',endDate:'',assigned:false,noticed:false,fee:'',room:''};
   const assigned=val.includes('[✓]');
   const noticed=val.includes('[O]');
   const fee=val.includes('[P]')?'유료':val.includes('[F]')?'무료':'';
-  const sm=val.match(/\[D:([^\]]+)\]/), em=val.match(/\[E:([^\]]+)\]/), wm=val.match(/\[W:([^\]]+)\]/);
-  let clean=val.replace(/\[✓\]|\[O\]|\[P\]|\[F\]|\[D:[^\]]+\]|\[E:[^\]]+\]|\[W:[^\]]+\]/g,'').trim();
+  const sm=val.match(/\[D:([^\]]+)\]/), em=val.match(/\[E:([^\]]+)\]/), wm=val.match(/\[W:([^\]]+)\]/), rm=val.match(/\[R:([^\]]+)\]/);
+  let clean=val.replace(/\[✓\]|\[O\]|\[P\]|\[F\]|\[D:[^\]]+\]|\[E:[^\]]+\]|\[W:[^\]]+\]|\[R:[^\]]+\]/g,'').trim();
   const tm=clean.match(/^(\d{2}:\d{2})/), tc=clean.match(/\(([^)]+)\)\s*$/);
   const time=tm?tm[1]:'', teacher=tc?tc[1]:'';
   let cls=clean.replace(/^\d{2}:\d{2}\s*/,'').replace(/\s*\([^)]+\)\s*$/,'').trim();
-  return {time,cls,teacher,days:wm?wm[1]:'',startDate:sm?sm[1]:'',endDate:em?em[1]:'',assigned,noticed,fee};
+  return {time,cls,teacher,days:wm?wm[1]:'',startDate:sm?sm[1]:'',endDate:em?em[1]:'',assigned,noticed,fee,room:rm?rm[1]:''};
 }
 
 function bdBuildVal(d){
@@ -2801,6 +2801,7 @@ function bdBuildVal(d){
   if(d.startDate) v+=` [D:${d.startDate}]`;
   if(d.endDate)   v+=` [E:${d.endDate}]`;
   if(d.days)      v+=` [W:${d.days}]`;
+  if(d.room)      v+=` [R:${d.room}]`;
   return v.trim();
 }
 
@@ -2874,6 +2875,7 @@ function bdOpenDD(arrName,si,mk){
   else if(custInp){custInp.style.display='none';custInp.value='';}
   panel.querySelector('.bd-time').value=p.time||'10:00';
   panel.querySelector('.bd-teacher').value=p.teacher||'';
+  panel.querySelector('.bd-room').value=p.room||'';
   panel.querySelector('.bd-sd').value=p.startDate||'';
   panel.querySelector('.bd-ed').value=p.endDate||'';
   panel.querySelectorAll('.bd-day-b').forEach(b=>b.classList.toggle('on',p.days.includes(b.dataset.d)));
@@ -2892,6 +2894,7 @@ function bdSaveDD(arrName,si,mk){
   const cls=(selCls&&selCls.dataset.cls==='__custom__')?(customInp?customInp.value.trim():''):(selCls?selCls.dataset.cls:'');
   const time=panel.querySelector('.bd-time').value;
   const teacher=panel.querySelector('.bd-teacher').value.trim();
+  const room=panel.querySelector('.bd-room').value.trim();
   const sd=panel.querySelector('.bd-sd').value;
   const ed=panel.querySelector('.bd-ed').value;
   const days=Array.from(panel.querySelectorAll('.bd-day-b.on')).map(b=>b.dataset.d).join('');
@@ -2900,7 +2903,7 @@ function bdSaveDD(arrName,si,mk){
   const arr=window[arrName];
   if(!arr[si]['수업배정']) arr[si]['수업배정']={};
   if(cls){
-    arr[si]['수업배정'][mk]=bdBuildVal({time,cls,teacher,days,startDate:sd,endDate:ed,assigned,noticed});
+    arr[si]['수업배정'][mk]=bdBuildVal({time,cls,teacher,room,days,startDate:sd,endDate:ed,assigned,noticed});
   } else {
     delete arr[si]['수업배정'][mk];
   }
@@ -2963,6 +2966,7 @@ function renderBoardTable(){
       <input class="bd-custom-inp ef-input" placeholder="수업명 직접입력" style="display:none;width:100%;font-size:11px;padding:4px 8px;margin-bottom:6px;" oninput="this.closest('.bd-dd-panel').querySelector('[data-cls=\'__custom__\']').dataset.cls=this.value||'__custom__'">
       <div class="bd-dd-row"><label>시간</label><input class="bd-time ef-select" type="time" value="10:00" style="flex:1;font-size:11px;"></div>
       <div class="bd-dd-row"><label>강사명</label><input class="bd-teacher ef-input" type="text" placeholder="강사명" style="flex:1;font-size:11px;padding:4px 8px;"></div>
+      <div class="bd-dd-row"><label>강의장</label><input class="bd-room ef-input" type="text" placeholder="예: A강의장" style="flex:1;font-size:11px;padding:4px 8px;"></div>
       <div class="bd-dd-row"><label>개강일</label><input class="bd-sd ef-input" type="date" style="flex:1;font-size:11px;padding:4px 8px;"></div>
       <div class="bd-dd-row"><label>종강일</label><input class="bd-ed ef-input" type="date" style="flex:1;font-size:11px;padding:4px 8px;"></div>
       <div class="bd-dd-row"><label>요일</label><div style="display:flex;gap:3px;flex-wrap:wrap;">${dayBtns}</div></div>
@@ -5570,6 +5574,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
   const infoRows=[
     `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">과 목 :</b> <input value="${displayCls}" title="${displayCls}" style="${valStyle}flex:1;" onchange="_notiEditField('cls',this.value)" /></div>`,
     `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">강 사 :</b> <input value="${displayTeacher}" placeholder="강사명 입력" title="${displayTeacher}" style="${valStyle}flex:1;" onchange="_notiEditField('teacher',this.value)" /></div>`,
+    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">강의장 :</b> <input value="${p.room||''}" placeholder="강의장 입력" style="${valStyle}flex:1;" onchange="_notiEditField('room',this.value)" /></div>`,
     `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">요 일 :</b> <input value="${displayDays}" style="${valStyle}flex:1;${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('daysLabel',this.value)" /></div>`,
     uniqueTimes.length > 1
       ? `<div style="line-height:1.7;"><b style="${labelStyle}">시 간 :</b><br>${timeEntries.map(e=>{
@@ -5798,6 +5803,7 @@ function copyNotiText(){
   }
   const cls=getVal('과 목')||p.cls;
   const teacher=getVal('강 사')||(p.teacher?(p.teacher.replace(' 강사','')):null);
+  const room=getVal('강의장')||p.room||null;
   const days=getVal('요 일')||daysLabel;
   const time=getVal('시 간')||p.time;
   const sDate=getVal('개 강')||startDate;
@@ -5809,6 +5815,7 @@ function copyNotiText(){
     `● ${sy}년 ${parseInt(sm)}월 개강안내 ●`, '',
     cls?`과 목 : ${cls}`:null,
     teacher?`강 사 : ${teacher} 강사`:null,
+    room?`강의장 : ${room}`:null,
     days?`요 일 : ${days}`:null,
     time?`시 간 : ${time}`:null,
     sDate?`개 강 : ${sDate}`:null,
