@@ -885,21 +885,10 @@ async function seedMentors(){
   try {
     const snap=await fbGet('mentorList');
     const existing=snap.val()||{};
-    if(Object.keys(existing).length>0){
-      // 기존 멘토: role/emoji/team 동기화. 신규 멘토: 추가
-      for(const [id,mentor] of Object.entries(INITIAL_MENTORS)){
-        if(!existing[id]){
-          // 신규 멘토 추가
-          await fbSet(`mentorList/${id}`, mentor);
-          continue;
-        }
-        // role/emoji만 동기화 (team/order는 Firebase 값 유지)
-        if(existing[id].role!==mentor.role) await fbSet(`mentorList/${id}/role`,mentor.role);
-        if(existing[id].emoji!==mentor.emoji) await fbSet(`mentorList/${id}/emoji`,mentor.emoji);
-      }
-      return;
+    // Firebase에 데이터가 전혀 없을 때만 초기 데이터 삽입
+    if(Object.keys(existing).length===0){
+      for(const [id,mentor] of Object.entries(INITIAL_MENTORS)) await fbSet(`mentorList/${id}`,mentor);
     }
-    for(const [id,mentor] of Object.entries(INITIAL_MENTORS)) await fbSet(`mentorList/${id}`,mentor);
   } catch(e) {}
 }
 
