@@ -676,10 +676,11 @@ function dropOnCard(e) {
     team: newTeam,
     order: newOrder,
   };
-  // 재정렬 반영
+  // 전체 배열 순서 기준으로 order 재부여 (드래그 결과 순서 확정)
   mentors.forEach((m, i) => {
-    if (!_pendingChanges[m.id]) _pendingChanges[m.id] = { team: m.team, order: m.order ?? i };
-    _pendingChanges[m.id].order = i;
+    if (!_pendingChanges[m.id]) _pendingChanges[m.id] = { team: m.team };
+    _pendingChanges[m.id].order = i * 10; // 10 단위로 여백 확보
+    m.order = i * 10;
   });
 
   showPendingBar();
@@ -793,12 +794,7 @@ function openTeamRename(team, el){
 function loadMentors(){
   fbOnValue('mentorList', snap=>{
     const data=snap.val();
-    const ROLE_ORDER2={'멘토':0,'선임':1,'책임':2,'수석':3,'팀장':4,'부장':5,'원장':6};
-    mentors=data?Object.values(data).sort((a,b)=>{
-      const ro=(ROLE_ORDER2[b.role]??-1)-(ROLE_ORDER2[a.role]??-1);
-      if(ro!==0) return ro;
-      return (a.order??99)-(b.order??99);
-    }):[];
+    mentors=data?Object.values(data).sort((a,b)=>(a.order??99)-(b.order??99)):[];
     updateLoginUI(); renderMentors();
   });
 }
