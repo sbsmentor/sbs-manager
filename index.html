@@ -750,7 +750,6 @@ document.addEventListener('dragend', function() {
   _dragMentorId = null;
 });
 // ─────────────────────────────
-function loadMentors(){
 let _teamNames = {}; // {'1팀':'게임원화팀', ...}
 
 function loadTeamNames(){
@@ -790,6 +789,8 @@ function openTeamRename(team, el){
     if(e.key==='Escape'){ input.value=current; input.blur(); }
   });
 }
+
+function loadMentors(){
   fbOnValue('mentorList', snap=>{
     const data=snap.val();
     const ROLE_ORDER2={'멘토':0,'선임':1,'책임':2,'수석':3,'팀장':4,'부장':5,'원장':6};
