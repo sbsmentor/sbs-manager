@@ -893,9 +893,9 @@ async function seedMentors(){
           await fbSet(`mentorList/${id}`, mentor);
           continue;
         }
+        // role/emoji만 동기화 (team/order는 Firebase 값 유지)
         if(existing[id].role!==mentor.role) await fbSet(`mentorList/${id}/role`,mentor.role);
         if(existing[id].emoji!==mentor.emoji) await fbSet(`mentorList/${id}/emoji`,mentor.emoji);
-        if(existing[id].team!==mentor.team) await fbSet(`mentorList/${id}/team`,mentor.team);
       }
       return;
     }
