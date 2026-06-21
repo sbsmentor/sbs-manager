@@ -602,7 +602,7 @@ function renderMentors(){
     const tc=teamColors[team]||'#333', tb=teamBgs[team]||'rgba(0,0,0,.04)';
     const isDropTarget = isSuperAdmin(loggedId) && isAdmin;
     html+=`<div class="team-section" data-team="${team}" style="border-left:3px solid ${tc};padding:10px 14px 14px;margin-bottom:10px;border-radius:0 8px 8px 0;" ${isDropTarget?`ondragover="event.preventDefault();this.style.outline='2px dashed '+\'${tc}\'" ondragleave="this.style.outline=''" ondrop="dropOnTeam(event,'${team}')"`:''}>`;
-    html+=`<div class="team-label" style="font-size:12px;font-weight:700;color:${tc};margin-bottom:10px;">● ${team} <span style="font-weight:400;opacity:.7">${ms.length}명</span></div>`;
+    html+=`<div class="team-label" style="font-size:12px;font-weight:700;color:${tc};margin-bottom:10px;" ${isSuperAdmin(loggedId)&&isAdmin?`ondblclick="openTeamRename('${team}',this)" title="더블클릭으로 팀 이름 변경"`:''}>● <span class="team-name-text">${getTeamLabel(team)}</span> <span style="font-weight:400;opacity:.7">${ms.length}명</span>${isSuperAdmin(loggedId)&&isAdmin?'<span style="font-size:9px;opacity:.4;margin-left:4px;">✏️</span>':''}</div>`;
     html+=`<div class="mentor-grid">`;
     ms.forEach(m=>{
       const isMe=loggedId===m.id;
@@ -751,6 +751,45 @@ document.addEventListener('dragend', function() {
 });
 // ─────────────────────────────
 function loadMentors(){
+let _teamNames = {}; // {'1팀':'게임원화팀', ...}
+
+function loadTeamNames(){
+  fbOnValue('teamNames', snap=>{
+    _teamNames = snap.val() || {};
+    renderMentors();
+  });
+}
+
+function getTeamLabel(team){
+  return _teamNames[team] || team;
+}
+
+function openTeamRename(team, el){
+  if(!isSuperAdmin(getLoggedInId()) || !isAdmin) return;
+  const current = getTeamLabel(team);
+  const input = document.createElement('input');
+  input.value = current;
+  input.style.cssText = 'font-size:12px;font-weight:700;border:none;border-bottom:2px solid var(--accent);outline:none;background:transparent;color:inherit;width:120px;font-family:"Noto Sans KR",sans-serif;';
+  const span = el.querySelector('.team-name-text');
+  span.style.display = 'none';
+  el.appendChild(input);
+  input.focus();
+  input.select();
+  async function save(){
+    const val = input.value.trim();
+    input.remove();
+    span.style.display = '';
+    if(val && val !== current){
+      await fbSet(`teamNames/${team}`, val);
+      showToast(`✅ "${team}" → "${val}" 변경 완료`);
+    }
+  }
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', e=>{
+    if(e.key==='Enter') input.blur();
+    if(e.key==='Escape'){ input.value=current; input.blur(); }
+  });
+}
   fbOnValue('mentorList', snap=>{
     const data=snap.val();
     const ROLE_ORDER2={'멘토':0,'선임':1,'책임':2,'수석':3,'팀장':4,'부장':5,'원장':6};
@@ -883,6 +922,7 @@ async function init(){
   document.getElementById('loadingScreen').style.display='none';
   document.getElementById('mainScreen').style.display='block';
   await seedMentors();
+  loadTeamNames();
   loadMentors();
 }
 init();
