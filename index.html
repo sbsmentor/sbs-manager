@@ -930,7 +930,7 @@ init();
 
 
 // ── 뒤로가기 시 재로드 ──
-window.addEventListener('pageshow', function(e){ if(e.persisted){ loadTeamNames(); loadMentors(); } });
+window.addEventListener('pageshow', function(e){ if(e.persisted){ renderMentors(); } });
 </script>
 </body>
 </html>
