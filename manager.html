@@ -837,10 +837,6 @@ window.onerror = function(msg) {
 
 <header class="header">
   <a href="index.html" style="font-size:12px;color:var(--text2);text-decoration:none;font-family:var(--mono);padding:4px 10px;border:1px solid var(--border);border-radius:6px;margin-right:4px;white-space:nowrap;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">← 목록</a><div class="logo" id="logoTitle">SBS<em id="mentorNameEl">아카데미게임학원</em></div><span style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-left:6px;" id="mentorDisplayName"></span>
-  <div class="search-wrap">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input type="text" id="searchInput" placeholder="이름·연락처·과정 검색..." oninput="applyFilters()">
-  </div>
   <div class="header-counts">
     <div class="count-badge cb-active" id="hd-active" style="cursor:default;">재학 0</div>
     <div class="count-badge cb-leave" id="hd-leave" style="cursor:pointer;" onclick="openGroupPopup('leave')" title="휴학생 목록">휴학 0</div>
@@ -852,10 +848,6 @@ window.onerror = function(msg) {
   </div>
   <div style="display:flex;gap:6px;margin-left:8px;flex-shrink:0;">
     <span id="mentorSelectorWrap" style="display:inline-flex;align-items:center;"></span>
-    <button class="hdr-btn hdr-btn-save" onclick="saveToLocal()" title="저장">💾 저장</button>
-    <button class="hdr-btn hdr-btn-sheet" onclick="openSheetModal()" title="구글 시트 백업/복원">☁️ 백업</button>
-    <button class="hdr-btn hdr-btn-export" onclick="exportJSON()" title="JSON 파일로 내보내기">⬇ 내보내기</button>
-    <label class="hdr-btn hdr-btn-import" title="JSON 파일 불러오기">⬆ 불러오기<input type="file" accept=".json" style="display:none" onchange="importJSON(event)"></label>
   </div>
 </header>
 
@@ -1609,6 +1601,7 @@ function openViewModal(item){
   const gubn = item['구분']||'';
   const ddazua = item['따즈아']||'';
   const sugang = item['수강권']||'';
+  const fee = item['수강료']||'';
   const purpose = item['수강목적']||'';
   const birth = item['생년월일']||'';
   const age = calcAge(birth)||item['나이']||'';
@@ -1637,6 +1630,7 @@ function openViewModal(item){
   </div>
   <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     ${row('수강권', sugang ? (sugang.toString().includes('개') ? sugang : sugang+'개') : '')}
+    ${row('수강료', fee ? (fee.toString().replace(/[^0-9]/g,'') ? parseInt(fee.toString().replace(/[^0-9]/g,'')).toLocaleString()+'원' : fee) : '')}
     ${row('나이', age ? age+(birth?` (${birth})`:'') : birth)}
     ${row('연락처', tel ? `<a href="tel:${tel.replace(/[^0-9]/g,'')}" style="color:var(--accent);text-decoration:none;font-weight:700;">${tel}</a>` : '')}
     ${row('보호자연락처', parentTel)}
@@ -1711,11 +1705,12 @@ function openEditModal(arr,idx){
   const FIELD_DEFS=isStudent?[
     {key:'이름',type:'text'},
     {key:'구분',type:'select',opts:['평일','주말']},
-    {key:'과정',type:'select',opts:['게임원화','게임그래픽','게임프로그래밍','게임기획','이모티콘','게임QA','웹툰','웹소설','기타']},
-    {key:'수강목적',type:'select',opts:['취업', '입시', '취미', '데뷔', '창업', '스킬업', '프리랜서']},
+    {key:'과정',type:'select',opts:['게임원화','게임그래픽','게임프로그래밍','게임기획','게임아트웍','웹툰','웹소설','기타']},
+    {key:'수강목적',type:'select',opts:['취업','진학','창업','취미']},
     {key:'생년월일',type:'date'},{key:'나이',type:'age_auto'},
     {key:'연락처',type:'text'},{key:'보호자연락처',type:'text'},
     {key:'주소',type:'text'},{key:'수강권',type:'number'},
+    {key:'수강료',type:'money'},
     {key:'따즈아',type:'select',opts:['','1개월','1년','2년','3년','평생']},{key:'이관자',type:'text'},
   ]:[
     {key:'이름',type:'text'},
@@ -2513,7 +2508,6 @@ function renderStudents(data){
   const active=items.filter(({s})=>s['상태']==='재학').length;
   const leave=items.filter(({s})=>s['상태']==='휴학').length;
   const needN=items.filter(({s})=>getCurrentSched(s['수업배정']||{}).type==='need').length;
-  const purposes=[...new Set(data.map(s=>s['수강목적']))].filter(Boolean);
   let html=`
     <div class="summary-cards">
       <div class="sum-card"><div class="sum-label">전체</div><div class="sum-val" style="color:var(--accent)">${items.length}</div></div>
@@ -2521,13 +2515,19 @@ function renderStudents(data){
       <div class="sum-card"><div class="sum-label">휴학</div><div class="sum-val" style="color:var(--orange)">${leave}</div></div>
       <div class="sum-card"><div class="sum-label">배정필요</div><div class="sum-val" style="color:var(--red)">${needN}</div></div>
     </div>
-    <div class="filter-row">
-      <button class="filter-btn ${filterStatus==='all'&&filterGubn==='all'?'active':''}" onclick="setStatus('all');setGubn('all')">전체</button>
-      <button class="filter-btn ${filterGubn==='평일'?'active':''}" onclick="setGubn('평일')">평일</button>
-      <button class="filter-btn ${filterGubn==='주말'?'active':''}" onclick="setGubn('주말')">주말</button>
-      <div style="width:1px;background:var(--border);height:18px;margin:0 2px"></div>
-      ${purposes.map(p=>`<button class="filter-btn ${filterPurpose===p?'active':''}" onclick="setPurpose('${p}')">${p}</button>`).join('')}
-      ${filterPurpose!=='all'?`<button class="filter-btn active" onclick="setPurpose('all')">✕</button>`:''}
+    <div class="filter-row" style="flex-wrap:wrap;gap:6px;align-items:center;">
+      <button class="filter-btn ${filterStatus==='all'&&filterGubn==='all'&&filterPurpose==='all'?'active':''}" onclick="setStatus('all');setGubn('all');setPurpose('all')">전체</button>
+      <button class="filter-btn ${filterGubn==='평일'?'active':''}" onclick="setGubn('평일');setPurpose('all')">평일</button>
+      <button class="filter-btn ${filterGubn==='주말'?'active':''}" onclick="setGubn('주말');setPurpose('all')">주말</button>
+      <div style="width:1px;background:var(--border);height:18px;margin:0 2px;flex-shrink:0;"></div>
+      ${['취업','진학','창업','취미'].map(p=>`<button class="filter-btn ${filterPurpose===p?'active':''}" onclick="setPurpose('${p}');setGubn('all')">${p}</button>`).join('')}
+      <div style="margin-left:auto;position:relative;display:flex;align-items:center;">
+        <svg style="position:absolute;left:9px;opacity:.4;pointer-events:none;" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="searchInput" type="text" placeholder="이름·연락처·과정 검색..." oninput="applyFilters()"
+          style="padding:5px 10px 5px 28px;border:1px solid var(--border2);border-radius:20px;font-size:12px;font-family:'Noto Sans KR',sans-serif;width:200px;outline:none;background:var(--surface);color:var(--text);transition:border-color .15s;"
+          onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'"
+          onkeydown="if(event.key==='Escape'){this.value='';applyFilters();}">
+      </div>
     </div>
     ${addBar()}
     <div id="bulkActionBar" style="display:none;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:5px 10px;margin-bottom:8px;align-items:center;gap:6px;">
@@ -3186,7 +3186,7 @@ function switchTab(id){
     const el=document.getElementById('bdBaseM');
     if(el) el.value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   }
-  currentTab=id;filterStatus='all';filterPurpose='all';filterGubn='all';renderTabs();renderContent();
+  currentTab=id;filterStatus='all';filterPurpose='all';filterGubn='all';searchQ='';renderTabs();renderContent();
 }
 function setStatus(s){filterStatus=s;renderContent();}
 function setGubn(g){filterGubn=g;renderContent();}
