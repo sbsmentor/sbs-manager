@@ -1355,11 +1355,9 @@ function renderBulkRows(mo, typeF) {
 
     const rowEl = document.createElement('div');
     rowEl.style.cssText = 'background:#f8fafc;border-radius:10px;padding:12px 14px;border:1px solid #e2e8f0;';
-    rowEl.dataset.teacher = g.teacher;
-    rowEl.dataset.start   = start;
-    rowEl.dataset.end     = end;
     rowEl.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px;">
+      <div data-teacher="${g.teacher.replace(/"/g,'&quot;')}" data-start="${start}" data-end="${end}"
+        style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px;">
         <div>
           <div style="font-size:13px;font-weight:800;color:#1e293b;">${g.teacher}${typeBadge} <span style="font-size:11px;font-weight:600;color:#475569;">/ ${g.name}</span>${g.days?` <span style="font-size:11px;color:#7c3aed;">(${g.days})</span>`:''}</div>
           <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${start}${end?' ~ '+end:''}</div>
@@ -1422,24 +1420,26 @@ function parseBulkDates(raw, startDate) {
 
 async function saveBulkDates() {
   const rowEls = document.getElementById('bulkDatesRows').querySelectorAll('div[data-teacher]');
-  if (!rowEls.length) return;
+  if (!rowEls.length) { showToast('⚠ 저장할 항목이 없습니다'); return; }
 
   const statusEl = document.getElementById('bulkDatesStatus');
   statusEl.textContent = '저장 중...';
 
-  let savedCount = 0, errorCount = 0;
+  let savedCount = 0, skipCount = 0, errorCount = 0;
 
-  for (const rowEl of rowEls) {
-    const teacher = rowEl.dataset.teacher;
-    const start   = rowEl.dataset.start;
-    const end     = rowEl.dataset.end;
+  for (const infoDiv of rowEls) {
+    const teacher = infoDiv.dataset.teacher;
+    const start   = infoDiv.dataset.start;
+    const end     = infoDiv.dataset.end;
     if (!teacher || teacher === '(강사없음)') continue;
 
-    const ta = rowEl.querySelector('textarea');
-    if (!ta) continue;
+    // textarea는 infoDiv의 부모(rowEl) 안에 있음
+    const rowEl = infoDiv.closest ? infoDiv.parentElement : infoDiv;
+    const ta = rowEl ? rowEl.querySelector('textarea') : null;
+    if (!ta || !ta.value.trim()) { skipCount++; continue; }
 
     const newDates = parseBulkDates(ta.value, start);
-    if (!newDates.length) continue;
+    if (!newDates.length) { skipCount++; continue; }
 
     try {
       let existing = [];
@@ -1451,11 +1451,16 @@ async function saveBulkDates() {
       const merged = [...new Set([...kept, ...newDates])].sort();
       await _db.ref('gkyilDates/' + teacher).set(merged.join(','));
       savedCount++;
-    } catch(e) { errorCount++; }
+    } catch(e) {
+      console.error('저장 실패:', teacher, e);
+      errorCount++;
+    }
   }
 
   if (errorCount) {
-    statusEl.textContent = `⚠ ${savedCount}명 저장, ${errorCount}명 실패`;
+    statusEl.textContent = `⚠ ${savedCount}명 저장 완료, ${errorCount}명 실패`;
+  } else if (savedCount === 0) {
+    statusEl.textContent = '입력된 날짜가 없습니다 (날짜 형식: 09/14 09/16...)';
   } else {
     showToast(`✅ ${savedCount}명 출석일 저장 완료!`);
     closeBulkDatesModal();
