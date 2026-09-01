@@ -4600,10 +4600,11 @@ function tabBulkAction(tab, action) {
     <div id="notiCardScroll" style="overflow-y:auto;flex:1;">
       <div id="notiPrintable" style="background:#fff;padding:10px 14px;font-family:'Noto Sans KR',sans-serif;">
 
-        <!-- 제목 -->
-        <div id="notiTitle" style="text-align:center;font-size:13px;font-weight:900;color:#1e293b;margin-bottom:8px;letter-spacing:-.3px;"></div>
-
-        <!-- 달력 그리드 -->
+        <!-- 제목 + 출석일 토글 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div id="notiTitle" style="text-align:center;font-size:13px;font-weight:900;color:#1e293b;letter-spacing:-.3px;flex:1;"></div>
+          <button id="notiCalToggleBtn" onclick="toggleNotiCalAttendOnly()" style="flex-shrink:0;padding:3px 9px;border-radius:20px;border:1.5px solid #cbd5e1;background:#f8fafc;color:#64748b;font-size:10px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;white-space:nowrap;">출석일만</button>
+        </div>
         <div id="notiCalWrap"></div>
 
         <!-- 수업 정보 -->
@@ -4751,7 +4752,13 @@ function renderNotiCalGrid(yearMonth, classDates, startDate, endDate){
     const finalMark=isCustomOff
     ? `<div style="font-size:9px;color:#ef4444;line-height:1;text-decoration:line-through;opacity:0.5;">${markHtml?'●':''}</div>`
     : (isCustomOn?`<div style="font-size:9px;font-weight:700;color:#1d4ed8;line-height:1;">●</div>`:markHtml);
-    cells+=`<div onclick="notiCalClick('${ds}')" oncontextmenu="openHolidayCtx(event,'${ds}')" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:3px 1px;background:${finalBg};${borderR}min-height:36px;">
+
+    // 출석일만 보기 모드: 비출석일 흐리게
+    const attendOnly = window._notiCalAttendOnly;
+    const isAttendDay = isClass || isCustomOn;
+    const dimStyle = (attendOnly && !isAttendDay) ? 'opacity:0.15;' : '';
+
+    cells+=`<div onclick="notiCalClick('${ds}')" oncontextmenu="openHolidayCtx(event,'${ds}')" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:3px 1px;background:${finalBg};${borderR}${dimStyle}min-height:36px;">
       <div style="font-size:11px;font-weight:${isClass||isFirst||isLast?'700':'400'};color:${numColor};line-height:1.2;">${day}</div>
       ${finalMark}
     </div>`;
@@ -4826,6 +4833,26 @@ function renderNotiCalendar(yearMonth, classDates, startDate, endDate){
   </div>`;
 }
 
+
+// 출석일만 보기 토글
+window._notiCalAttendOnly = false;
+function toggleNotiCalAttendOnly(){
+  window._notiCalAttendOnly = !window._notiCalAttendOnly;
+  const btn = document.getElementById('notiCalToggleBtn');
+  if(btn){
+    btn.style.background = window._notiCalAttendOnly ? '#1d4ed8' : '#f8fafc';
+    btn.style.color = window._notiCalAttendOnly ? '#fff' : '#64748b';
+    btn.style.borderColor = window._notiCalAttendOnly ? '#1d4ed8' : '#cbd5e1';
+  }
+  // 달력 재렌더
+  if(window._notiCtx){
+    const {origDates, p} = window._notiCtx;
+    const allDates = [...(window._notiCustomDates||new Set()),...origDates].filter(d=>!(window._notiRemovedDates||new Set()).has(d));
+    const moSet = new Set(allDates.map(d=>d.slice(0,7)));
+    document.getElementById('notiCalWrap').innerHTML =
+      [...moSet].sort().map(mo=>renderNotiCalGrid(mo, allDates, p.startDate, p.endDate)).join('');
+  }
+}
 
 // 개강안내 달력 날짜 클릭 토글
 window._notiCustomDates = new Set();  // 수동 추가
@@ -5707,6 +5734,11 @@ async function openNotiCardFromBoard(arrName, si, mk){
   // 저장 버튼 표시
   const saveBtn = document.getElementById('notiSaveBtn');
   if (saveBtn) saveBtn.style.display = 'none'; // 변경 없으면 숨김
+  // 출석일만 토글 초기화
+  window._notiCalAttendOnly = false;
+  const toggleBtn = document.getElementById('notiCalToggleBtn');
+  if(toggleBtn){ toggleBtn.style.background='#f8fafc'; toggleBtn.style.color='#64748b'; toggleBtn.style.borderColor='#cbd5e1'; }
+
   document.getElementById('notiCardBg').style.display='flex';
 }
 
@@ -6445,6 +6477,119 @@ function handleTTUpload(event, type) {
 // ════════ 시간표 직접추가/편집 ════════
 let _ttEditKey = null; // null=추가, 'cXX'=편집
 
+function openTTEditModal(key){
+  _ttEditKey = key || null;
+  const modal = document.getElementById('ttEditModalBg');
+  document.getElementById('ttEditModalTitle').textContent = key ? '강좌 편집' : '강좌 추가';
+  // 필드 초기화
+  ['tte-name','tte-teacher','tte-start','tte-end','tte-time','tte-room','tte-days','tte-dates'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+  document.getElementById('tte-type').value = '평일';
+  // 편집 시 기존값 채우기
+  if(key){
+    const all = DB.get('ttClasses');
+    const c = all.find(x=>x.id===key);
+    if(c){
+      document.getElementById('tte-name').value = c.courseName||'';
+      document.getElementById('tte-teacher').value = c.instructor||'';
+      document.getElementById('tte-start').value = c.startDate||'';
+      document.getElementById('tte-end').value = c.endDate||'';
+      document.getElementById('tte-time').value = c.startTime||'';
+      document.getElementById('tte-room').value = c.room||'';
+      document.getElementById('tte-days').value = c.days||'';
+      document.getElementById('tte-type').value = c.type||'평일';
+      // 출석일 표시 (gkyilDates에서)
+      const teacher = c.instructor||'';
+      if(teacher && window._gkyilDates && window._gkyilDates[teacher]){
+        const sd = c.startDate||'', ed = c.endDate||'';
+        const filtered = window._gkyilDates[teacher].filter(d=>(!sd||d>=sd)&&(!ed||d<=ed));
+        if(filtered.length){
+          document.getElementById('tte-dates').value =
+            filtered.map(d=>d.slice(5).replace('-','/')).join('\t');
+        }
+      }
+    }
+  }
+  modal.style.display = 'flex';
+}
+
+function closeTTEditModal(){
+  document.getElementById('ttEditModalBg').style.display = 'none';
+  _ttEditKey = null;
+}
+
+async function saveTTEditModal(){
+  const name    = document.getElementById('tte-name').value.trim();
+  const teacher = document.getElementById('tte-teacher').value.trim();
+  const start   = document.getElementById('tte-start').value;
+  const end     = document.getElementById('tte-end').value;
+  const time    = document.getElementById('tte-time').value;
+  const room    = document.getElementById('tte-room').value.trim();
+  const days    = document.getElementById('tte-days').value.trim();
+  const type    = document.getElementById('tte-type').value;
+  const datesRaw= document.getElementById('tte-dates').value.trim();
+
+  if(!name){ showNotif('입력 오류','강좌명을 입력해주세요','danger'); return; }
+
+  // 출석일 파싱: 09-14, 09/14, 09.14, 탭/줄바꿈/쉼표/공백 구분 모두 지원
+  let parsedDates = [];
+  if(datesRaw){
+    const year = start ? start.slice(0,4) : new Date().getFullYear().toString();
+    parsedDates = datesRaw
+      .split(/[\t\n,\s]+/)
+      .map(s => s.trim().replace(/[./]/g,'-'))
+      .filter(s => /^\d{1,2}-\d{1,2}$/.test(s))
+      .map(s => {
+        const [mm,dd] = s.split('-');
+        return `${year}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+      })
+      .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))
+      .sort();
+    // 중복 제거
+    parsedDates = [...new Set(parsedDates)];
+  }
+
+  // ttClasses 저장
+  const all = DB.get('ttClasses');
+  const newEntry = {
+    id: _ttEditKey || ('c' + Date.now()),
+    courseName: name, instructor: teacher,
+    startDate: start, endDate: end,
+    startTime: time, room, days, type,
+  };
+  if(_ttEditKey){
+    const idx = all.findIndex(x=>x.id===_ttEditKey);
+    if(idx>=0) all[idx] = {...all[idx], ...newEntry};
+    else all.push(newEntry);
+  } else {
+    all.push(newEntry);
+  }
+  DB.set('ttClasses', all);
+
+  // gkyilDates에 출석일 저장 (Firebase + 메모리)
+  if(parsedDates.length && teacher){
+    if(!window._gkyilDates) window._gkyilDates = {};
+    // 기존 날짜에서 이 강좌 범위만 교체
+    const existing = (window._gkyilDates[teacher] || []).filter(d=>start&&end?(d<start||d>end):false);
+    const merged = [...new Set([...existing, ...parsedDates])].sort();
+    window._gkyilDates[teacher] = merged;
+    window._gkyilDatesLoaded = true;
+    // Firebase 저장
+    if(window._fbDb){
+      try{
+        await window._fbDb.ref('gkyilDates/' + teacher).set(merged.join(','));
+        showToast(`✅ ${teacher} 출석일 ${parsedDates.length}일 저장 완료`);
+      } catch(e){ showToast('⚠ Firebase 저장 실패'); }
+    }
+  }
+
+  renderTimetable();
+  closeTTEditModal();
+  showNotif('저장 완료', `[${name}] 저장되었습니다`);
+}
+
 
 
 
@@ -6512,6 +6657,11 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
             <option value="주말">주말</option>
           </select>
         </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <label style="font-size:12px;font-weight:700;color:#374151;">출석일 <span style="font-weight:400;color:#94a3b8;">(탭/줄바꿈/쉼표로 구분 · 예: 09/14&nbsp;09/16&nbsp;09/18)</span></label>
+        <textarea id="tte-dates" placeholder="09/14&#9;09/16&#9;09/18&#9;09/21&#9;..." rows="3"
+          style="padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:12px;font-family:'Noto Sans KR',sans-serif;resize:vertical;line-height:1.6;"></textarea>
       </div>
     </div>
     <div style="padding:16px 20px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px;">
