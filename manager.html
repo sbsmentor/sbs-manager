@@ -2755,14 +2755,6 @@ function renderBoard(){
       </div>
     </div>
     <div id="boardTable"></div>
-    <!-- 강좌 관리 패널 -->
-    <div id="ttGridWrap" style="display:none;margin-bottom:18px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <span style="font-size:13px;font-weight:800;color:var(--text);">📅 강좌 목록</span>
-        <button onclick="openTTEditModal(null)" style="padding:5px 14px;border-radius:7px;border:none;background:#0891b2;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">+ 강좌 추가</button>
-      </div>
-      <div id="ttGrid" class="tt-grid"></div>
-    </div>
   </div>`;
 
   // 기준월: 이미 값이 있으면 유지, 없으면 현재월
@@ -2770,6 +2762,21 @@ function renderBoard(){
   const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const existingVal=document.getElementById('bdBaseM').value;
   if(!existingVal) document.getElementById('bdBaseM').value=ym;
+
+  // 강좌 관리 패널 — innerHTML 밖에 동적으로 삽입 (renderBoard 재호출 시 유지)
+  if(!document.getElementById('ttGridWrap')){
+    const ttWrap = document.createElement('div');
+    ttWrap.id = 'ttGridWrap';
+    ttWrap.style.cssText = 'display:none;margin-bottom:18px;';
+    ttWrap.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:13px;font-weight:800;color:var(--text);">📅 강좌 목록</span>
+        <button onclick="openTTEditModal(null)" style="padding:5px 14px;border-radius:7px;border:none;background:#0891b2;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">+ 강좌 추가</button>
+      </div>
+      <div id="ttGrid" class="tt-grid"></div>`;
+    document.getElementById('boardWrap').insertBefore(ttWrap, document.getElementById('boardTable'));
+  }
+
   renderBoardTable();
 }
 
