@@ -593,6 +593,21 @@ window.renderTable = function() {
 
 window.toggleMonth = function(mo) {};
 
+// ════════ 토스트 알림 ════════
+function showToast(msg, duration) {
+  var t = document.getElementById('_toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = '_toast';
+    t.className = 'toast';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function(){ t.classList.remove('show'); }, duration || 2500);
+}
+
 // ════════ 인라인 편집 ════════
 window.editCell = function(span, key, field) {
   const oldVal = span.textContent === '-' ? '' : span.textContent;
