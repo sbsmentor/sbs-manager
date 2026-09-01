@@ -560,7 +560,10 @@ window.renderTable = function() {
       + '<td><span class="editable" data-key="'+k+'" data-field="room" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.room||'-')+'</span></td>'
       + '<td><span class="editable" data-key="'+k+'" data-field="days" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.days||'-')+'</span></td>'
       + '<td><span class="type-badge '+(c.type==='주말'?'t-weekend':'t-weekday')+'">'+(c.type||'평일')+'</span></td>'
-      + '<td><button class="del-btn" data-key="'+k+'" data-name="'+(c.name||'').replace(/"/g,'&quot;')+'" onclick="deleteCourse(this.dataset.key,this.dataset.name)">삭제</button></td>'
+      + '<td style="white-space:nowrap;display:flex;gap:4px;">'
+      + '<button class="del-btn" data-key="'+k+'" data-name="'+(c.name||'').replace(/"/g,'&quot;')+'" onclick="deleteCourse(this.dataset.key,this.dataset.name)">삭제</button>'
+      + '<button class="del-btn" style="border-color:#0891b2;color:#0891b2;background:rgba(8,145,178,.08);" onclick="openDatesModal(\''+k+'\',\''+encodeURIComponent(c.teacher||'')+'\',\''+encodeURIComponent(c.name||'')+'\',\''+encodeURIComponent(c.start||'')+'\',\''+encodeURIComponent(c.end||'')+'\')">📋 출석일</button>'
+      + '</td>'
       + '</tr>';
   }).join('');
 
@@ -1021,5 +1024,143 @@ window.showToast = function(msg) {
     </div>
   </div>
 </div>
+<!-- 출석일 입력 모달 -->
+<div id="datesModalBg" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.5);align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;width:94%;max-width:500px;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden;">
+    <div style="padding:16px 20px;background:linear-gradient(135deg,#0891b2,#0e7490);display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div id="datesModalTitle" style="font-size:15px;font-weight:800;color:#fff;"></div>
+        <div id="datesModalSub" style="font-size:11px;color:rgba(255,255,255,.75);margin-top:2px;"></div>
+      </div>
+      <button onclick="closeDatesModal()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;">×</button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:12px;">
+      <div style="font-size:12px;color:#64748b;line-height:1.6;">
+        📋 출석일을 붙여넣기 하세요.<br>
+        <span style="color:#0891b2;font-weight:700;">09/14 09/16 09/18</span> 또는 <span style="color:#0891b2;font-weight:700;">09-14&nbsp;&nbsp;09-16</span> 형식 (탭·공백·쉼표·줄바꿈 모두 인식)
+      </div>
+      <div style="background:#f0f9ff;border-radius:8px;padding:8px 12px;font-size:11px;color:#0369a1;">
+        ⚡ 저장하면 개강안내 카드에 자동 반영됩니다
+      </div>
+      <textarea id="datesInput" rows="5" placeholder="09/14&#9;09/16&#9;09/18&#9;09/21&#9;09/23&#10;10/02&#9;10/05&#9;10/07&#9;..."
+        style="padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:12px;font-family:'Noto Sans KR',sans-serif;resize:vertical;line-height:1.8;outline:none;"
+        onfocus="this.style.borderColor='#0891b2'" onblur="this.style.borderColor='#cbd5e1'"></textarea>
+      <div id="datesPreview" style="font-size:11px;color:#64748b;min-height:18px;"></div>
+    </div>
+    <div style="padding:14px 20px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px;">
+      <button onclick="closeDatesModal()" style="padding:9px 20px;border-radius:8px;border:1px solid #d1d5db;background:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">취소</button>
+      <button onclick="saveDatesModal()" style="padding:9px 24px;border-radius:8px;border:none;background:#0891b2;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">💾 저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════ 출석일 모달 ════════
+var _datesCtx = null;
+
+window.openDatesModal = async function(key, teacherEnc, nameEnc, startEnc, endEnc) {
+  const teacher = decodeURIComponent(teacherEnc);
+  const name    = decodeURIComponent(nameEnc);
+  const start   = decodeURIComponent(startEnc);
+  const end     = decodeURIComponent(endEnc);
+  _datesCtx = { key, teacher, name, start, end };
+
+  document.getElementById('datesModalTitle').textContent = name || '출석일 입력';
+  document.getElementById('datesModalSub').textContent   = teacher + (start ? '  |  ' + start + ' ~ ' + end : '');
+  document.getElementById('datesInput').value = '';
+  document.getElementById('datesPreview').textContent = '';
+
+  // 기존 저장된 출석일 불러오기
+  if (teacher && _db) {
+    try {
+      const snap = await _db.ref('gkyilDates/' + teacher).once('value');
+      const raw  = snap.val();
+      let existing = [];
+      if (typeof raw === 'string') existing = raw.split(',').filter(Boolean);
+      else if (Array.isArray(raw))  existing = raw;
+      // 이 강좌 범위로 필터
+      const filtered = existing.filter(d => (!start || d >= start) && (!end || d <= end));
+      if (filtered.length) {
+        document.getElementById('datesInput').value =
+          filtered.map(d => d.slice(5).replace('-', '/')).join('\t');
+        updateDatesPreview();
+      }
+    } catch(e) {}
+  }
+
+  document.getElementById('datesModalBg').style.display = 'flex';
+  setTimeout(() => document.getElementById('datesInput').focus(), 100);
+};
+
+window.closeDatesModal = function() {
+  document.getElementById('datesModalBg').style.display = 'none';
+  _datesCtx = null;
+};
+
+// 입력 중 미리보기
+document.addEventListener('DOMContentLoaded', function() {
+  const inp = document.getElementById('datesInput');
+  if (inp) inp.addEventListener('input', updateDatesPreview);
+});
+
+function updateDatesPreview() {
+  const raw = document.getElementById('datesInput').value.trim();
+  if (!raw) { document.getElementById('datesPreview').textContent = ''; return; }
+  const parsed = parseDatesInput(raw, _datesCtx ? _datesCtx.start : '');
+  document.getElementById('datesPreview').textContent =
+    parsed.length ? '✅ ' + parsed.length + '일 인식됨: ' + parsed.slice(0,5).map(d=>d.slice(5).replace('-','/')).join(', ') + (parsed.length>5?'...':'') : '⚠ 날짜를 인식하지 못했습니다';
+}
+
+function parseDatesInput(raw, startDate) {
+  const year = startDate ? startDate.slice(0,4) : new Date().getFullYear().toString();
+  return [...new Set(
+    raw.split(/[\t\n,\s]+/)
+      .map(s => s.trim().replace(/[./]/g,'-'))
+      .filter(s => /^\d{1,2}-\d{1,2}$/.test(s))
+      .map(s => {
+        const [mm,dd] = s.split('-');
+        return year + '-' + mm.padStart(2,'0') + '-' + dd.padStart(2,'0');
+      })
+      .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))
+  )].sort();
+}
+
+window.saveDatesModal = async function() {
+  if (!_datesCtx) return;
+  const { teacher, start, end } = _datesCtx;
+  const raw = document.getElementById('datesInput').value.trim();
+  const newDates = parseDatesInput(raw, start);
+
+  if (!newDates.length) {
+    alert('인식된 날짜가 없습니다. 형식을 확인해주세요.');
+    return;
+  }
+  if (!teacher) {
+    alert('강사명이 없는 강좌는 출석일을 저장할 수 없습니다.');
+    return;
+  }
+
+  // 기존 날짜에서 이 강좌 범위 외 날짜 유지 + 새 날짜 합산
+  let existing = [];
+  if (_db) {
+    try {
+      const snap = await _db.ref('gkyilDates/' + teacher).once('value');
+      const raw2 = snap.val();
+      if (typeof raw2 === 'string') existing = raw2.split(',').filter(Boolean);
+      else if (Array.isArray(raw2))  existing = raw2;
+    } catch(e) {}
+  }
+  const kept    = existing.filter(d => (start && d < start) || (end && d > end));
+  const merged  = [...new Set([...kept, ...newDates])].sort();
+
+  try {
+    await _db.ref('gkyilDates/' + teacher).set(merged.join(','));
+    showToast('✅ ' + teacher + ' 출석일 ' + newDates.length + '일 저장 완료!');
+    closeDatesModal();
+  } catch(e) {
+    alert('저장 실패: ' + e.message);
+  }
+};
+</script>
 </body>
 </html>
