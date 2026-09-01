@@ -1247,28 +1247,29 @@ window.saveDatesModal = async function() {
 
 <script>
 // ════════ 출석일 일괄입력 ════════
-let _bulkAllGroups = []; // 전체 그룹 저장 (탭 전환용)
-let _bulkActiveMonth = ''; // 현재 선택된 월
+let _bulkAllGroups = [];
+let _bulkActiveMonth = '';
+let _bulkActiveType = 'all'; // 'all' | '평일' | '주말'
 
 function openBulkDatesModal() {
   const q = (document.getElementById('searchInp').value||'').toLowerCase();
   const tab = typeof currentTab !== 'undefined' ? currentTab : 'all';
 
-  // 전체 강좌 (월 필터 무시)
   let items = Object.keys(allCourses).map(k => Object.assign({key:k}, allCourses[k]));
   if (tab !== 'all') items = items.filter(c => c.type === tab);
   if (q) items = items.filter(c => (c.name||'').toLowerCase().includes(q)||(c.teacher||'').toLowerCase().includes(q));
   items.sort((a,b) => (a.start||'') < (b.start||'') ? -1 : 1);
 
-  // 과목명+강사명+요일+개강월로 그룹화
+  // 과목명+강사명+요일+개강월+구분으로 그룹화
   const groups = {};
   items.forEach(c => {
-    const teacher  = c.teacher || '(강사없음)';
-    const name     = c.name    || '(과목없음)';
-    const days     = c.days    || '';
-    const startMo  = (c.start||'').slice(0,7); // "2026-09"
-    const gkey     = name + '||' + teacher + '||' + days + '||' + startMo;
-    if (!groups[gkey]) groups[gkey] = { teacher, name, days, startMo, starts:[], ends:[], keys:[] };
+    const teacher = c.teacher || '(강사없음)';
+    const name    = c.name    || '(과목없음)';
+    const days    = c.days    || '';
+    const type    = c.type    || '평일';
+    const startMo = (c.start||'').slice(0,7);
+    const gkey    = name + '||' + teacher + '||' + days + '||' + startMo + '||' + type;
+    if (!groups[gkey]) groups[gkey] = { teacher, name, days, type, startMo, starts:[], ends:[], keys:[] };
     groups[gkey].keys.push(c.key);
     if (c.start) groups[gkey].starts.push(c.start);
     if (c.end)   groups[gkey].ends.push(c.end);
@@ -1276,7 +1277,6 @@ function openBulkDatesModal() {
 
   _bulkAllGroups = Object.values(groups);
 
-  // 월 목록 추출
   const months = [...new Set(_bulkAllGroups.map(g => g.startMo).filter(Boolean))].sort();
 
   if (!months.length) {
@@ -1286,39 +1286,62 @@ function openBulkDatesModal() {
     return;
   }
 
-  // 기본 탭: 현재 월 필터값 또는 첫 번째 월
   const curMonthF = document.getElementById('monthFilter').value;
   _bulkActiveMonth = (curMonthF && months.includes(curMonthF)) ? curMonthF : months[0];
+  _bulkActiveType = 'all';
 
   renderBulkMonthTabs(months);
-  renderBulkRows(_bulkActiveMonth);
+  renderBulkRows(_bulkActiveMonth, _bulkActiveType);
   document.getElementById('bulkDatesModalBg').style.display = 'flex';
 }
 
 function renderBulkMonthTabs(months) {
   const tabEl = document.getElementById('bulkMonthTabs');
-  tabEl.innerHTML = months.map(mo => {
+  // 월 탭 + 평일/주말 세그먼트
+  const moTabs = months.map(mo => {
     const label = mo.slice(5).replace(/^0/,'') + '월';
     const active = mo === _bulkActiveMonth;
-    return `<button onclick="switchBulkMonth('${mo}')" style="padding:10px 18px;border:none;border-bottom:3px solid ${active?'#0891b2':'transparent'};background:none;font-size:13px;font-weight:${active?'800':'500'};color:${active?'#0891b2':'#64748b'};cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;transition:all .15s;">${label}</button>`;
+    return `<button onclick="switchBulkMonth('${mo}')" style="padding:10px 16px;border:none;border-bottom:3px solid ${active?'#0891b2':'transparent'};background:none;font-size:13px;font-weight:${active?'800':'500'};color:${active?'#0891b2':'#64748b'};cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">${label}</button>`;
   }).join('');
+
+  const typeSeg = `<div style="margin-left:auto;display:flex;align-items:center;gap:4px;padding:0 12px;">
+    ${['all','평일','주말'].map(t => {
+      const label = t==='all'?'전체':t;
+      const active = _bulkActiveType === t;
+      return `<button onclick="switchBulkType('${t}')" style="padding:4px 12px;border-radius:20px;border:1.5px solid ${active?'#0891b2':'#e2e8f0'};background:${active?'#0891b2':'#fff'};color:${active?'#fff':'#64748b'};font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">${label}</button>`;
+    }).join('')}
+  </div>`;
+
+  tabEl.innerHTML = `<div style="display:flex;align-items:center;width:100%;overflow-x:auto;">${moTabs}${typeSeg}</div>`;
 }
 
 function switchBulkMonth(mo) {
   _bulkActiveMonth = mo;
   const months = [...new Set(_bulkAllGroups.map(g => g.startMo).filter(Boolean))].sort();
   renderBulkMonthTabs(months);
-  renderBulkRows(mo);
+  renderBulkRows(_bulkActiveMonth, _bulkActiveType);
 }
 
-function renderBulkRows(mo) {
+function switchBulkType(t) {
+  _bulkActiveType = t;
+  const months = [...new Set(_bulkAllGroups.map(g => g.startMo).filter(Boolean))].sort();
+  renderBulkMonthTabs(months);
+  renderBulkRows(_bulkActiveMonth, _bulkActiveType);
+}
+
+function renderBulkRows(mo, typeF) {
   const rows = document.getElementById('bulkDatesRows');
   rows.innerHTML = '';
   document.getElementById('bulkDatesStatus').textContent = '';
 
-  const filtered = _bulkAllGroups.filter(g => g.startMo === mo);
+  let filtered = _bulkAllGroups.filter(g => g.startMo === mo);
+  if (typeF && typeF !== 'all') filtered = filtered.filter(g => g.type === typeF);
+
+  // 강사 가나다 순 정렬
+  filtered.sort((a,b) => (a.teacher||'').localeCompare(b.teacher||'', 'ko'));
+
   if (!filtered.length) {
-    rows.innerHTML = '<div style="text-align:center;padding:32px;color:#94a3b8;">해당 월에 강좌가 없습니다.</div>';
+    rows.innerHTML = '<div style="text-align:center;padding:32px;color:#94a3b8;">해당 조건에 강좌가 없습니다.</div>';
     return;
   }
 
@@ -1326,6 +1349,9 @@ function renderBulkRows(mo) {
   filtered.forEach((g, idx) => {
     const start = g.starts.length ? [...g.starts].sort()[0] : '';
     const end   = g.ends.length   ? [...g.ends].sort().slice(-1)[0] : '';
+    const typeBadge = g.type === '주말'
+      ? '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#fef3c7;color:#d97706;font-weight:700;margin-left:4px;">주말</span>'
+      : '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#dbeafe;color:#1d4ed8;font-weight:700;margin-left:4px;">평일</span>';
 
     const rowEl = document.createElement('div');
     rowEl.style.cssText = 'background:#f8fafc;border-radius:10px;padding:12px 14px;border:1px solid #e2e8f0;';
@@ -1335,37 +1361,35 @@ function renderBulkRows(mo) {
     rowEl.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px;">
         <div>
-          <div style="font-size:13px;font-weight:800;color:#1e293b;">${g.name} <span style="font-size:11px;font-weight:600;color:#0891b2;">/ ${g.teacher}</span>${g.days?` <span style="font-size:11px;font-weight:600;color:#7c3aed;">(${g.days})</span>`:''}</div>
-          <div style="font-size:11px;color:#64748b;margin-top:2px;">${start}${end?' ~ '+end:''}</div>
+          <div style="font-size:13px;font-weight:800;color:#1e293b;">${g.teacher}${typeBadge} <span style="font-size:11px;font-weight:600;color:#475569;">/ ${g.name}</span>${g.days?` <span style="font-size:11px;color:#7c3aed;">(${g.days})</span>`:''}</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${start}${end?' ~ '+end:''}</div>
         </div>
-        <span class="bulk-preview-${idx}" style="font-size:11px;color:#0891b2;white-space:nowrap;"></span>
+        <span id="bulk-preview-${idx}" style="font-size:11px;color:#0891b2;white-space:nowrap;"></span>
       </div>
-      <textarea class="bulk-ta" rows="2" placeholder="09/14&#9;09/16&#9;09/18&#9;09/21&#9;..."
+      <textarea rows="2" placeholder="09/14&#9;09/16&#9;09/18&#9;09/21&#9;..."
         style="width:100%;padding:8px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:12px;font-family:'Noto Sans KR',sans-serif;resize:vertical;box-sizing:border-box;outline:none;"
         onfocus="this.style.borderColor='#0891b2'" onblur="this.style.borderColor='#cbd5e1'"
-        oninput="this.closest('div[data-teacher]').querySelector('.bulk-preview-${idx}') && updateBulkPreviewEl(this, document.querySelector('.bulk-preview-${idx}'), '${start}')"></textarea>`;
+        oninput="(function(ta){var p=document.getElementById('bulk-preview-${idx}');if(p){var d=parseBulkDates(ta.value,'${start}');p.textContent=d.length?'✅ '+d.length+'일':'';};})(this)"></textarea>`;
     rows.appendChild(rowEl);
 
-    // 기존 날짜 로드
     if (_db && g.teacher && g.teacher !== '(강사없음)') {
       _db.ref('gkyilDates/' + g.teacher).once('value').then(snap => {
         const raw = snap.val();
         let existing = [];
         if (typeof raw === 'string') existing = raw.split(',').filter(Boolean);
         else if (Array.isArray(raw)) existing = raw;
-        const fd = existing.filter(d => (!start||d>=start) && (!end||d<=end));
+        const fd = existing.filter(d => (!start||d>=start)&&(!end||d<=end));
         if (fd.length) {
           const ta = rowEl.querySelector('textarea');
           if (ta) {
             ta.value = fd.map(d => d.slice(5).replace('-','/')).join('\t');
-            const prev = rowEl.querySelector('.bulk-preview-' + idx);
-            if (prev) updateBulkPreviewEl(ta, prev, start);
+            const prev = document.getElementById('bulk-preview-' + idx);
+            if (prev) { const pd = parseBulkDates(ta.value, start); prev.textContent = pd.length ? '✅ '+pd.length+'일' : ''; }
           }
         }
         loadCount++;
-        if (loadCount === filtered.filter(g=>g.teacher!=='(강사없음)').length) {
+        if (loadCount === filtered.filter(g=>g.teacher!=='(강사없음)').length)
           document.getElementById('bulkDatesStatus').textContent = '기존 출석일 로드 완료';
-        }
       }).catch(() => loadCount++);
     }
   });
