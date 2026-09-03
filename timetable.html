@@ -1430,20 +1430,29 @@ function _renderBulkRows() {
 
     // 기수별 입력 행
     periods.sort((a,b)=>(a.start||'')<(b.start||'')?-1:1).forEach(({ start, end }) => {
-      _appendRow(card, g.teacher, start, end, rowIdx++);
+      _appendRow(card, g.teacher, g.names[0]||'', start, end, rowIdx++);
     });
 
     wrap.appendChild(card);
   });
 }
 
-function _appendRow(container, teacher, start, end, idx) {
+function _fbKey(teacher, courseName) {
+  // Firebase 키: 강사|과목명 (과목별로 날짜 분리 저장)
+  const safe = (s||'').replace(/[.#$/\[\]]/g,'_');
+  return safe(teacher) + '|' + safe(courseName||'_');
+}
+
+function _appendRow(container, teacher, courseName, start, end, idx) {
   const uid = 'br' + idx;
+  const fbKey = _fbKey(teacher, courseName);
   const div = document.createElement('div');
   div.style.cssText = 'padding:8px 14px;border-top:1px solid #f1f5f9;';
-  div.dataset.teacher = teacher;
-  div.dataset.start   = start;
-  div.dataset.end     = end;
+  div.dataset.teacher    = teacher;
+  div.dataset.courseName = courseName || '';
+  div.dataset.fbkey      = fbKey;
+  div.dataset.start      = start;
+  div.dataset.end        = end;
   div.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
       <div style="font-size:11px;color:#64748b;">${start}${end?' ~ '+end:''}</div>
@@ -1457,7 +1466,7 @@ function _appendRow(container, teacher, start, end, idx) {
   container.appendChild(div);
 
   if (_db && teacher) {
-    _db.ref('gkyilDates/' + teacher).once('value').then(snap => {
+    _db.ref('gkyilDates/' + fbKey).once('value').then(snap => {
       const raw = snap.val();
       let existing = [];
       if (typeof raw === 'string') existing = raw.split(',').filter(Boolean);
@@ -1520,49 +1529,47 @@ async function saveBulkDates() {
   const statusEl = document.getElementById('bulkDatesStatus');
   statusEl.textContent = '저장 중...';
 
-  // 강사별로 기수(start~end)별 새 날짜 수집
-  const byTeacher = {}; // teacher → [{start, end, newDates:[]}]
+  // fbkey별로 기수(start~end)별 새 날짜 수집
+  const byKey = {}; // fbkey → [{start, end, newDates}]
 
   for (const div of divs) {
-    const teacher = div.dataset.teacher;
-    const start   = div.dataset.start || '';
-    const end     = div.dataset.end   || '';
-    if (!teacher) continue;
+    const fbKey  = div.dataset.fbkey || div.dataset.teacher;
+    const start  = div.dataset.start || '';
+    const end    = div.dataset.end   || '';
+    if (!fbKey) continue;
     const ta = div.querySelector('textarea');
     const newDates = (ta && ta.value.trim()) ? parseBulkDates(ta.value, start) : [];
-    if (!byTeacher[teacher]) byTeacher[teacher] = [];
-    byTeacher[teacher].push({ start, end, newDates });
+    if (!byKey[fbKey]) byKey[fbKey] = [];
+    byKey[fbKey].push({ start, end, newDates });
   }
 
   let saved = 0, failed = 0;
-
-  for (const [teacher, periods] of Object.entries(byTeacher)) {
+  for (const [fbKey, periods] of Object.entries(byKey)) {
     if (!periods.some(p => p.newDates.length)) continue;
     try {
       let existing = [];
-      const snap = await _db.ref('gkyilDates/' + teacher).once('value');
+      const snap = await _db.ref('gkyilDates/' + fbKey).once('value');
       const raw = snap.val();
       if (typeof raw === 'string') existing = raw.split(',').filter(Boolean);
       else if (Array.isArray(raw)) existing = raw;
 
-      // 날짜 입력된 기수 범위 안의 기존 날짜 제거 후 새 날짜로 교체
       const activePeriods = periods.filter(p => p.newDates.length);
       const kept = existing.filter(d =>
-        !activePeriods.some(p => (!p.start || d >= p.start) && (!p.end || d <= p.end))
+        !activePeriods.some(p => (!p.start||d>=p.start) && (!p.end||d<=p.end))
       );
       const allNew = periods.flatMap(p => p.newDates);
       const merged = [...new Set([...kept, ...allNew])].sort();
-      await _db.ref('gkyilDates/' + teacher).set(merged.join(','));
+      await _db.ref('gkyilDates/' + fbKey).set(merged.join(','));
       saved++;
-    } catch(e) { console.error('저장 실패:', teacher, e); failed++; }
+    } catch(e) { console.error('저장 실패:', fbKey, e); failed++; }
   }
 
   if (failed) {
-    statusEl.textContent = `⚠ ${saved}명 저장, ${failed}명 실패`;
+    statusEl.textContent = `⚠ ${saved}개 저장, ${failed}개 실패`;
   } else if (!saved) {
     statusEl.textContent = '입력된 날짜가 없습니다';
   } else {
-    showToast(`✅ ${saved}명 출석일 저장 완료!`);
+    showToast(`✅ 출석일 저장 완료!`);
     closeBulkDatesModal();
   }
 }
