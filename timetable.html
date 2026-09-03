@@ -1346,19 +1346,19 @@ function openBulkDatesModal() {
   document.getElementById('bulkDatesModalBg').style.display = 'flex';
 }
 
-function _renderBulkTabs(months) {
-  const ROOM_RANK = ['A','B','C','D','E','F','G','H','I','J','K','L'];
-  function rr(r){ if(!r) return 999; if(r.includes('비대면')) return 900; const l=(r.replace(/[^A-Z]/g,'')||'')[0]; const i=ROOM_RANK.indexOf(l); return i>=0?i:800; }
+let _bulkMonths = [];
 
+function _renderBulkTabs(months) {
+  _bulkMonths = months;
   const moHtml = ['ALL',...months].map(mo => {
     const act = mo === _bulkMo;
     const lbl = mo === 'ALL' ? '전체' : mo.slice(5).replace(/^0/,'')+'월';
-    return `<button onclick="_bulkMo='${mo}';_renderBulkTabs(${JSON.stringify(months)});_renderBulkRows();" style="padding:9px 14px;border:none;border-bottom:3px solid ${act?'#0891b2':'transparent'};background:none;font-size:12px;font-weight:${act?'800':'500'};color:${act?'#0891b2':'#64748b'};cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">${lbl}</button>`;
+    return `<button onclick="switchBulkMonth('${mo}')" style="padding:9px 14px;border:none;border-bottom:3px solid ${act?'#0891b2':'transparent'};background:none;font-size:12px;font-weight:${act?'800':'500'};color:${act?'#0891b2':'#64748b'};cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">${lbl}</button>`;
   }).join('');
   const typeHtml = ['all','평일','주말'].map(t => {
     const act = t === _bulkType;
     const lbl = t==='all'?'전체':t;
-    return `<button onclick="_bulkType='${t}';_renderBulkRows();" style="padding:3px 10px;border-radius:20px;border:1.5px solid ${act?'#0891b2':'#e2e8f0'};background:${act?'#0891b2':'#fff'};color:${act?'#fff':'#64748b'};font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">${lbl}</button>`;
+    return `<button onclick="switchBulkType('${t}')" style="padding:3px 10px;border-radius:20px;border:1.5px solid ${act?'#0891b2':'#e2e8f0'};background:${act?'#0891b2':'#fff'};color:${act?'#fff':'#64748b'};font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">${lbl}</button>`;
   }).join('');
   document.getElementById('bulkMonthTabs').innerHTML =
     `<div style="display:flex;align-items:center;width:100%;overflow-x:auto;">${moHtml}<div style="margin-left:auto;display:flex;gap:4px;padding:0 12px;">${typeHtml}</div></div>`;
@@ -1485,8 +1485,16 @@ function _bulkPreview(uid, start) {
   prev.textContent = d.length ? '✅ '+d.length+'일' : '';
 }
 
-function switchBulkMonth(mo) { _bulkMo = mo; }
-function switchBulkType(t) { _bulkType = t; }
+function switchBulkMonth(mo) {
+  _bulkMo = mo;
+  _renderBulkTabs(_bulkMonths);
+  _renderBulkRows();
+}
+function switchBulkType(t) {
+  _bulkType = t;
+  _renderBulkTabs(_bulkMonths);
+  _renderBulkRows();
+}
 
 function parseBulkDates(raw, startDate) {
   if (!raw || !raw.trim()) return [];
