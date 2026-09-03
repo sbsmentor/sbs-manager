@@ -5450,7 +5450,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
 
   // 수업 정보 (편집 가능)
   const labelStyle = 'display:inline-block;min-width:46px;font-weight:700;color:#64748b;font-size:10.5px;flex-shrink:0;';
-  const valStyle = 'border:none;border-bottom:none;background:transparent;font-size:11px;font-family:inherit;color:inherit;cursor:text;outline:none;text-decoration:none;width:100%;box-sizing:border-box;';
+  const valStyle = 'font-size:11px;font-family:inherit;color:inherit;flex:1;';
 
   // ── 연강 포함 모든 수업 정보 합산 ──
   const allCourses = [{p}].concat(linkedMks); // 현재 + 연강 수업 전체
@@ -5510,19 +5510,19 @@ async function openNotiCardFromBoard(arrName, si, mk){
     : '';
   document.getElementById('notiInfo').insertAdjacentHTML('beforebegin', '');
   const infoRows=[
-    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">과 목 :</b> <input value="${displayCls}" title="${displayCls}" style="${valStyle}flex:1;" onchange="_notiEditField('cls',this.value)" /></div>`,
-    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">강 사 :</b> <input value="${displayTeacher}" placeholder="강사명 입력" title="${displayTeacher}" style="${valStyle}flex:1;" onchange="_notiEditField('teacher',this.value)" /></div>`,
-    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">강의장 :</b> <span style="${valStyle}flex:1;cursor:default;">${displayRoom||'-'}</span></div>`,
-    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">요 일 :</b> <input value="${displayDays}" style="${valStyle}flex:1;${linkedMks.length>0?'color:#2563eb;font-weight:700;':''}" onchange="_notiEditField('daysLabel',this.value)" /></div>`,
+    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">과 목 :</b> <span style="${valStyle}">${displayCls||'-'}</span></div>`,
+    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">강 사 :</b> <span style="${valStyle}">${displayTeacher||'-'}</span></div>`,
+    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">강의장 :</b> <span style="${valStyle}">${displayRoom||'-'}</span></div>`,
+    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">요 일 :</b> <span style="${valStyle}${linkedMks.length>0?';color:#2563eb;font-weight:700;':''}">${displayDays||'-'}</span></div>`,
     uniqueTimes.length > 1
       ? `<div style="line-height:1.7;"><b style="${labelStyle}">시 간 :</b><br>${timeEntries.map(e=>{
           const shortCls = e.cls.replace(/\([^)]*\)/g,'').trim();
           const dStr = e.days ? (' ('+e.days+')') : '';
           return `<span style="font-size:11px;color:#374151;padding-left:4px;">${e.time} ${shortCls}${dStr}</span>`;
         }).join('<br>')}</div>`
-      : `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">시 간 :</b> <input value="${displayTime}" style="${valStyle}flex:1;" onchange="_notiEditField('time',this.value)" /></div>`,
-    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">개 강 :</b> <input value="${startDate||''}" style="${valStyle}flex:1;" onchange="_notiEditField('startDate',this.value)" /></div>`,
-    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">종 강 :</b> <input value="${endDate||''}" style="${valStyle}flex:1;" onchange="_notiEditField('endDate',this.value)" /></div>`,
+      : `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">시 간 :</b> <span style="${valStyle}">${displayTime||'-'}</span></div>`,
+    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">개 강 :</b> <span style="${valStyle}">${startDate||'-'}</span></div>`,
+    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">종 강 :</b> <span style="${valStyle}">${endDate||'-'}</span></div>`,
     '',  // 출석일은 아래에서 async로 별도 처리
     `<div style="line-height:1.7;margin-top:3px;"><b style="${labelStyle}">출석일 :</b> <span id="notiAttendList" style="font-size:11px;color:#374151;font-family:inherit;">불러오는 중...</span></div>`,
   ].join('');
