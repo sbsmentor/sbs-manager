@@ -5241,6 +5241,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
   console.log('[noti] val:', val, 'cls:', p.cls);
   if(!p.cls){ showToast('⚠ 수업 정보가 없습니다. 먼저 수업을 배정해주세요.'); return; }
 
+  console.log('[noti] roomFix 조회 시작');
   // Firebase roomFix에서 최신 강의장 조회
   const _rfSanitize = s => (s||'').trim().replace(/\//g,'%2F').replace(/[.#$\[\]]/g,'_');
   const gubn = arr[si]['구분']||'평일';
@@ -5305,6 +5306,8 @@ async function openNotiCardFromBoard(arrName, si, mk){
     }
   }
 
+  console.log('[noti] linkedMks:', linkedMks.length, 'displayRoom:', displayRoom);
+
   // ── 교육부 휴가 기간 처리 ──
   // 휴가 적용 제외 학생 (이 이름들은 정상 수업)
   const VACATION_EXEMPT = new Set(['최해광','장덕윤','노용선','박찬주','최영길','강예은','신은진','노광필','이혜영']);
@@ -5321,8 +5324,10 @@ async function openNotiCardFromBoard(arrName, si, mk){
   }
 
   // ── 날짜 계산: gkyilDates 우선, 없으면 days 계산 ──
+  console.log('[noti] 날짜 계산 시작, startDate:', startDate, 'endDate:', endDate);
   let classDates;
   const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time, p.days);
+  console.log('[noti] fbDates:', fbDates ? fbDates.length : 'null');
   if(fbDates && fbDates.length){
     classDates = fbDates;
   } else {
@@ -5617,7 +5622,9 @@ async function openNotiCardFromBoard(arrName, si, mk){
   const toggleBtn = document.getElementById('notiCalToggleBtn');
   if(toggleBtn){ toggleBtn.style.background='#f8fafc'; toggleBtn.style.color='#64748b'; toggleBtn.style.borderColor='#cbd5e1'; }
 
+  console.log('[noti] 모달 표시 시도');
   document.getElementById('notiCardBg').style.display='flex';
+  console.log('[noti] 모달 표시 완료');
 }
 
 function closeNotiCard(){
