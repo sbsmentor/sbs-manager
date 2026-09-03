@@ -5203,8 +5203,8 @@ async function _getTimetableDates(teacher, startDate, endDate, time, days, cls) 
         if (!window._gkyilDates) window._gkyilDates = {};
         window._gkyilDates[teacher] = allDates;
         const result = filterDates(allDates, start, end);
-        if (result && validateDays(result, days)) {
-          console.log('[gkyil] Firebase 직접 조회 적용:', result.length, '일'); return result;
+        if (result && result.length) {
+          return result;
         }
       }
     }
