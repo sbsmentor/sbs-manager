@@ -1298,20 +1298,23 @@ window.saveDatesModal = async function() {
 
 <script>
 // ════════ 출석일 일괄입력 ════════
-let _bulkGroups = [];
-let _bulkMo = 'ALL';
-let _bulkType = 'all';
+let _bulkGroups   = [];  // { teacher, names, daysStr, type, room, periods:[{start,end}] }
+let _bulkMonths   = [];
+let _bulkMo       = 'ALL';
+let _bulkType     = 'all';
 
 function openBulkDatesModal() {
-  const q = (document.getElementById('searchInp').value||'').toLowerCase();
+  const q   = (document.getElementById('searchInp').value||'').toLowerCase();
   const tab = (typeof currentTab !== 'undefined' ? currentTab : 'all');
+
   let items = Object.keys(allCourses).map(k => Object.assign({key:k}, allCourses[k]));
   if (tab !== 'all') items = items.filter(c => c.type === tab);
-  if (q) items = items.filter(c => (c.name||'').toLowerCase().includes(q)||(c.teacher||'').toLowerCase().includes(q));
-  items = items.filter(c => c.teacher); // 강사 없는 항목 제외
+  if (q) items = items.filter(c =>
+    (c.name||'').toLowerCase().includes(q) || (c.teacher||'').toLowerCase().includes(q));
+  items = items.filter(c => c.teacher);
   items.sort((a,b) => (a.start||'') < (b.start||'') ? -1 : 1);
 
-  // 그룹화: 강사+개강일+종강일+구분 동일하면 하나로 (날짜 공유)
+  // 그룹화: 강사+과목명+요일+구분 동일하면 같은 카드, 기수(start~end)는 서브로우
   const map = {};
   items.forEach(c => {
     const teacher = c.teacher;
@@ -1322,35 +1325,42 @@ function openBulkDatesModal() {
     const start   = c.start  || '';
     const end     = c.end    || '';
     const startMo = start.slice(0,7);
-    const gk = `${teacher}||${start}||${end}||${type}`;
-    if (!map[gk]) map[gk] = { teacher, names:[], daysSet:[], type, room, start, end, startMo };
-    if (!map[gk].names.includes(name)) map[gk].names.push(name);
-    if (days && !map[gk].daysSet.includes(days)) map[gk].daysSet.push(days);
-    if (!map[gk].room && room) map[gk].room = room;
+
+    // 카드 키: 강사+과목+요일+구분
+    const ck = `${teacher}||${name}||${days}||${type}`;
+    if (!map[ck]) map[ck] = { teacher, names:[name], daysStr:days, type, room, periods:[], startMos:new Set() };
+    if (!map[ck].names.includes(name)) map[ck].names.push(name);
+    if (!map[ck].room && room) map[ck].room = room;
+
+    // 기수 추가 (start+end 중복 방지)
+    if (!map[ck].periods.find(p => p.start===start && p.end===end)) {
+      map[ck].periods.push({ start, end });
+    }
+    if (startMo) map[ck].startMos.add(startMo);
   });
 
   _bulkGroups = Object.values(map);
+  _bulkMonths = [...new Set(_bulkGroups.flatMap(g=>[...g.startMos]))].sort();
 
-  const months = [...new Set(_bulkGroups.map(g=>g.startMo).filter(Boolean))].sort();
-  if (!months.length) {
-    document.getElementById('bulkDatesRows').innerHTML = '<div style="padding:32px;text-align:center;color:#94a3b8;">강좌가 없습니다.</div>';
+  if (!_bulkGroups.length) {
+    document.getElementById('bulkDatesRows').innerHTML =
+      '<div style="padding:32px;text-align:center;color:#94a3b8;">강좌가 없습니다.</div>';
     document.getElementById('bulkMonthTabs').innerHTML = '';
     document.getElementById('bulkDatesModalBg').style.display = 'flex';
     return;
   }
+
   const curF = document.getElementById('monthFilter').value;
-  _bulkMo   = (curF && months.includes(curF)) ? curF : 'ALL';
+  _bulkMo   = (curF && _bulkMonths.includes(curF)) ? curF : 'ALL';
   _bulkType = 'all';
-  _renderBulkTabs(months);
+
+  _renderBulkTabs();
   _renderBulkRows();
   document.getElementById('bulkDatesModalBg').style.display = 'flex';
 }
 
-let _bulkMonths = [];
-
-function _renderBulkTabs(months) {
-  _bulkMonths = months;
-  const moHtml = ['ALL',...months].map(mo => {
+function _renderBulkTabs() {
+  const moHtml = ['ALL',..._bulkMonths].map(mo => {
     const act = mo === _bulkMo;
     const lbl = mo === 'ALL' ? '전체' : mo.slice(5).replace(/^0/,'')+'월';
     return `<button onclick="switchBulkMonth('${mo}')" style="padding:9px 14px;border:none;border-bottom:3px solid ${act?'#0891b2':'transparent'};background:none;font-size:12px;font-weight:${act?'800':'500'};color:${act?'#0891b2':'#64748b'};cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">${lbl}</button>`;
@@ -1364,104 +1374,85 @@ function _renderBulkTabs(months) {
     `<div style="display:flex;align-items:center;width:100%;overflow-x:auto;">${moHtml}<div style="margin-left:auto;display:flex;gap:4px;padding:0 12px;">${typeHtml}</div></div>`;
 }
 
+function switchBulkMonth(mo) { _bulkMo = mo; _renderBulkTabs(); _renderBulkRows(); }
+function switchBulkType(t)   { _bulkType = t; _renderBulkTabs(); _renderBulkRows(); }
+
 function _renderBulkRows() {
   const wrap = document.getElementById('bulkDatesRows');
   wrap.innerHTML = '';
   document.getElementById('bulkDatesStatus').textContent = '';
 
-  let list = _bulkGroups.filter(g => _bulkMo === 'ALL' || g.startMo === _bulkMo);
-  if (_bulkType !== 'all') list = list.filter(g => g.type === _bulkType);
-
   const ROOM_RANK = ['A','B','C','D','E','F','G','H','I','J','K','L'];
-  function rr(r){ if(!r) return 999; if(r.includes('비대면')) return 900; const l=(r.replace(/[^A-Z]/g,'')||'')[0]; const i=ROOM_RANK.indexOf(l); return i>=0?i:800; }
+  function rr(r){ if(!r) return 999; if((r||'').includes('비대면')) return 900; const l=(r.replace(/[^A-Z]/g,'')||'')[0]; const i=ROOM_RANK.indexOf(l); return i>=0?i:800; }
+
+  // 필터
+  let list = _bulkGroups.filter(g => {
+    if (_bulkType !== 'all' && g.type !== _bulkType) return false;
+    if (_bulkMo === 'ALL') return true;
+    return g.startMos.has(_bulkMo);
+  });
 
   if (!list.length) {
     wrap.innerHTML = '<div style="padding:32px;text-align:center;color:#94a3b8;">해당 조건에 강좌가 없습니다.</div>';
     return;
   }
 
-  if (_bulkMo === 'ALL') {
-    // 전체 보기: 강사별 카드, 카드 안에 월별 코스 나열
-    const byTeacher = {};
-    list.forEach(g => {
-      if (!byTeacher[g.teacher]) byTeacher[g.teacher] = { room: g.room, type: g.type, list: [] };
-      byTeacher[g.teacher].list.push(g);
-    });
-    const teachers = Object.keys(byTeacher).sort((a,b) => {
-      const dr = rr(byTeacher[a].room) - rr(byTeacher[b].room);
-      return dr !== 0 ? dr : a.localeCompare(b,'ko');
+  list.sort((a,b) => { const dr=rr(a.room)-rr(b.room); return dr!==0?dr:(a.teacher||'').localeCompare(b.teacher||'','ko'); });
+
+  let lastRoom = null, rowIdx = 0;
+
+  list.forEach(g => {
+    // 선택된 월에 해당하는 기수만 표시
+    const periods = _bulkMo === 'ALL'
+      ? g.periods
+      : g.periods.filter(p => p.start && p.start.slice(0,7) === _bulkMo);
+    if (!periods.length) return;
+
+    if (g.room !== lastRoom) {
+      lastRoom = g.room;
+      const rh = document.createElement('div');
+      rh.style.cssText = 'font-size:11px;font-weight:800;color:#0891b2;padding:4px 2px;border-bottom:1.5px solid #bae6fd;margin:8px 0 4px;';
+      rh.textContent = '🏫 ' + (g.room || '강의장 미지정');
+      wrap.appendChild(rh);
+    }
+
+    // 강사 카드
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:8px;';
+
+    const badge = g.type === '주말'
+      ? '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#fef3c7;color:#d97706;font-weight:700;margin-left:5px;">주말</span>'
+      : '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#dbeafe;color:#1d4ed8;font-weight:700;margin-left:5px;">평일</span>';
+
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'padding:7px 14px;background:#e0f2fe;border-bottom:1px solid #bae6fd;font-size:12px;font-weight:800;color:#0c4a6e;border-radius:10px 10px 0 0;';
+    hdr.innerHTML = `${g.teacher}${badge} <span style="font-size:11px;font-weight:600;color:#475569;">${g.names.join(', ')}</span>${g.daysStr?' <span style="font-size:11px;color:#7c3aed;">('+g.daysStr+')</span>':''}`;
+    card.appendChild(hdr);
+
+    // 기수별 입력 행
+    periods.sort((a,b)=>(a.start||'')<(b.start||'')?-1:1).forEach(({ start, end }) => {
+      _appendRow(card, g.teacher, start, end, rowIdx++);
     });
 
-    let lastRoom = null, rowIdx = 0;
-    teachers.forEach(teacher => {
-      const { room, type, list: tlist } = byTeacher[teacher];
-      if (room !== lastRoom) {
-        lastRoom = room;
-        const rh = document.createElement('div');
-        rh.style.cssText = 'font-size:11px;font-weight:800;color:#0891b2;padding:4px 2px;border-bottom:1.5px solid #bae6fd;margin:8px 0 4px;';
-        rh.textContent = '🏫 ' + (room || '강의장 미지정');
-        wrap.appendChild(rh);
-      }
-      const card = document.createElement('div');
-      card.style.cssText = 'background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:8px;';
-      const badge = type === '주말'
-        ? '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#fef3c7;color:#d97706;font-weight:700;margin-left:5px;">주말</span>'
-        : '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#dbeafe;color:#1d4ed8;font-weight:700;margin-left:5px;">평일</span>';
-      card.innerHTML = `<div style="padding:8px 14px;background:#e0f2fe;border-bottom:1px solid #bae6fd;font-size:12px;font-weight:800;color:#0c4a6e;border-radius:10px 10px 0 0;">${teacher}${badge}${room?' <span style="font-size:11px;color:#0891b2;font-weight:600;">/ '+room+'</span>':''}</div>`;
-      tlist.sort((a,b)=>(a.start||'')<(b.start||'')?-1:1).forEach(g => {
-        _appendRow(card, g, rowIdx++);
-      });
-      wrap.appendChild(card);
-    });
-  } else {
-    // 월별 보기: 강의장 → 강사 가나다순
-    list.sort((a,b) => { const dr=rr(a.room)-rr(b.room); return dr!==0?dr:(a.teacher||'').localeCompare(b.teacher||'','ko'); });
-    let lastRoom = null, rowIdx = 0;
-    list.forEach(g => {
-      if (g.room !== lastRoom) {
-        lastRoom = g.room;
-        const rh = document.createElement('div');
-        rh.style.cssText = 'font-size:11px;font-weight:800;color:#0891b2;padding:4px 2px;border-bottom:1.5px solid #bae6fd;margin:8px 0 4px;';
-        rh.textContent = '🏫 ' + (g.room || '강의장 미지정');
-        wrap.appendChild(rh);
-      }
-      const card = document.createElement('div');
-      card.style.cssText = 'background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:6px;';
-      const badge = g.type === '주말'
-        ? '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#fef3c7;color:#d97706;font-weight:700;margin-left:5px;">주말</span>'
-        : '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#dbeafe;color:#1d4ed8;font-weight:700;margin-left:5px;">평일</span>';
-      // 강사 헤더
-      const hdr = document.createElement('div');
-      hdr.style.cssText = 'padding:7px 14px;background:#e0f2fe;border-bottom:1px solid #bae6fd;font-size:12px;font-weight:800;color:#0c4a6e;border-radius:10px 10px 0 0;';
-      hdr.innerHTML = `${g.teacher}${badge}${g.names.join(', ')?' <span style="font-size:11px;font-weight:600;color:#475569;">'+g.names.join(', ')+'</span>':''}`;
-      card.appendChild(hdr);
-      _appendRow(card, g, rowIdx++);
-      wrap.appendChild(card);
-    });
-  }
+    wrap.appendChild(card);
+  });
 }
 
-function _appendRow(container, g, idx) {
-  const { teacher, names, daysSet, start, end } = g;
-  const nameStr = names.join(', ');
-  const daysStr = daysSet.join(' / ');
+function _appendRow(container, teacher, start, end, idx) {
   const uid = 'br' + idx;
-
   const div = document.createElement('div');
-  div.style.cssText = 'padding:10px 14px;';
+  div.style.cssText = 'padding:8px 14px;border-top:1px solid #f1f5f9;';
   div.dataset.teacher = teacher;
   div.dataset.start   = start;
   div.dataset.end     = end;
   div.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <div>
-        <div style="font-size:11px;font-weight:700;color:#475569;">${daysStr?'('+daysStr+') ':''}<span style="color:#94a3b8;font-weight:400;">${start}${end?' ~ '+end:''}</span></div>
-      </div>
-      <span id="${uid}-prev" style="font-size:11px;color:#0891b2;white-space:nowrap;flex-shrink:0;"></span>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+      <div style="font-size:11px;color:#64748b;">${start}${end?' ~ '+end:''}</div>
+      <span id="${uid}-prev" style="font-size:11px;color:#0891b2;white-space:nowrap;"></span>
     </div>
     <textarea id="${uid}-ta" rows="2"
-      placeholder="${start?start.slice(5).replace('-','/'):'MM/DD'} ~ ${end?end.slice(5).replace('-','/'):'MM/DD'} 출석일..."
-      style="width:100%;padding:7px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:12px;font-family:'Noto Sans KR',sans-serif;resize:vertical;box-sizing:border-box;outline:none;"
+      placeholder="${start?start.slice(5).replace('-','/'):'MM/DD'} ~ ${end?end.slice(5).replace('-','/'):'MM/DD'} 출석일 입력..."
+      style="width:100%;padding:6px 10px;border:1.5px solid #cbd5e1;border-radius:7px;font-size:12px;font-family:'Noto Sans KR',sans-serif;resize:vertical;box-sizing:border-box;outline:none;"
       onfocus="this.style.borderColor='#0891b2'" onblur="this.style.borderColor='#cbd5e1'"
       oninput="_bulkPreview('${uid}','${start}')"></textarea>`;
   container.appendChild(div);
@@ -1483,22 +1474,11 @@ function _appendRow(container, g, idx) {
 }
 
 function _bulkPreview(uid, start) {
-  const ta = document.getElementById(uid+'-ta');
+  const ta   = document.getElementById(uid+'-ta');
   const prev = document.getElementById(uid+'-prev');
   if (!ta || !prev) return;
   const d = parseBulkDates(ta.value, start);
   prev.textContent = d.length ? '✅ '+d.length+'일' : '';
-}
-
-function switchBulkMonth(mo) {
-  _bulkMo = mo;
-  _renderBulkTabs(_bulkMonths);
-  _renderBulkRows();
-}
-function switchBulkType(t) {
-  _bulkType = t;
-  _renderBulkTabs(_bulkMonths);
-  _renderBulkRows();
 }
 
 function parseBulkDates(raw, startDate) {
