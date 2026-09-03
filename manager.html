@@ -4845,6 +4845,12 @@ function toggleNotiCalAttendOnly(){
     const {origDates, p} = window._notiCtx;
     const allDates = [...(window._notiCustomDates||new Set()),...origDates].filter(d=>!(window._notiRemovedDates||new Set()).has(d));
     const moSet = new Set(allDates.map(d=>d.slice(0,7)));
+    if(p.startDate){
+      let cur=new Date(p.startDate.slice(0,7)+'-01');
+      const endMo=p.endDate?p.endDate.slice(0,7):p.startDate.slice(0,7);
+      const endCur=new Date(endMo+'-01');
+      while(cur<=endCur){ moSet.add(cur.toISOString().slice(0,7)); cur.setMonth(cur.getMonth()+1); }
+    }
     document.getElementById('notiCalWrap').innerHTML =
       [...moSet].sort().map(mo=>renderNotiCalGrid(mo, allDates, p.startDate, p.endDate)).join('');
   }
@@ -4998,8 +5004,16 @@ function notiCalClick(ds) {
   }
   // 달력 다시 렌더
   const allDates = [...origDates.filter(d => !window._notiRemovedDates.has(d)), ...window._notiCustomDates];
+  // 개강~종강 사이 모든 월 포함
   const moSet = new Set(allDates.map(d => d.slice(0,7)));
-  if (!moSet.size && _notiCtx.p.startDate) moSet.add(_notiCtx.p.startDate.slice(0,7));
+  const _sd = _notiCtx.p.startDate, _ed = _notiCtx.p.endDate;
+  if(_sd){
+    let cur=new Date(_sd.slice(0,7)+'-01');
+    const endMo=_ed?_ed.slice(0,7):_sd.slice(0,7);
+    const endCur=new Date(endMo+'-01');
+    while(cur<=endCur){ moSet.add(cur.toISOString().slice(0,7)); cur.setMonth(cur.getMonth()+1); }
+  }
+  if (!moSet.size && _sd) moSet.add(_sd.slice(0,7));
   const months = [...moSet].sort();
   document.getElementById('notiCalWrap').innerHTML =
     months.map(mo => renderNotiCalGrid(mo, allDates, _notiCtx.p.startDate, _notiCtx.p.endDate)).join('');
@@ -5333,6 +5347,16 @@ async function openNotiCardFromBoard(arrName, si, mk){
     :'x';
 
   const moSet=new Set(classDates.map(d=>d.slice(0,7)));
+  // 개강일~종강일 사이 모든 월 포함 (출석일 없어도 캘린더 표시)
+  if(startDate){
+    let cur=new Date(startDate.slice(0,7)+'-01');
+    const endMo=endDate?endDate.slice(0,7):(startDate.slice(0,7));
+    const endCur=new Date(endMo+'-01');
+    while(cur<=endCur){
+      moSet.add(cur.toISOString().slice(0,7));
+      cur.setMonth(cur.getMonth()+1);
+    }
+  }
   if(!moSet.size&&startDate) moSet.add(startDate.slice(0,7));
   if(!moSet.size) moSet.add(new Date().toISOString().slice(0,7));
   const months=[...moSet].sort();
@@ -5543,9 +5567,15 @@ async function openNotiCardFromBoard(arrName, si, mk){
     d3.forEach(function(d){ if(!allClassDates.includes(d)) allClassDates.push(d); });
   }
   allClassDates.sort();
-  // 날짜 상태로 달력 재렌더 (removed/custom 반영)
   const allDates2 = [...allClassDates.filter(d => !window._notiRemovedDates.has(d)), ...window._notiCustomDates];
   const moSet2 = new Set(allDates2.map(d => d.slice(0,7)));
+  // 개강~종강 사이 모든 월 포함
+  if(startDate){
+    let cur2=new Date(startDate.slice(0,7)+'-01');
+    const endMo2=endDate?endDate.slice(0,7):startDate.slice(0,7);
+    const endCur2=new Date(endMo2+'-01');
+    while(cur2<=endCur2){ moSet2.add(cur2.toISOString().slice(0,7)); cur2.setMonth(cur2.getMonth()+1); }
+  }
   if (!moSet2.size && startDate) moSet2.add(startDate.slice(0,7));
   if (!moSet2.size) moSet2.add(months[0]||new Date().toISOString().slice(0,7));
   document.getElementById('notiCalWrap').innerHTML =
