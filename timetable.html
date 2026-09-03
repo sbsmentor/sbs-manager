@@ -330,8 +330,13 @@ async function rebuildRoomFixFromCourses() {
 let _roomFix = {}; // key: "강사|강좌|구분" → 강의실
 
 function _sanitizeKey(s) {
-  // Firebase 키에 금지된 문자 제거: . # $ / [ ]
-  return (s||'').trim().replace(/[.#$\/\[\]]/g, '_');
+  // Firebase 키 금지 문자: . # $ / [ ] → / 는 %2F로 인코딩(복원 가능), 나머지는 _로 대체
+  return (s||'').trim()
+    .replace(/\//g, '%2F')
+    .replace(/[.#$\[\]]/g, '_');
+}
+function _desanitizeKey(s) {
+  return (s||'').replace(/%2F/g, '/');
 }
 function _roomFixKey(teacher, course, type) {
   return _sanitizeKey(teacher) + '|' + _sanitizeKey(course) + '|' + _sanitizeKey(type);
@@ -416,21 +421,24 @@ function loadRoomFix() {
   ref('roomFix').on('value', snap => {
     const saved = snap.val();
     if (saved && Object.keys(saved).length > 0) {
-      // 키 형식 검증: 강사|강좌|구분 순서인지 확인
-      // 올바른 형식이면 강사명이 첫 번째 파트 (한글 2~5자)
       const firstKey = Object.keys(saved)[0];
       const parts = firstKey.split('|');
-      const isValidFormat = parts.length === 3 && /^[가-힣]{2,5}$/.test(parts[0]);
+      const isValidFormat = parts.length === 3 && /^[가-힣]{2,6}$/.test(parts[0]);
       if (isValidFormat) {
-        _roomFix = saved;
+        // 기존 _ 인코딩된 키가 있으면 %2F로 마이그레이션
+        const needsMigration = Object.keys(saved).some(k => k.includes('/'));
+        if (needsMigration) {
+          // / 가 있으면 Firebase 키로 쓸 수 없으므로 이상한 데이터 — 그냥 사용
+          _roomFix = saved;
+        } else {
+          _roomFix = saved;
+        }
       } else {
-        // 잘못된 형식 → 기본값으로 리셋
-        console.log('[roomFix] 키 형식 오류, 기본값으로 리셋');
+        console.log('[roomFix] 키 형식 오류, 기본값 유지');
         _roomFix = Object.assign({}, _DEFAULT_ROOM_FIX);
         set(ref('roomFix'), _roomFix).catch(()=>{});
       }
     } else {
-      // Firebase에 없으면 기본값으로 초기화
       _roomFix = Object.assign({}, _DEFAULT_ROOM_FIX);
       set(ref('roomFix'), _roomFix).catch(()=>{});
     }
@@ -438,19 +446,25 @@ function loadRoomFix() {
 }
 
 function getFixedRoom(teacher, course, type, parsedRoom) {
-  // 정확한 매칭 (sanitize 적용)
+  if (!teacher && !course) return parsedRoom || '';
+  // 정확한 매칭
   const key = _roomFixKey(teacher, course, type);
-  if (_roomFix[key]) return _roomFix[key];
-  // 공백+특수문자 제거 후 매칭
+  if (Object.prototype.hasOwnProperty.call(_roomFix, key) && _roomFix[key]) return _roomFix[key];
+  // 구분 없이 강사+강좌만으로 fallback
+  const keyNoType1 = _roomFixKey(teacher, course, '평일');
+  const keyNoType2 = _roomFixKey(teacher, course, '주말');
+  if (_roomFix[keyNoType1]) return _roomFix[keyNoType1];
+  if (_roomFix[keyNoType2]) return _roomFix[keyNoType2];
+  // 공백/특수문자 제거 후 유사 매칭
+  const normTeacher = _sanitizeKey((teacher||'').replace(/\s+/g,''));
   const normCourse  = _sanitizeKey((course||'').replace(/\s+/g,''));
-  const normTeacher = _sanitizeKey((teacher||'').trim());
   for (const [k, v] of Object.entries(_roomFix)) {
+    if (!v) continue;
     const [kt, kc, ktype] = k.split('|');
     if ((kt||'').replace(/\s+/g,'') === normTeacher &&
-        (kc||'').replace(/\s+/g,'') === normCourse &&
-        (ktype||'') === type) return v;
+        (kc||'').replace(/\s+/g,'') === normCourse) return v;
   }
-  return parsedRoom;
+  return parsedRoom || '';
 }
 
 function openRoomFixModal() {
@@ -472,13 +486,17 @@ function renderRoomFixList() {
   }
   // 평일 먼저, 주말 나중 / 각 안에서 강사 가나다순
   entries.sort((a, b) => {
-    const [at,,atype] = a[0].split('|');
-    const [bt,,btype] = b[0].split('|');
+    const ap = a[0].split('|'), bp = b[0].split('|');
+    const atype = _desanitizeKey(ap[2]||''), btype = _desanitizeKey(bp[2]||'');
+    const at = _desanitizeKey(ap[0]||''), bt = _desanitizeKey(bp[0]||'');
     if (atype !== btype) return atype === '평일' ? -1 : 1;
     return at.localeCompare(bt, 'ko');
   });
   entries.forEach(([key, room]) => {
-    const [teacher, course, type] = key.split('|');
+    const parts = key.split('|');
+    const teacher = _desanitizeKey(parts[0]||'');
+    const course  = _desanitizeKey(parts[1]||'');
+    const type    = _desanitizeKey(parts[2]||'평일');
     list.appendChild(_makeRoomFixRow(teacher, course, type, room));
   });
 }
@@ -522,6 +540,7 @@ async function saveRoomFix() {
     await set(ref('roomFix'), newMap);
     _roomFix = newMap;
     closeRoomFixModal();
+    renderTable();
     showToast('✅ 강의실 고정 설정 저장 완료 (' + Object.keys(newMap).length + '개)');
   } catch(e) {
     showToast('❌ 저장 실패: ' + e.message);
