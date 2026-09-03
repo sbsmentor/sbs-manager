@@ -5263,19 +5263,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
   // 메인 수업 강의장
   const mainRoom = getRoomFromFix(p.teacher, p.cls, gubn) || p.room || '';
   p.room = mainRoom;
-  // 연강 포함 강의장 표시: A(웹툰), I(핸드드로잉)
-  let displayRoom = mainRoom;
-  if(linkedMks.length > 0){
-    const roomParts = [{room: mainRoom, cls: (p.cls||'').replace(/\([^)]*\)/g,'').trim()}];
-    linkedMks.forEach(({p:pp})=>{
-      const r = getRoomFromFix(pp.teacher, pp.cls, gubn) || pp.room || '';
-      const c = (pp.cls||'').replace(/\([^)]*\)/g,'').trim();
-      if(!roomParts.find(x=>x.room===r && x.cls===c)) roomParts.push({room:r, cls:c});
-    });
-    if(roomParts.some(x=>x.room)){
-      displayRoom = roomParts.filter(x=>x.room).map(x=>`${x.room}(${x.cls})`).join(', ');
-    }
-  }
+  // displayRoom은 linkedMks 계산 후 아래에서 설정
 
   const startDate=p.startDate||''; let endDate=p.endDate||''; const daysStr=p.days||'';
 
@@ -5300,6 +5288,20 @@ async function openNotiCardFromBoard(arrName, si, mk){
 
   // endDate는 메인 수업 자체 값 사용
   // 연강 수업은 각자의 startDate~endDate 범위로 따로 조회 후 합산
+
+  // 연강 포함 강의장 표시: A(웹툰), I(핸드드로잉)
+  let displayRoom = mainRoom;
+  if(linkedMks.length > 0){
+    const roomParts = [{room: mainRoom, cls: (p.cls||'').replace(/\([^)]*\)/g,'').trim()}];
+    linkedMks.forEach(({p:pp})=>{
+      const r = getRoomFromFix(pp.teacher, pp.cls, gubn) || pp.room || '';
+      const c = (pp.cls||'').replace(/\([^)]*\)/g,'').trim();
+      if(!roomParts.find(x=>x.room===r && x.cls===c)) roomParts.push({room:r, cls:c});
+    });
+    if(roomParts.some(x=>x.room)){
+      displayRoom = roomParts.filter(x=>x.room).map(x=>`${x.room}(${x.cls})`).join(', ');
+    }
+  }
 
   // ── 교육부 휴가 기간 처리 ──
   // 휴가 적용 제외 학생 (이 이름들은 정상 수업)
