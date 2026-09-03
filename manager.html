@@ -5128,7 +5128,7 @@ function _loadGkyilDatesFromFirebase() {
 
 // Firebase timetable에서 해당 강좌의 dates 필드 조회
 // 우선순위: 1) 메모리 _gkyilDates 2) Firebase gkyilDates 직접 조회 3) Firebase timetable.dates
-async function _getTimetableDates(teacher, startDate, endDate, time, days) {
+async function _getTimetableDates(teacher, startDate, endDate, time, days, cls) {
   if (!teacher || !startDate) return null;
 
   function parseDayNums(daysStr) {
@@ -5175,9 +5175,8 @@ async function _getTimetableDates(teacher, startDate, endDate, time, days) {
   // 키 우선순위: teacher|course|days → teacher|course → teacher (하위 호환)
   if (window._fbDb) {
     const _safe = s => (s||'').trim().replace(/[.#$\/\[\]\s]/g,'_');
-    const cls = p && p.cls ? p.cls : '';
-    const keyWithDays = _safe(teacher) + '|' + _safe(cls) + '|' + _safe(days||'');
-    const keyNoDays   = _safe(teacher) + '|' + _safe(cls);
+    const keyWithDays = _safe(teacher) + '|' + _safe(cls||'') + '|' + _safe(days||'');
+    const keyNoDays   = _safe(teacher) + '|' + _safe(cls||'');
     const keyTeacher  = teacher;
     let rawDates = null;
     try {
@@ -5326,7 +5325,10 @@ async function openNotiCardFromBoard(arrName, si, mk){
   // ── 날짜 계산: gkyilDates 우선, 없으면 days 계산 ──
   console.log('[noti] 날짜 계산 시작, startDate:', startDate, 'endDate:', endDate);
   let classDates;
-  const fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time, p.days);
+  let fbDates = null;
+  try {
+    fbDates = await _getTimetableDates(p.teacher, startDate, endDate, p.time, p.days, p.cls);
+  } catch(e) { console.error('[noti] _getTimetableDates 오류:', e); }
   console.log('[noti] fbDates:', fbDates ? fbDates.length : 'null');
   if(fbDates && fbDates.length){
     classDates = fbDates;
@@ -5338,7 +5340,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
   if(linkedMks.length > 0){
     for(const {p:pp} of linkedMks){
       // 각 연강 수업은 자신의 startDate~endDate 범위로 조회 (다음 기수 날짜 혼입 방지)
-      const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.endDate, pp.time, pp.days);
+      const fbD2 = await _getTimetableDates(pp.teacher, pp.startDate, pp.endDate, pp.time, pp.days, pp.cls);
       let d2;
       if(fbD2 && fbD2.length){
         // gkyilDates 결과를 pp.endDate로 한 번 더 필터 (월수금 날짜가 섞여있을 수 있음)
@@ -5589,7 +5591,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
   for(const [,v2] of allSchedEntries){
     const pp2 = bdParseVal(v2);
     if(!pp2.cls || !pp2.startDate) continue;
-    const fbD3 = await _getTimetableDates(pp2.teacher, pp2.startDate, pp2.endDate, pp2.time, pp2.days);
+    const fbD3 = await _getTimetableDates(pp2.teacher, pp2.startDate, pp2.endDate, pp2.time, pp2.days, pp2.cls);
     let d3;
     if(fbD3 && fbD3.length) d3 = fbD3;
     else d3 = getClassDatesForNoti(pp2.startDate||'', pp2.endDate||'', pp2.days||'');
