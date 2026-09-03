@@ -1482,20 +1482,35 @@ function _bulkPreview(uid, start) {
 
 function parseBulkDates(raw, startDate) {
   if (!raw || !raw.trim()) return [];
-  const year = startDate ? startDate.slice(0,4) : new Date().getFullYear().toString();
-  return [...new Set(
-    raw.split(/[\t\n,\s]+/)
-      .map(s => s.trim())
-      .filter(s => s)
-      .map(s => {
-        const full = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
-        if (full) return `${full[1]}-${full[2].padStart(2,'0')}-${full[3].padStart(2,'0')}`;
-        const short = s.replace(/[./]/g,'-').match(/^(\d{1,2})-(\d{1,2})$/);
-        if (short) return `${year}-${short[1].padStart(2,'0')}-${short[2].padStart(2,'0')}`;
-        return null;
-      })
-      .filter(d => d && /^\d{4}-\d{2}-\d{2}$/.test(d))
-  )].sort();
+  const baseYear   = startDate ? parseInt(startDate.slice(0,4)) : new Date().getFullYear();
+  const startMonth = startDate ? parseInt(startDate.slice(5,7)) : 1;
+
+  // 입력된 토큰 순서 그대로 처리 (순서에 따라 연도 자동 넘김)
+  const tokens = raw.split(/[\t\n,\s]+/).map(s => s.trim()).filter(s => s);
+  const results = [];
+  let currentYear  = baseYear;
+  let prevMonth    = startMonth;
+
+  for (const s of tokens) {
+    // 전체 날짜 형식 (2027/01/05 등) → 그대로 사용
+    const full = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (full) {
+      const d = `${full[1]}-${full[2].padStart(2,'0')}-${full[3].padStart(2,'0')}`;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) { results.push(d); prevMonth = parseInt(full[2]); }
+      continue;
+    }
+    // MM/DD 또는 MM-DD
+    const short = s.replace(/[./]/g,'-').match(/^(\d{1,2})-(\d{1,2})$/);
+    if (short) {
+      const mm = parseInt(short[1]);
+      // 월이 이전 월보다 작아지면 → 다음 연도로 넘김 (예: 12→01)
+      if (mm < prevMonth && prevMonth >= 10 && mm <= 3) currentYear++;
+      prevMonth = mm;
+      const d = `${currentYear}-${short[1].padStart(2,'0')}-${short[2].padStart(2,'0')}`;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) results.push(d);
+    }
+  }
+  return [...new Set(results)].sort();
 }
 
 async function saveBulkDates() {
