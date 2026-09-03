@@ -1325,9 +1325,9 @@ function openBulkDatesModal() {
     const end     = c.end    || '';
     const startMo = start.slice(0,7);
 
-    // 카드 키: 강사+구분만 (요일/과목 무관하게 한 카드)
-    const ck = `${teacher}||${type}`;
-    if (!map[ck]) map[ck] = { teacher, names:[], type, room, periods:[], startMos:new Set() };
+    // 카드 키: 강사+과목명+구분 (요일 무관, 같은 과목이면 한 카드)
+    const ck = `${teacher}||${name}||${type}`;
+    if (!map[ck]) map[ck] = { teacher, names:[name], type, room, periods:[], startMos:new Set() };
     if (!map[ck].names.includes(name)) map[ck].names.push(name);
     if (!map[ck].room && room) map[ck].room = room;
 
