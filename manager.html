@@ -4721,13 +4721,11 @@ function renderNotiCalGrid(yearMonth, classDates, startDate, endDate){
     let markHtml='';
 
     if(isFirst&&!isClass){
-      // 개강일이 수업일이 아닌 경우 배경만 표시
       cellBg='#dbeafe'; numColor='#1d4ed8';
     } else if(isLast&&!isClass){
-      // 종강일이 수업일이 아닌 경우 배경만 표시 (점 없음)
-      cellBg='#f0fdf4'; numColor='#15803d';
+      // 종강일도 개강일과 같은 파란 배경
+      cellBg='#dbeafe'; numColor='#1d4ed8';
     } else if(isFirst||isLast){
-      // 개강일/종강일이 수업일인 경우 점 표시
       cellBg='#dbeafe'; numColor='#1d4ed8';
       markHtml=`<div style="font-size:9px;font-weight:700;color:#1d4ed8;line-height:1;">●</div>`;
     } else if(isClass&&holiday){
