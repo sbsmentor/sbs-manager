@@ -5421,7 +5421,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
     months.map(mo=>renderNotiCalGrid(mo,classDates,startDate,endDate)).join('');
 
   // 수업 정보 (편집 가능)
-  const labelStyle = 'display:inline-block;width:38px;font-weight:700;color:#64748b;font-size:10.5px;';
+  const labelStyle = 'display:inline-block;min-width:46px;font-weight:700;color:#64748b;font-size:10.5px;flex-shrink:0;';
   const valStyle = 'border:none;border-bottom:none;background:transparent;font-size:11px;font-family:inherit;color:inherit;cursor:text;outline:none;text-decoration:none;width:100%;box-sizing:border-box;';
 
   // ── 연강 포함 모든 수업 정보 합산 ──
