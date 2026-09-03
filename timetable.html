@@ -1500,30 +1500,38 @@ async function saveBulkDates() {
   const statusEl = document.getElementById('bulkDatesStatus');
   statusEl.textContent = '저장 중...';
 
-  let savedCount = 0, skipCount = 0, errorCount = 0;
+  // 강사별로 날짜 합산 (같은 강사 월수+화목 등 모두 합쳐서 한번에 저장)
+  const teacherNewDates = {}; // teacher → Set of new dates
 
   for (const infoDiv of rowEls) {
     const teacher = infoDiv.dataset.teacher;
     const start   = infoDiv.dataset.start;
-    const end     = infoDiv.dataset.end;
     if (!teacher || teacher === '(강사없음)') continue;
 
-    // textarea는 infoDiv의 부모(rowEl) 안에 있음
-    const rowEl = infoDiv.closest ? infoDiv.parentElement : infoDiv;
-    const ta = rowEl ? rowEl.querySelector('textarea') : null;
-    if (!ta || !ta.value.trim()) { skipCount++; continue; }
+    const rowEl = infoDiv.parentElement;
+    const ta = rowEl?.querySelector('textarea');
+    if (!ta || !ta.value.trim()) continue;
 
     const newDates = parseBulkDates(ta.value, start);
-    if (!newDates.length) { skipCount++; continue; }
+    if (!newDates.length) continue;
 
+    if (!teacherNewDates[teacher]) teacherNewDates[teacher] = new Set();
+    newDates.forEach(d => teacherNewDates[teacher].add(d));
+  }
+
+  let savedCount = 0, errorCount = 0;
+
+  for (const [teacher, newSet] of Object.entries(teacherNewDates)) {
+    const newDates = [...newSet].sort();
     try {
+      // 기존 날짜 읽기 후 합산 (기존 날짜 삭제 없음 — 카드에서 개강~종강 범위로 필터링)
       let existing = [];
       const snap = await _db.ref('gkyilDates/' + teacher).once('value');
       const raw = snap.val();
       if (typeof raw === 'string') existing = raw.split(',').filter(Boolean);
       else if (Array.isArray(raw)) existing = raw;
-      const kept   = existing.filter(d => (start && d < start) || (end && d > end));
-      const merged = [...new Set([...kept, ...newDates])].sort();
+
+      const merged = [...new Set([...existing, ...newDates])].sort();
       await _db.ref('gkyilDates/' + teacher).set(merged.join(','));
       savedCount++;
     } catch(e) {
