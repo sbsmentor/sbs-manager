@@ -612,7 +612,7 @@ window.renderTable = function() {
       + '<td><span class="editable" data-key="'+k+'" data-field="start" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.start||'-')+'</span></td>'
       + '<td><span class="editable" data-key="'+k+'" data-field="end" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.end||'-')+'</span></td>'
       + '<td><span class="editable" data-key="'+k+'" data-field="time" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.time||'-')+'</span></td>'
-      + '<td><span class="editable" data-key="'+k+'" data-field="room" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.room||'-')+'</span></td>'
+      + '<td><span class="editable" data-key="'+k+'" data-field="room" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(getFixedRoom(c.teacher,c.name,c.type,c.room)||'-')+'</span></td>'
       + '<td><span class="editable" data-key="'+k+'" data-field="days" onclick="editCell(this,this.dataset.key,this.dataset.field)">'+(c.days||'-')+'</span></td>'
       + '<td><span class="type-badge '+(c.type==='주말'?'t-weekend':'t-weekday')+'">'+(c.type||'평일')+'</span></td>'
       + '<td style="white-space:nowrap;display:flex;gap:4px;">'
@@ -983,20 +983,13 @@ window.uploadTimetable = async function(event, scheduleType) {
             }
           }
 
-          // 강의실: td의 실제 컬럼 위치로 매핑
-          const tdColEntry = rowColMap.find(e => e.cell === tds[colIdx]);
-          const tdCol = tdColEntry ? tdColEntry.col : -1;
-          const rawRoom = tdCol >= 0 ? (colToRoom1[tdCol] || colToRoom0[tdCol] || '') : '';
-          const roomMatch = rawRoom.match(/^([A-Z]+)/);
-          const parsedRoom = roomMatch ? roomMatch[1] : rawRoom;
-          // 강의실 고정 설정 적용 (강사+강좌+구분 매핑)
-          const room = getFixedRoom(teacher, courseName, scheduleType, parsedRoom);
+          // 강의실: 업로드 시 빈칸으로 저장 (강의실 고정 설정에서 별도 관리)
+          const room = '';
 
           // 중복 체크: 같은 파일 내 + Firebase 기존 데이터 모두 비교
-          // 강사+개강일+종강일+시간+강의실(rawRoom) 기준
-          const key = (teacher||'_') + '|' + startDate + '|' + endDate + '|' + rowTime + '|' + rawRoom;
+          const key = (teacher||'_') + '|' + startDate + '|' + endDate + '|' + rowTime;
           if (seen.has(key)) { skipped++; continue; }
-          // Firebase 기존 데이터와 비교 (강사+개강일+시간 기준 — rawRoom 무관)
+          // Firebase 기존 데이터와 비교 (강사+개강일+시간+종강일 기준)
           const fbDupKey = (teacher||'_') + '|' + startDate + '|' + rowTime;
           const fbExists = Object.values(allCourses).some(c =>
             ((c.teacher||'_') + '|' + (c.start||'') + '|' + (c.time||'')) === fbDupKey
