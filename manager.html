@@ -5172,21 +5172,19 @@ async function _getTimetableDates(teacher, startDate, endDate, time, days) {
   const end   = endDate   || '';
 
   // Firebase gkyilDates 직접 조회 (항상 최신 데이터)
-  // 키 우선순위: teacher|courseName → teacher (하위 호환)
+  // 키 우선순위: teacher|course|days → teacher|course → teacher (하위 호환)
   if (window._fbDb) {
-    const _safe = s => (s||'').trim().replace(/[.#$\/\[\]]/g,'_');
-    const courseKey = _safe(teacher) + '|' + _safe(p && p.cls ? p.cls : (days||''));
-    const teacherKey = teacher;
+    const _safe = s => (s||'').trim().replace(/[.#$\/\[\]\s]/g,'_');
+    const cls = p && p.cls ? p.cls : '';
+    const keyWithDays = _safe(teacher) + '|' + _safe(cls) + '|' + _safe(days||'');
+    const keyNoDays   = _safe(teacher) + '|' + _safe(cls);
+    const keyTeacher  = teacher;
     let rawDates = null;
     try {
-      // 1) teacher|course 키 시도
-      let snap = await window._fbDb.ref('gkyilDates/' + courseKey).once('value');
-      if (snap.val()) {
-        rawDates = snap.val();
-      } else {
-        // 2) 기존 teacher 키 fallback
-        snap = await window._fbDb.ref('gkyilDates/' + teacherKey).once('value');
-        rawDates = snap.val();
+      for (const k of [keyWithDays, keyNoDays, keyTeacher]) {
+        if (!k || k === '|' || k === '|_') continue;
+        const snap = await window._fbDb.ref('gkyilDates/' + k).once('value');
+        if (snap.val()) { rawDates = snap.val(); break; }
       }
     } catch(e) {}
 
@@ -5497,15 +5495,21 @@ async function openNotiCardFromBoard(arrName, si, mk){
       if (window._fbDb) {
         try {
           const _safe2 = s => (s||'').trim().replace(/[.#$\/\[\]]/g,'_');
-          const ck = _safe2(pp2.teacher) + '|' + _safe2(pp2.cls||'');
-          let snap2 = await window._fbDb.ref('gkyilDates/' + ck).once('value');
-          if (!snap2.val()) snap2 = await window._fbDb.ref('gkyilDates/' + pp2.teacher).once('value');
-          const raw2 = snap2.val();
-          let allD = [];
-          if (typeof raw2 === 'string') allD = raw2.split(',').filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d));
-          else if (Array.isArray(raw2)) allD = raw2.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d));
-          const fd2 = allD.filter(d => d >= (pp2.startDate||'') && d <= (pp2.endDate||'9999'));
-          if (fd2.length) return fd2.sort();
+          const _safe2 = s => (s||'').trim().replace(/[.#$\/\[\]\s]/g,'_');
+          const k1 = _safe2(pp2.teacher) + '|' + _safe2(pp2.cls||'') + '|' + _safe2(pp2.days||'');
+          const k2 = _safe2(pp2.teacher) + '|' + _safe2(pp2.cls||'');
+          let raw2 = null;
+          for (const k of [k1, k2, pp2.teacher]) {
+            const snap2 = await window._fbDb.ref('gkyilDates/' + k).once('value');
+            if (snap2.val()) { raw2 = snap2.val(); break; }
+          }
+          if (raw2) {
+            let allD = [];
+            if (typeof raw2 === 'string') allD = raw2.split(',').filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d));
+            else if (Array.isArray(raw2)) allD = raw2.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d));
+            const fd2 = allD.filter(d => d >= (pp2.startDate||'') && d <= (pp2.endDate||'9999'));
+            if (fd2.length) return fd2.sort();
+          }
         } catch(e) {}
       }
       return getClassDatesForNoti(pp2.startDate||'', pp2.endDate||'', pp2.days||'');
