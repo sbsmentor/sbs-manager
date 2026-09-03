@@ -297,6 +297,35 @@ let _sortAsc = true;
 
 
 
+async function rebuildRoomFixFromCourses() {
+  const seen = new Set();
+  const newMap = {};
+  const typeOrder = ['평일', '주말'];
+  const entries = Object.values(allCourses).filter(c => c.teacher && c.name);
+
+  for (const type of typeOrder) {
+    const filtered = entries
+      .filter(c => (c.type || '평일') === type)
+      .sort((a, b) => (a.teacher||'').localeCompare(b.teacher||'', 'ko') || (a.name||'').localeCompare(b.name||'', 'ko'));
+
+    for (const c of filtered) {
+      const key = _roomFixKey(c.teacher, c.name, type);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      // 기존 강의실 값 유지, 없으면 빈칸
+      newMap[key] = _roomFix[key] || '';
+    }
+  }
+
+  try {
+    await set(ref('roomFix'), newMap);
+    _roomFix = newMap;
+    console.log('[roomFix] 자동 재생성:', Object.keys(newMap).length + '개');
+  } catch(e) {
+    console.warn('[roomFix] 재생성 실패:', e);
+  }
+}
+
 // ── 강의실 고정 설정 (강사+강좌+구분 → 강의실) ──
 let _roomFix = {}; // key: "강사|강좌|구분" → 강의실
 
@@ -438,9 +467,16 @@ function renderRoomFixList() {
   const entries = Object.entries(_roomFix);
   list.innerHTML = '';
   if (entries.length === 0) {
-    list.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;">설정이 없습니다. 추가 버튼을 눌러주세요.</div>';
+    list.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;">설정이 없습니다. 시간표를 업로드하면 자동 생성됩니다.</div>';
     return;
   }
+  // 평일 먼저, 주말 나중 / 각 안에서 강사 가나다순
+  entries.sort((a, b) => {
+    const [at,,atype] = a[0].split('|');
+    const [bt,,btype] = b[0].split('|');
+    if (atype !== btype) return atype === '평일' ? -1 : 1;
+    return at.localeCompare(bt, 'ko');
+  });
   entries.forEach(([key, room]) => {
     const [teacher, course, type] = key.split('|');
     list.appendChild(_makeRoomFixRow(teacher, course, type, room));
@@ -990,6 +1026,9 @@ window.uploadTimetable = async function(event, scheduleType) {
       showLoading(false);
       event.target.value = '';
       showToast('✅ ' + added + '개 추가 (' + skipped + '개 중복 스킵)');
+
+      // 업로드 후 강의실 고정 목록 자동 재생성 (강의실 빈칸)
+      await rebuildRoomFixFromCourses();
     } catch(err) {
       showLoading(false);
       showToast('❌ 오류: ' + err.message);
@@ -1338,10 +1377,18 @@ function renderBulkRows(mo, typeF) {
   let filtered = _bulkAllGroups.filter(g => g.startMo === mo);
   if (typeF && typeF !== 'all') filtered = filtered.filter(g => g.type === typeF);
 
-  // 강의장 → 강사 가나다 순 정렬
+  // 강의장 순서: A~L → 비대면 → 미지정, 그 안에서 강사 가나다순
+  const ROOM_ORDER = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+  function getRoomRank(room) {
+    if (!room) return 999;
+    if (room.includes('비대면')) return 900;
+    const letter = room.replace(/[^A-Z]/g,'')[0];
+    const idx = ROOM_ORDER.indexOf(letter);
+    return idx >= 0 ? idx : 800;
+  }
   filtered.sort((a,b) => {
-    const roomCmp = (a.room||'').localeCompare(b.room||'', 'ko');
-    if(roomCmp !== 0) return roomCmp;
+    const rc = getRoomRank(a.room) - getRoomRank(b.room);
+    if(rc !== 0) return rc;
     return (a.teacher||'').localeCompare(b.teacher||'', 'ko');
   });
 
