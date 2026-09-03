@@ -5175,13 +5175,12 @@ async function _getTimetableDates(teacher, startDate, endDate, time, days, cls) 
   // 키 우선순위: teacher|course|days → teacher|course → teacher (하위 호환)
   if (window._fbDb) {
     const _safe = s => (s||'').trim().replace(/[.#$\/\[\]\s]/g,'_');
-    const keyWithDays = _safe(teacher) + '|' + _safe(cls||'') + '|' + _safe(days||'');
-    const keyNoDays   = _safe(teacher) + '|' + _safe(cls||'');
-    const keyTeacher  = teacher;
+    const keyMain = _safe(teacher) + '|' + _safe(cls||'');
+    const keyShort = _safe(teacher) + '|' + _safe((cls||'').replace(/\s*\([^)]*\)/g,'').trim());
     let rawDates = null;
     try {
-      for (const k of [keyWithDays, keyNoDays, keyTeacher]) {
-        if (!k || k === '|' || k === '|_') continue;
+      for (const k of [keyMain, keyShort]) {
+        if (!k || k === '|') continue;
         const snap = await window._fbDb.ref('gkyilDates/' + k).once('value');
         if (snap.val()) { rawDates = snap.val(); break; }
       }
@@ -5505,10 +5504,10 @@ async function openNotiCardFromBoard(arrName, si, mk){
       if (window._fbDb) {
         try {
           const _safe2 = s => (s||'').trim().replace(/[.#$\/\[\]\s]/g,'_');
-          const k1 = _safe2(pp2.teacher) + '|' + _safe2(pp2.cls||'') + '|' + _safe2(pp2.days||'');
-          const k2 = _safe2(pp2.teacher) + '|' + _safe2(pp2.cls||'');
+          const k1 = _safe2(pp2.teacher) + '|' + _safe2(pp2.cls||'');
+          const k2 = _safe2(pp2.teacher) + '|' + _safe2((pp2.cls||'').replace(/\s*\([^)]*\)/g,'').trim());
           let raw2 = null;
-          for (const k of [k1, k2, pp2.teacher]) {
+          for (const k of [k1, k2]) {
             const snap2 = await window._fbDb.ref('gkyilDates/' + k).once('value');
             if (snap2.val()) { raw2 = snap2.val(); break; }
           }

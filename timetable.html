@@ -1434,8 +1434,8 @@ function _renderBulkRows() {
 
 function _fbKey(teacher, courseName, days) {
   const safe = s => (s||'').trim().replace(/[.#$\/\[\]\s]/g,'_');
-  // 강사|과목|요일 - 요일까지 분리해서 저장
-  return safe(teacher) + '|' + safe(courseName||'_') + (days ? '|' + safe(days) : '');
+  // 강사|과목명 키 (요일 제외 - 같은 과목은 날짜 합산, 개강~종강 범위로 분리)
+  return safe(teacher) + '|' + safe(courseName||'_');
 }
 
 function _appendRow(container, teacher, courseName, days, start, end, idx) {
