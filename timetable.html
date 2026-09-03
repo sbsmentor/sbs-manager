@@ -1438,8 +1438,7 @@ function _renderBulkRows() {
 }
 
 function _fbKey(teacher, courseName) {
-  // Firebase 키: 강사|과목명 (과목별로 날짜 분리 저장)
-  const safe = (s||'').replace(/[.#$/\[\]]/g,'_');
+  const safe = s => (s||'').trim().replace(/[.#$\/\[\]]/g,'_');
   return safe(teacher) + '|' + safe(courseName||'_');
 }
 
