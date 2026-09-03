@@ -1267,7 +1267,7 @@ function openBulkDatesModal() {
     const name    = c.name    || '(과목없음)';
     const days    = c.days    || '';
     const type    = c.type    || '평일';
-    const room    = c.room    || '';
+    const room    = getFixedRoom(c.teacher, c.name, c.type, c.room||'');
     const startMo = (c.start||'').slice(0,7);
     const gkey    = name + '||' + teacher + '||' + days + '||' + startMo + '||' + type + '||' + room;
     if (!groups[gkey]) groups[gkey] = { teacher, name, days, type, room, startMo, starts:[], ends:[], keys:[] };
