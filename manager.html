@@ -5213,6 +5213,18 @@ async function openNotiCardFromBoard(arrName, si, mk){
   const p=bdParseVal(val);
   if(!p.cls){ showToast('⚠ 수업 정보가 없습니다. 먼저 수업을 배정해주세요.'); return; }
 
+  // Firebase timetable에서 최신 강의장 조회 (배정 당시 저장값 무시)
+  if(window._fbDb && p.teacher && p.startDate){
+    try{
+      const ttSnap = await window._fbDb.ref('timetable').orderByChild('teacher').equalTo(p.teacher).once('value');
+      const ttData = ttSnap.val()||{};
+      const match = Object.values(ttData).find(c=>
+        c.teacher===p.teacher && c.start===p.startDate && (!p.time||c.time===p.time||!c.time)
+      );
+      if(match && match.room) p.room = match.room;
+    }catch(e){}
+  }
+
   const startDate=p.startDate||''; let endDate=p.endDate||''; const daysStr=p.days||'';
 
   // 연강 감지: 같은 달 + 같은 강사 + 개강일 ±7일 이내

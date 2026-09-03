@@ -1260,16 +1260,17 @@ function openBulkDatesModal() {
   if (q) items = items.filter(c => (c.name||'').toLowerCase().includes(q)||(c.teacher||'').toLowerCase().includes(q));
   items.sort((a,b) => (a.start||'') < (b.start||'') ? -1 : 1);
 
-  // 과목명+강사명+요일+개강월+구분으로 그룹화
+  // 과목명+강사명+요일+개강월+구분+강의장으로 그룹화
   const groups = {};
   items.forEach(c => {
     const teacher = c.teacher || '(강사없음)';
     const name    = c.name    || '(과목없음)';
     const days    = c.days    || '';
     const type    = c.type    || '평일';
+    const room    = c.room    || '';
     const startMo = (c.start||'').slice(0,7);
-    const gkey    = name + '||' + teacher + '||' + days + '||' + startMo + '||' + type;
-    if (!groups[gkey]) groups[gkey] = { teacher, name, days, type, startMo, starts:[], ends:[], keys:[] };
+    const gkey    = name + '||' + teacher + '||' + days + '||' + startMo + '||' + type + '||' + room;
+    if (!groups[gkey]) groups[gkey] = { teacher, name, days, type, room, startMo, starts:[], ends:[], keys:[] };
     groups[gkey].keys.push(c.key);
     if (c.start) groups[gkey].starts.push(c.start);
     if (c.end)   groups[gkey].ends.push(c.end);
@@ -1337,18 +1338,32 @@ function renderBulkRows(mo, typeF) {
   let filtered = _bulkAllGroups.filter(g => g.startMo === mo);
   if (typeF && typeF !== 'all') filtered = filtered.filter(g => g.type === typeF);
 
-  // 강사 가나다 순 정렬
-  filtered.sort((a,b) => (a.teacher||'').localeCompare(b.teacher||'', 'ko'));
+  // 강의장 → 강사 가나다 순 정렬
+  filtered.sort((a,b) => {
+    const roomCmp = (a.room||'').localeCompare(b.room||'', 'ko');
+    if(roomCmp !== 0) return roomCmp;
+    return (a.teacher||'').localeCompare(b.teacher||'', 'ko');
+  });
 
   if (!filtered.length) {
     rows.innerHTML = '<div style="text-align:center;padding:32px;color:#94a3b8;">해당 조건에 강좌가 없습니다.</div>';
     return;
   }
 
+  let lastRoom = null;
   let loadCount = 0;
   filtered.forEach((g, idx) => {
     const start = g.starts.length ? [...g.starts].sort()[0] : '';
     const end   = g.ends.length   ? [...g.ends].sort().slice(-1)[0] : '';
+
+    // 강의장 구분 헤더
+    if(g.room !== lastRoom){
+      lastRoom = g.room;
+      const roomHeader = document.createElement('div');
+      roomHeader.style.cssText = 'font-size:11px;font-weight:800;color:#0891b2;padding:4px 2px;border-bottom:1.5px solid #bae6fd;margin-bottom:4px;margin-top:8px;';
+      roomHeader.textContent = '🏫 ' + (g.room || '강의장 미지정');
+      rows.appendChild(roomHeader);
+    }
     const typeBadge = g.type === '주말'
       ? '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#fef3c7;color:#d97706;font-weight:700;margin-left:4px;">주말</span>'
       : '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#dbeafe;color:#1d4ed8;font-weight:700;margin-left:4px;">평일</span>';
@@ -1360,7 +1375,7 @@ function renderBulkRows(mo, typeF) {
         style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px;">
         <div>
           <div style="font-size:13px;font-weight:800;color:#1e293b;">${g.teacher}${typeBadge} <span style="font-size:11px;font-weight:600;color:#475569;">/ ${g.name}</span>${g.days?` <span style="font-size:11px;color:#7c3aed;">(${g.days})</span>`:''}</div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${start}${end?' ~ '+end:''}</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${start}${end?' ~ '+end:''}${g.room?` &nbsp;|&nbsp; 🏫 <b style="color:#0891b2;">${g.room}</b>`:''}</div>
         </div>
         <span id="bulk-preview-${idx}" style="font-size:11px;color:#0891b2;white-space:nowrap;"></span>
       </div>
