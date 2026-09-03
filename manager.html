@@ -4722,9 +4722,10 @@ function renderNotiCalGrid(yearMonth, classDates, startDate, endDate){
 
     if(isFirst&&!isClass){
       cellBg='#dbeafe'; numColor='#1d4ed8';
+      markHtml=`<div style="font-size:9px;font-weight:700;color:#1d4ed8;line-height:1;">●</div>`;
     } else if(isLast&&!isClass){
-      // 종강일도 개강일과 같은 파란 배경
       cellBg='#dbeafe'; numColor='#1d4ed8';
+      markHtml=`<div style="font-size:9px;font-weight:700;color:#1d4ed8;line-height:1;">●</div>`;
     } else if(isFirst||isLast){
       cellBg='#dbeafe'; numColor='#1d4ed8';
       markHtml=`<div style="font-size:9px;font-weight:700;color:#1d4ed8;line-height:1;">●</div>`;
