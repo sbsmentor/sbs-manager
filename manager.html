@@ -1597,6 +1597,7 @@ function toggleOpenNoticeCell(arr,idx,monKey){
 // ════════════════════════════════════════════
 function openViewModal(item){
   const name = item['이름']||'(이름 없음)';
+  const appNo = item['원서번호']||'';
   const course = item['과정']||'';
   const gubn = item['구분']||'';
   const ddazua = item['따즈아']||'';
@@ -1618,7 +1619,7 @@ function openViewModal(item){
 
   let html = `<div class="modal-header">
     <div>
-      <div class="modal-name">${name}</div>
+      <div class="modal-name">${appNo?`<span style="font-size:13px;font-weight:600;color:var(--text3);margin-right:6px;font-family:var(--mono);">#${appNo}</span>`:''}${name}</div>
       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
         ${course?`<span class="course-tag ${courseClass(course)}">${course}</span>`:''}
         ${gubn?`<span style="font-size:11px;padding:2px 8px;border-radius:12px;background:#e0e7ff;color:#3730a3;font-weight:700;">${gubn}</span>`:''}
@@ -1703,8 +1704,8 @@ function openEditModal(arr,idx){
   if(isStudent&&!item['수업배정']) item['수업배정']={};
 
   const FIELD_DEFS=isStudent?[
+    {key:'원서번호',type:'text'},
     {key:'이름',type:'text'},
-    {key:'구분',type:'select',opts:['평일','주말']},
     {key:'과정',type:'select',opts:['게임원화','게임그래픽','게임프로그래밍','게임기획','게임아트웍','웹툰','웹소설','기타']},
     {key:'수강목적',type:'select',opts:['취업','진학','창업','취미']},
     {key:'생년월일',type:'date'},{key:'나이',type:'age_auto'},
@@ -2499,12 +2500,34 @@ function editStudentInDash(arrName, idx) {
   openEditModal(arr, idx);
 }
 
+let _studentSortKey = '원서번호';
+let _studentSortAsc = true;
+
+function sortStudents(key) {
+  if (_studentSortKey === key) _studentSortAsc = !_studentSortAsc;
+  else { _studentSortKey = key; _studentSortAsc = true; }
+  renderContent();
+}
+
 function renderStudents(data){
   const arrName='STUDENTS_MERGED'; // 통합모드
   let items=data.map((s,i)=>({s,i})).filter(({s})=>match(s,searchQ));
   if(filterStatus!=='all') items=items.filter(({s})=>s['상태']===filterStatus);
   if(filterGubn!=='all') items=items.filter(({s})=>s['구분']===filterGubn);
   if(filterPurpose!=='all') items=items.filter(({s})=>s['수강목적']===filterPurpose);
+  // 컬럼 정렬
+  items.sort((a,b)=>{
+    let av, bv;
+    if (_studentSortKey === '원서번호') {
+      av = parseInt((a.s['원서번호']||'').toString().replace(/[^0-9]/g,''))||99999;
+      bv = parseInt((b.s['원서번호']||'').toString().replace(/[^0-9]/g,''))||99999;
+      return _studentSortAsc ? av-bv : bv-av;
+    }
+    av = (a.s[_studentSortKey]||'').toString();
+    bv = (b.s[_studentSortKey]||'').toString();
+    const cmp = av.localeCompare(bv, 'ko');
+    return _studentSortAsc ? cmp : -cmp;
+  });
   const active=items.filter(({s})=>s['상태']==='재학').length;
   const leave=items.filter(({s})=>s['상태']==='휴학').length;
   const needN=items.filter(({s})=>getCurrentSched(s['수업배정']||{}).type==='need').length;
@@ -2541,7 +2564,11 @@ function renderStudents(data){
       <button style="font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--border2);background:none;color:var(--text3);cursor:pointer;margin-left:2px;" onclick="clearSelection()">✕</button>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th style="width:32px;text-align:center;"><input type="checkbox" id="chkAll" onclick="toggleAllCheck(this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"></th><th>이름</th><th>구분</th><th>과정</th><th>목적</th><th>나이</th><th>연락처</th><th>주소</th><th>따즈아</th><th>개강안내</th><th>현재 수업</th><th>관리</th></tr></thead>
+      <thead><tr>
+        <th style="width:32px;text-align:center;"><input type="checkbox" id="chkAll" onclick="toggleAllCheck(this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"></th>
+        ${['원서번호','이름','구분','과정','목적'].map(k=>`<th onclick="sortStudents('${k}')" style="cursor:pointer;user-select:none;white-space:nowrap;">${k} ${_studentSortKey===k?(_studentSortAsc?'↑':'↓'):'⇅'}</th>`).join('')}
+        <th>나이</th><th>연락처</th><th>주소</th><th>따즈아</th><th>개강안내</th><th>현재 수업</th><th>관리</th>
+      </tr></thead>
       <tbody>`;
   if(items.length===0){
     html+=`<tr><td colspan="12" style="text-align:center;padding:48px;color:var(--text3)">등록된 학생이 없습니다<br><span style="font-size:12px;margin-top:6px;display:block">+ 새 항목 추가로 학생을 등록하세요</span></td></tr>`;
@@ -2560,6 +2587,7 @@ function renderStudents(data){
       const isChk = selectedRows.has(i);
       html+=`<tr onclick="openViewModal(window['${realArr}'][${realIdx}])" style="cursor:pointer;${isChk?'background:var(--accent-dim);outline:1.5px solid var(--accent);':''}">
         <td style="text-align:center;width:32px;" onclick="event.stopPropagation()"><input type="checkbox" class="row-chk" data-idx="${i}" ${isChk?'checked':''} onchange="toggleRowCheck(this,${i})" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"></td>
+        <td style="text-align:center;font-size:11px;font-family:var(--mono);color:var(--text3);width:50px;">${s['원서번호']||'-'}</td>
         <td><strong>${s['이름']||'-'}</strong></td>
         <td><span class="status-badge ${s['구분']==='주말'?'s-natl':'s-active'}">${s['구분']||'평일'}</span></td>
         <td><span class="course-tag ${courseClass(s['과정']||'')}">${s['과정']||'-'}</span></td>
@@ -3186,7 +3214,7 @@ function switchTab(id){
     const el=document.getElementById('bdBaseM');
     if(el) el.value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   }
-  currentTab=id;filterStatus='all';filterPurpose='all';filterGubn='all';searchQ='';renderTabs();renderContent();
+  currentTab=id;filterStatus='all';filterPurpose='all';filterGubn='all';searchQ='';_studentSortKey='원서번호';_studentSortAsc=true;renderTabs();renderContent();
 }
 function setStatus(s){filterStatus=s;renderContent();}
 function setGubn(g){filterGubn=g;renderContent();}
