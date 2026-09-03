@@ -1403,11 +1403,11 @@ function _renderBulkRows() {
         wrap.appendChild(rh);
       }
       const card = document.createElement('div');
-      card.style.cssText = 'background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:8px;overflow:hidden;';
+      card.style.cssText = 'background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:8px;';
       const badge = type === '주말'
         ? '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#fef3c7;color:#d97706;font-weight:700;margin-left:5px;">주말</span>'
         : '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#dbeafe;color:#1d4ed8;font-weight:700;margin-left:5px;">평일</span>';
-      card.innerHTML = `<div style="padding:8px 14px;background:#e0f2fe;border-bottom:1px solid #bae6fd;font-size:12px;font-weight:800;color:#0c4a6e;">${teacher}${badge}${room?' <span style="font-size:11px;color:#0891b2;font-weight:600;">/ '+room+'</span>':''}</div>`;
+      card.innerHTML = `<div style="padding:8px 14px;background:#e0f2fe;border-bottom:1px solid #bae6fd;font-size:12px;font-weight:800;color:#0c4a6e;border-radius:10px 10px 0 0;">${teacher}${badge}${room?' <span style="font-size:11px;color:#0891b2;font-weight:600;">/ '+room+'</span>':''}</div>`;
       tlist.sort((a,b)=>(a.start||'')<(b.start||'')?-1:1).forEach(g => {
         _appendRow(card, g, rowIdx++);
       });
@@ -1426,13 +1426,13 @@ function _renderBulkRows() {
         wrap.appendChild(rh);
       }
       const card = document.createElement('div');
-      card.style.cssText = 'background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:6px;overflow:hidden;';
+      card.style.cssText = 'background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:6px;';
       const badge = g.type === '주말'
         ? '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#fef3c7;color:#d97706;font-weight:700;margin-left:5px;">주말</span>'
         : '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#dbeafe;color:#1d4ed8;font-weight:700;margin-left:5px;">평일</span>';
       // 강사 헤더
       const hdr = document.createElement('div');
-      hdr.style.cssText = 'padding:7px 14px;background:#e0f2fe;border-bottom:1px solid #bae6fd;font-size:12px;font-weight:800;color:#0c4a6e;';
+      hdr.style.cssText = 'padding:7px 14px;background:#e0f2fe;border-bottom:1px solid #bae6fd;font-size:12px;font-weight:800;color:#0c4a6e;border-radius:10px 10px 0 0;';
       hdr.innerHTML = `${g.teacher}${badge}${g.names.join(', ')?' <span style="font-size:11px;font-weight:600;color:#475569;">'+g.names.join(', ')+'</span>':''}`;
       card.appendChild(hdr);
       _appendRow(card, g, rowIdx++);
