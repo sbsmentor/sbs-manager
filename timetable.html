@@ -1299,8 +1299,8 @@ window.saveDatesModal = async function() {
 <script>
 // ════════ 출석일 일괄입력 ════════
 let _bulkAllGroups = [];
-let _bulkActiveMonth = '';
-let _bulkActiveType = 'all'; // 'all' | '평일' | '주말'
+let _bulkActiveMonth = 'ALL'; // 'ALL' | '2026-09' | ...
+let _bulkActiveType = 'all';
 
 function openBulkDatesModal() {
   const q = (document.getElementById('searchInp').value||'').toLowerCase();
@@ -1311,7 +1311,8 @@ function openBulkDatesModal() {
   if (q) items = items.filter(c => (c.name||'').toLowerCase().includes(q)||(c.teacher||'').toLowerCase().includes(q));
   items.sort((a,b) => (a.start||'') < (b.start||'') ? -1 : 1);
 
-  // 과목명+강사명+요일+개강월+구분+강의장으로 그룹화
+  // 그룹화: 강사+개강일+종강일 이 같으면 같은 행 공유 (날짜 동일하므로)
+  // 다른 요일이라도 start~end 같으면 날짜 입력 한번만
   const groups = {};
   items.forEach(c => {
     const teacher = c.teacher || '(강사없음)';
@@ -1320,18 +1321,24 @@ function openBulkDatesModal() {
     const type    = c.type    || '평일';
     const room    = getFixedRoom(c.teacher, c.name, c.type, c.room||'');
     const startMo = (c.start||'').slice(0,7);
-    // 개강월+요일이 다르면 별도 행 (토/일 vs 토 분리)
-    const gkey    = teacher + '||' + name + '||' + days + '||' + startMo + '||' + type + '||' + room;
-    if (!groups[gkey]) groups[gkey] = { teacher, name, days, type, room, startMo, starts:[], ends:[], keys:[] };
+    const start   = c.start||'';
+    const end     = c.end||'';
+
+    // 같은 강사+개강일+종강일 → 날짜 공유 그룹 (요일 무관)
+    const gkey = teacher + '||' + start + '||' + end + '||' + type;
+    if (!groups[gkey]) {
+      groups[gkey] = { teacher, names:[], daysSet:[], type, room, startMo, start, end, keys:[] };
+    }
+    if (!groups[gkey].names.includes(name)) groups[gkey].names.push(name);
+    if (days && !groups[gkey].daysSet.includes(days)) groups[gkey].daysSet.push(days);
     groups[gkey].keys.push(c.key);
-    if (c.start) groups[gkey].starts.push(c.start);
-    if (c.end)   groups[gkey].ends.push(c.end);
+    // 강의장: 이미 설정된 게 없으면 채우기
+    if (!groups[gkey].room && room) groups[gkey].room = room;
   });
 
   _bulkAllGroups = Object.values(groups);
 
   const months = [...new Set(_bulkAllGroups.map(g => g.startMo).filter(Boolean))].sort();
-
   if (!months.length) {
     document.getElementById('bulkDatesRows').innerHTML = '<div style="text-align:center;padding:32px;color:#94a3b8;">강좌가 없습니다.</div>';
     document.getElementById('bulkMonthTabs').innerHTML = '';
@@ -1340,7 +1347,7 @@ function openBulkDatesModal() {
   }
 
   const curMonthF = document.getElementById('monthFilter').value;
-  _bulkActiveMonth = (curMonthF && months.includes(curMonthF)) ? curMonthF : months[0];
+  _bulkActiveMonth = (curMonthF && months.includes(curMonthF)) ? curMonthF : 'ALL';
   _bulkActiveType = 'all';
 
   renderBulkMonthTabs(months);
@@ -1350,21 +1357,22 @@ function openBulkDatesModal() {
 
 function renderBulkMonthTabs(months) {
   const tabEl = document.getElementById('bulkMonthTabs');
-  // 월 탭 + 평일/주말 세그먼트
-  const moTabs = months.map(mo => {
-    const label = mo.slice(5).replace(/^0/,'') + '월';
-    const active = mo === _bulkActiveMonth;
-    return `<button onclick="switchBulkMonth('${mo}')" style="padding:10px 16px;border:none;border-bottom:3px solid ${active?'#0891b2':'transparent'};background:none;font-size:13px;font-weight:${active?'800':'500'};color:${active?'#0891b2':'#64748b'};cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">${label}</button>`;
-  }).join('');
+  const moTabs = [
+    `<button onclick="switchBulkMonth('ALL')" style="padding:10px 14px;border:none;border-bottom:3px solid ${_bulkActiveMonth==='ALL'?'#0891b2':'transparent'};background:none;font-size:12px;font-weight:${_bulkActiveMonth==='ALL'?'800':'500'};color:${_bulkActiveMonth==='ALL'?'#0891b2':'#64748b'};cursor:pointer;font-family:'Noto Sans KR',sans-serif;">전체</button>`,
+    ...months.map(mo => {
+      const label = mo.slice(5).replace(/^0/,'') + '월';
+      const active = mo === _bulkActiveMonth;
+      return `<button onclick="switchBulkMonth('${mo}')" style="padding:10px 14px;border:none;border-bottom:3px solid ${active?'#0891b2':'transparent'};background:none;font-size:12px;font-weight:${active?'800':'500'};color:${active?'#0891b2':'#64748b'};cursor:pointer;font-family:'Noto Sans KR',sans-serif;">${label}</button>`;
+    })
+  ].join('');
 
   const typeSeg = `<div style="margin-left:auto;display:flex;align-items:center;gap:4px;padding:0 12px;">
     ${['all','평일','주말'].map(t => {
       const label = t==='all'?'전체':t;
       const active = _bulkActiveType === t;
-      return `<button onclick="switchBulkType('${t}')" style="padding:4px 12px;border-radius:20px;border:1.5px solid ${active?'#0891b2':'#e2e8f0'};background:${active?'#0891b2':'#fff'};color:${active?'#fff':'#64748b'};font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">${label}</button>`;
+      return `<button onclick="switchBulkType('${t}')" style="padding:4px 10px;border-radius:20px;border:1.5px solid ${active?'#0891b2':'#e2e8f0'};background:${active?'#0891b2':'#fff'};color:${active?'#fff':'#64748b'};font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">${label}</button>`;
     }).join('')}
   </div>`;
-
   tabEl.innerHTML = `<div style="display:flex;align-items:center;width:100%;overflow-x:auto;">${moTabs}${typeSeg}</div>`;
 }
 
@@ -1387,90 +1395,135 @@ function renderBulkRows(mo, typeF) {
   rows.innerHTML = '';
   document.getElementById('bulkDatesStatus').textContent = '';
 
-  let filtered = _bulkAllGroups.filter(g => g.startMo === mo);
+  let filtered = _bulkAllGroups.filter(g => mo === 'ALL' || g.startMo === mo);
   if (typeF && typeF !== 'all') filtered = filtered.filter(g => g.type === typeF);
 
-  // 강의장 순서: A~L → 비대면 → 미지정, 그 안에서 강사 가나다순
   const ROOM_ORDER = ['A','B','C','D','E','F','G','H','I','J','K','L'];
   function getRoomRank(room) {
     if (!room) return 999;
     if (room.includes('비대면')) return 900;
-    const letter = room.replace(/[^A-Z]/g,'')[0];
+    const letter = (room.replace(/[^A-Z]/g,'')||'')[0];
     const idx = ROOM_ORDER.indexOf(letter);
     return idx >= 0 ? idx : 800;
   }
-  filtered.sort((a,b) => {
-    const rc = getRoomRank(a.room) - getRoomRank(b.room);
-    if(rc !== 0) return rc;
-    return (a.teacher||'').localeCompare(b.teacher||'', 'ko');
-  });
 
-  if (!filtered.length) {
-    rows.innerHTML = '<div style="text-align:center;padding:32px;color:#94a3b8;">해당 조건에 강좌가 없습니다.</div>';
-    return;
+  if (mo === 'ALL') {
+    // 전체 보기: 강사별로 묶어서 표시
+    const teacherGroups = {};
+    filtered.forEach(g => {
+      if (!teacherGroups[g.teacher]) teacherGroups[g.teacher] = { room: g.room, groups: [] };
+      teacherGroups[g.teacher].groups.push(g);
+    });
+
+    const sortedTeachers = Object.keys(teacherGroups).sort((a,b) => {
+      const ra = getRoomRank(teacherGroups[a].room);
+      const rb = getRoomRank(teacherGroups[b].room);
+      if (ra !== rb) return ra - rb;
+      return a.localeCompare(b, 'ko');
+    });
+
+    let lastRoom = null;
+    let idx = 0;
+
+    sortedTeachers.forEach(teacher => {
+      const { room, groups } = teacherGroups[teacher];
+      // 강의장 헤더
+      if (room !== lastRoom) {
+        lastRoom = room;
+        const rh = document.createElement('div');
+        rh.style.cssText = 'font-size:11px;font-weight:800;color:#0891b2;padding:4px 2px;border-bottom:1.5px solid #bae6fd;margin-bottom:4px;margin-top:8px;';
+        rh.textContent = '🏫 ' + (room || '강의장 미지정');
+        rows.appendChild(rh);
+      }
+
+      // 강사 섹션 (여러 월 코스 포함)
+      const teacherEl = document.createElement('div');
+      teacherEl.style.cssText = 'background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:8px;overflow:hidden;';
+
+      const typeBadge = groups[0].type === '주말'
+        ? '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#fef3c7;color:#d97706;font-weight:700;margin-left:4px;">주말</span>'
+        : '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#dbeafe;color:#1d4ed8;font-weight:700;margin-left:4px;">평일</span>';
+
+      teacherEl.innerHTML = `<div style="padding:8px 14px;background:#e0f2fe;border-bottom:1px solid #bae6fd;font-size:12px;font-weight:800;color:#0c4a6e;">${teacher}${typeBadge}${room ? ` <span style="font-size:11px;font-weight:600;color:#0891b2;">🏫 ${room}</span>` : ''}</div>`;
+
+      groups.sort((a,b) => (a.start||'') < (b.start||'') ? -1 : 1).forEach(g => {
+        _appendGroupRow(teacherEl, g, idx);
+        idx++;
+      });
+
+      rows.appendChild(teacherEl);
+    });
+  } else {
+    // 월별 보기: 강의장별 정렬
+    filtered.sort((a,b) => {
+      const rc = getRoomRank(a.room) - getRoomRank(b.room);
+      if (rc !== 0) return rc;
+      return (a.teacher||'').localeCompare(b.teacher||'', 'ko');
+    });
+
+    if (!filtered.length) {
+      rows.innerHTML = '<div style="text-align:center;padding:32px;color:#94a3b8;">해당 조건에 강좌가 없습니다.</div>';
+      return;
+    }
+
+    let lastRoom = null;
+    filtered.forEach((g, idx) => {
+      if (g.room !== lastRoom) {
+        lastRoom = g.room;
+        const rh = document.createElement('div');
+        rh.style.cssText = 'font-size:11px;font-weight:800;color:#0891b2;padding:4px 2px;border-bottom:1.5px solid #bae6fd;margin-bottom:4px;margin-top:8px;';
+        rh.textContent = '🏫 ' + (g.room || '강의장 미지정');
+        rows.appendChild(rh);
+      }
+      const rowEl = document.createElement('div');
+      rowEl.style.cssText = 'background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:6px;';
+      _appendGroupRow(rowEl, g, idx);
+      rows.appendChild(rowEl);
+    });
   }
-
-  let lastRoom = null;
-  let loadCount = 0;
-  filtered.forEach((g, idx) => {
-    const start = g.starts.length ? [...g.starts].sort()[0] : '';
-    const end   = g.ends.length   ? [...g.ends].sort().slice(-1)[0] : '';
-
-    // 강의장 구분 헤더
-    if(g.room !== lastRoom){
-      lastRoom = g.room;
-      const roomHeader = document.createElement('div');
-      roomHeader.style.cssText = 'font-size:11px;font-weight:800;color:#0891b2;padding:4px 2px;border-bottom:1.5px solid #bae6fd;margin-bottom:4px;margin-top:8px;';
-      roomHeader.textContent = '🏫 ' + (g.room || '강의장 미지정');
-      rows.appendChild(roomHeader);
-    }
-    const typeBadge = g.type === '주말'
-      ? '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#fef3c7;color:#d97706;font-weight:700;margin-left:4px;">주말</span>'
-      : '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#dbeafe;color:#1d4ed8;font-weight:700;margin-left:4px;">평일</span>';
-
-    const rowEl = document.createElement('div');
-    rowEl.style.cssText = 'background:#f8fafc;border-radius:10px;padding:12px 14px;border:1px solid #e2e8f0;';
-    rowEl.innerHTML = `
-      <div data-teacher="${g.teacher.replace(/"/g,'&quot;')}" data-start="${start}" data-end="${end}"
-        style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px;">
-        <div>
-          <div style="font-size:13px;font-weight:800;color:#1e293b;">${g.teacher}${typeBadge} <span style="font-size:11px;font-weight:600;color:#475569;">/ ${g.name}</span>${g.days?` <span style="font-size:11px;color:#7c3aed;">(${g.days})</span>`:''}</div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${start}${end?' ~ '+end:''}${g.room?` &nbsp;|&nbsp; 🏫 <b style="color:#0891b2;">${g.room}</b>`:''}</div>
-        </div>
-        <span id="bulk-preview-${idx}" style="font-size:11px;color:#0891b2;white-space:nowrap;"></span>
-      </div>
-      <textarea rows="2" placeholder="09/14&#9;09/16&#9;09/18&#9;09/21&#9;..."
-        style="width:100%;padding:8px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:12px;font-family:'Noto Sans KR',sans-serif;resize:vertical;box-sizing:border-box;outline:none;"
-        onfocus="this.style.borderColor='#0891b2'" onblur="this.style.borderColor='#cbd5e1'"
-        oninput="(function(ta){var p=document.getElementById('bulk-preview-${idx}');if(p){var d=parseBulkDates(ta.value,'${start}');p.textContent=d.length?'✅ '+d.length+'일':'';};})(this)"></textarea>`;
-    rows.appendChild(rowEl);
-
-    if (_db && g.teacher && g.teacher !== '(강사없음)') {
-      _db.ref('gkyilDates/' + g.teacher).once('value').then(snap => {
-        const raw = snap.val();
-        let existing = [];
-        if (typeof raw === 'string') existing = raw.split(',').filter(Boolean);
-        else if (Array.isArray(raw)) existing = raw;
-        const fd = existing.filter(d => (!start||d>=start)&&(!end||d<=end));
-        if (fd.length) {
-          const ta = rowEl.querySelector('textarea');
-          if (ta) {
-            ta.value = fd.map(d => d.slice(5).replace('-','/')).join('\t');
-            const prev = document.getElementById('bulk-preview-' + idx);
-            if (prev) { const pd = parseBulkDates(ta.value, start); prev.textContent = pd.length ? '✅ '+pd.length+'일' : ''; }
-          }
-        }
-        loadCount++;
-        if (loadCount === filtered.filter(g=>g.teacher!=='(강사없음)').length)
-          document.getElementById('bulkDatesStatus').textContent = '기존 출석일 로드 완료';
-      }).catch(() => loadCount++);
-    }
-  });
 }
 
-function updateBulkPreviewEl(ta, previewEl, start) {
-  const parsed = parseBulkDates(ta.value, start);
-  previewEl.textContent = parsed.length ? '✅ ' + parsed.length + '일' : '';
+function _appendGroupRow(container, g, idx) {
+  const start = g.start || '';
+  const end   = g.end   || '';
+  const nameStr = g.names.join(', ');
+  const daysStr = g.daysSet.join(' / ');
+
+  const rowDiv = document.createElement('div');
+  rowDiv.style.cssText = 'padding:10px 14px;';
+  rowDiv.innerHTML = `
+    <div data-teacher="${(g.teacher||'').replace(/"/g,'&quot;')}" data-start="${start}" data-end="${end}"
+      style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px;">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#1e293b;">${nameStr}${daysStr?` <span style="font-size:11px;color:#7c3aed;">(${daysStr})</span>`:''}</div>
+        <div style="font-size:11px;color:#94a3b8;">${start}${end?' ~ '+end:''}</div>
+      </div>
+      <span id="bulk-preview-${idx}" style="font-size:11px;color:#0891b2;white-space:nowrap;"></span>
+    </div>
+    <textarea rows="2" placeholder="${start.slice(5).replace('-','/')} ~ ${end.slice(5).replace('-','/')} 출석일 입력..."
+      style="width:100%;padding:7px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:12px;font-family:'Noto Sans KR',sans-serif;resize:vertical;box-sizing:border-box;outline:none;"
+      onfocus="this.style.borderColor='#0891b2'" onblur="this.style.borderColor='#cbd5e1'"
+      oninput="(function(ta){var p=document.getElementById('bulk-preview-${idx}');if(p){var d=parseBulkDates(ta.value,'${start}');p.textContent=d.length?'✅ '+d.length+'일':'';};})(this)"></textarea>`;
+  container.appendChild(rowDiv);
+
+  // 기존 출석일 로드
+  if (_db && g.teacher && g.teacher !== '(강사없음)') {
+    _db.ref('gkyilDates/' + g.teacher).once('value').then(snap => {
+      const raw = snap.val();
+      let existing = [];
+      if (typeof raw === 'string') existing = raw.split(',').filter(Boolean);
+      else if (Array.isArray(raw)) existing = raw;
+      const fd = existing.filter(d => (!start||d>=start)&&(!end||d<=end));
+      if (fd.length) {
+        const ta = rowDiv.querySelector('textarea');
+        if (ta) {
+          ta.value = fd.map(d => d.slice(5).replace('-','/')).join('\t');
+          const prev = document.getElementById('bulk-preview-' + idx);
+          if (prev) { const pd = parseBulkDates(ta.value, start); prev.textContent = pd.length ? '✅ '+pd.length+'일' : ''; }
+        }
+      }
+    }).catch(()=>{});
+  }
 }
 
 function parseBulkDates(raw, startDate) {
