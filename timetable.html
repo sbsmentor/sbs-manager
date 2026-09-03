@@ -1298,233 +1298,195 @@ window.saveDatesModal = async function() {
 
 <script>
 // ════════ 출석일 일괄입력 ════════
-let _bulkAllGroups = [];
-let _bulkActiveMonth = 'ALL'; // 'ALL' | '2026-09' | ...
-let _bulkActiveType = 'all';
+let _bulkGroups = [];
+let _bulkMo = 'ALL';
+let _bulkType = 'all';
 
 function openBulkDatesModal() {
   const q = (document.getElementById('searchInp').value||'').toLowerCase();
-  const tab = typeof currentTab !== 'undefined' ? currentTab : 'all';
-
+  const tab = (typeof currentTab !== 'undefined' ? currentTab : 'all');
   let items = Object.keys(allCourses).map(k => Object.assign({key:k}, allCourses[k]));
   if (tab !== 'all') items = items.filter(c => c.type === tab);
   if (q) items = items.filter(c => (c.name||'').toLowerCase().includes(q)||(c.teacher||'').toLowerCase().includes(q));
+  items = items.filter(c => c.teacher); // 강사 없는 항목 제외
   items.sort((a,b) => (a.start||'') < (b.start||'') ? -1 : 1);
 
-  // 그룹화: 강사+개강일+종강일 이 같으면 같은 행 공유 (날짜 동일하므로)
-  // 다른 요일이라도 start~end 같으면 날짜 입력 한번만
-  const groups = {};
+  // 그룹화: 강사+개강일+종강일+구분 동일하면 하나로 (날짜 공유)
+  const map = {};
   items.forEach(c => {
-    const teacher = c.teacher || '(강사없음)';
+    const teacher = c.teacher;
     const name    = c.name    || '(과목없음)';
     const days    = c.days    || '';
     const type    = c.type    || '평일';
     const room    = getFixedRoom(c.teacher, c.name, c.type, c.room||'');
-    const startMo = (c.start||'').slice(0,7);
-    const start   = c.start||'';
-    const end     = c.end||'';
-
-    // 같은 강사+개강일+종강일 → 날짜 공유 그룹 (요일 무관)
-    const gkey = teacher + '||' + start + '||' + end + '||' + type;
-    if (!groups[gkey]) {
-      groups[gkey] = { teacher, names:[], daysSet:[], type, room, startMo, start, end, keys:[] };
-    }
-    if (!groups[gkey].names.includes(name)) groups[gkey].names.push(name);
-    if (days && !groups[gkey].daysSet.includes(days)) groups[gkey].daysSet.push(days);
-    groups[gkey].keys.push(c.key);
-    // 강의장: 이미 설정된 게 없으면 채우기
-    if (!groups[gkey].room && room) groups[gkey].room = room;
+    const start   = c.start  || '';
+    const end     = c.end    || '';
+    const startMo = start.slice(0,7);
+    const gk = `${teacher}||${start}||${end}||${type}`;
+    if (!map[gk]) map[gk] = { teacher, names:[], daysSet:[], type, room, start, end, startMo };
+    if (!map[gk].names.includes(name)) map[gk].names.push(name);
+    if (days && !map[gk].daysSet.includes(days)) map[gk].daysSet.push(days);
+    if (!map[gk].room && room) map[gk].room = room;
   });
 
-  _bulkAllGroups = Object.values(groups);
+  _bulkGroups = Object.values(map);
 
-  const months = [...new Set(_bulkAllGroups.map(g => g.startMo).filter(Boolean))].sort();
+  const months = [...new Set(_bulkGroups.map(g=>g.startMo).filter(Boolean))].sort();
   if (!months.length) {
-    document.getElementById('bulkDatesRows').innerHTML = '<div style="text-align:center;padding:32px;color:#94a3b8;">강좌가 없습니다.</div>';
+    document.getElementById('bulkDatesRows').innerHTML = '<div style="padding:32px;text-align:center;color:#94a3b8;">강좌가 없습니다.</div>';
     document.getElementById('bulkMonthTabs').innerHTML = '';
     document.getElementById('bulkDatesModalBg').style.display = 'flex';
     return;
   }
-
-  const curMonthF = document.getElementById('monthFilter').value;
-  _bulkActiveMonth = (curMonthF && months.includes(curMonthF)) ? curMonthF : 'ALL';
-  _bulkActiveType = 'all';
-
-  renderBulkMonthTabs(months);
-  renderBulkRows(_bulkActiveMonth, _bulkActiveType);
+  const curF = document.getElementById('monthFilter').value;
+  _bulkMo   = (curF && months.includes(curF)) ? curF : 'ALL';
+  _bulkType = 'all';
+  _renderBulkTabs(months);
+  _renderBulkRows();
   document.getElementById('bulkDatesModalBg').style.display = 'flex';
 }
 
-function renderBulkMonthTabs(months) {
-  const tabEl = document.getElementById('bulkMonthTabs');
-  const moTabs = [
-    `<button onclick="switchBulkMonth('ALL')" style="padding:10px 14px;border:none;border-bottom:3px solid ${_bulkActiveMonth==='ALL'?'#0891b2':'transparent'};background:none;font-size:12px;font-weight:${_bulkActiveMonth==='ALL'?'800':'500'};color:${_bulkActiveMonth==='ALL'?'#0891b2':'#64748b'};cursor:pointer;font-family:'Noto Sans KR',sans-serif;">전체</button>`,
-    ...months.map(mo => {
-      const label = mo.slice(5).replace(/^0/,'') + '월';
-      const active = mo === _bulkActiveMonth;
-      return `<button onclick="switchBulkMonth('${mo}')" style="padding:10px 14px;border:none;border-bottom:3px solid ${active?'#0891b2':'transparent'};background:none;font-size:12px;font-weight:${active?'800':'500'};color:${active?'#0891b2':'#64748b'};cursor:pointer;font-family:'Noto Sans KR',sans-serif;">${label}</button>`;
-    })
-  ].join('');
+function _renderBulkTabs(months) {
+  const ROOM_RANK = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+  function rr(r){ if(!r) return 999; if(r.includes('비대면')) return 900; const l=(r.replace(/[^A-Z]/g,'')||'')[0]; const i=ROOM_RANK.indexOf(l); return i>=0?i:800; }
 
-  const typeSeg = `<div style="margin-left:auto;display:flex;align-items:center;gap:4px;padding:0 12px;">
-    ${['all','평일','주말'].map(t => {
-      const label = t==='all'?'전체':t;
-      const active = _bulkActiveType === t;
-      return `<button onclick="switchBulkType('${t}')" style="padding:4px 10px;border-radius:20px;border:1.5px solid ${active?'#0891b2':'#e2e8f0'};background:${active?'#0891b2':'#fff'};color:${active?'#fff':'#64748b'};font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">${label}</button>`;
-    }).join('')}
-  </div>`;
-  tabEl.innerHTML = `<div style="display:flex;align-items:center;width:100%;overflow-x:auto;">${moTabs}${typeSeg}</div>`;
+  const moHtml = ['ALL',...months].map(mo => {
+    const act = mo === _bulkMo;
+    const lbl = mo === 'ALL' ? '전체' : mo.slice(5).replace(/^0/,'')+'월';
+    return `<button onclick="_bulkMo='${mo}';_renderBulkTabs(${JSON.stringify(months)});_renderBulkRows();" style="padding:9px 14px;border:none;border-bottom:3px solid ${act?'#0891b2':'transparent'};background:none;font-size:12px;font-weight:${act?'800':'500'};color:${act?'#0891b2':'#64748b'};cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;">${lbl}</button>`;
+  }).join('');
+  const typeHtml = ['all','평일','주말'].map(t => {
+    const act = t === _bulkType;
+    const lbl = t==='all'?'전체':t;
+    return `<button onclick="_bulkType='${t}';_renderBulkRows();" style="padding:3px 10px;border-radius:20px;border:1.5px solid ${act?'#0891b2':'#e2e8f0'};background:${act?'#0891b2':'#fff'};color:${act?'#fff':'#64748b'};font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">${lbl}</button>`;
+  }).join('');
+  document.getElementById('bulkMonthTabs').innerHTML =
+    `<div style="display:flex;align-items:center;width:100%;overflow-x:auto;">${moHtml}<div style="margin-left:auto;display:flex;gap:4px;padding:0 12px;">${typeHtml}</div></div>`;
 }
 
-function switchBulkMonth(mo) {
-  _bulkActiveMonth = mo;
-  const months = [...new Set(_bulkAllGroups.map(g => g.startMo).filter(Boolean))].sort();
-  renderBulkMonthTabs(months);
-  renderBulkRows(_bulkActiveMonth, _bulkActiveType);
-}
-
-function switchBulkType(t) {
-  _bulkActiveType = t;
-  const months = [...new Set(_bulkAllGroups.map(g => g.startMo).filter(Boolean))].sort();
-  renderBulkMonthTabs(months);
-  renderBulkRows(_bulkActiveMonth, _bulkActiveType);
-}
-
-function renderBulkRows(mo, typeF) {
-  const rows = document.getElementById('bulkDatesRows');
-  rows.innerHTML = '';
+function _renderBulkRows() {
+  const wrap = document.getElementById('bulkDatesRows');
+  wrap.innerHTML = '';
   document.getElementById('bulkDatesStatus').textContent = '';
 
-  let filtered = _bulkAllGroups.filter(g => mo === 'ALL' || g.startMo === mo);
-  if (typeF && typeF !== 'all') filtered = filtered.filter(g => g.type === typeF);
+  let list = _bulkGroups.filter(g => _bulkMo === 'ALL' || g.startMo === _bulkMo);
+  if (_bulkType !== 'all') list = list.filter(g => g.type === _bulkType);
 
-  const ROOM_ORDER = ['A','B','C','D','E','F','G','H','I','J','K','L'];
-  function getRoomRank(room) {
-    if (!room) return 999;
-    if (room.includes('비대면')) return 900;
-    const letter = (room.replace(/[^A-Z]/g,'')||'')[0];
-    const idx = ROOM_ORDER.indexOf(letter);
-    return idx >= 0 ? idx : 800;
+  const ROOM_RANK = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+  function rr(r){ if(!r) return 999; if(r.includes('비대면')) return 900; const l=(r.replace(/[^A-Z]/g,'')||'')[0]; const i=ROOM_RANK.indexOf(l); return i>=0?i:800; }
+
+  if (!list.length) {
+    wrap.innerHTML = '<div style="padding:32px;text-align:center;color:#94a3b8;">해당 조건에 강좌가 없습니다.</div>';
+    return;
   }
 
-  if (mo === 'ALL') {
-    // 전체 보기: 강사별로 묶어서 표시
-    const teacherGroups = {};
-    filtered.forEach(g => {
-      if (!teacherGroups[g.teacher]) teacherGroups[g.teacher] = { room: g.room, groups: [] };
-      teacherGroups[g.teacher].groups.push(g);
+  if (_bulkMo === 'ALL') {
+    // 전체 보기: 강사별 카드, 카드 안에 월별 코스 나열
+    const byTeacher = {};
+    list.forEach(g => {
+      if (!byTeacher[g.teacher]) byTeacher[g.teacher] = { room: g.room, type: g.type, list: [] };
+      byTeacher[g.teacher].list.push(g);
+    });
+    const teachers = Object.keys(byTeacher).sort((a,b) => {
+      const dr = rr(byTeacher[a].room) - rr(byTeacher[b].room);
+      return dr !== 0 ? dr : a.localeCompare(b,'ko');
     });
 
-    const sortedTeachers = Object.keys(teacherGroups).sort((a,b) => {
-      const ra = getRoomRank(teacherGroups[a].room);
-      const rb = getRoomRank(teacherGroups[b].room);
-      if (ra !== rb) return ra - rb;
-      return a.localeCompare(b, 'ko');
-    });
-
-    let lastRoom = null;
-    let idx = 0;
-
-    sortedTeachers.forEach(teacher => {
-      const { room, groups } = teacherGroups[teacher];
-      // 강의장 헤더
+    let lastRoom = null, rowIdx = 0;
+    teachers.forEach(teacher => {
+      const { room, type, list: tlist } = byTeacher[teacher];
       if (room !== lastRoom) {
         lastRoom = room;
         const rh = document.createElement('div');
-        rh.style.cssText = 'font-size:11px;font-weight:800;color:#0891b2;padding:4px 2px;border-bottom:1.5px solid #bae6fd;margin-bottom:4px;margin-top:8px;';
+        rh.style.cssText = 'font-size:11px;font-weight:800;color:#0891b2;padding:4px 2px;border-bottom:1.5px solid #bae6fd;margin:8px 0 4px;';
         rh.textContent = '🏫 ' + (room || '강의장 미지정');
-        rows.appendChild(rh);
+        wrap.appendChild(rh);
       }
-
-      // 강사 섹션 (여러 월 코스 포함)
-      const teacherEl = document.createElement('div');
-      teacherEl.style.cssText = 'background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:8px;overflow:hidden;';
-
-      const typeBadge = groups[0].type === '주말'
-        ? '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#fef3c7;color:#d97706;font-weight:700;margin-left:4px;">주말</span>'
-        : '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#dbeafe;color:#1d4ed8;font-weight:700;margin-left:4px;">평일</span>';
-
-      teacherEl.innerHTML = `<div style="padding:8px 14px;background:#e0f2fe;border-bottom:1px solid #bae6fd;font-size:12px;font-weight:800;color:#0c4a6e;">${teacher}${typeBadge}${room ? ` <span style="font-size:11px;font-weight:600;color:#0891b2;">🏫 ${room}</span>` : ''}</div>`;
-
-      groups.sort((a,b) => (a.start||'') < (b.start||'') ? -1 : 1).forEach(g => {
-        _appendGroupRow(teacherEl, g, idx);
-        idx++;
+      const card = document.createElement('div');
+      card.style.cssText = 'background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:8px;overflow:hidden;';
+      const badge = type === '주말'
+        ? '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#fef3c7;color:#d97706;font-weight:700;margin-left:5px;">주말</span>'
+        : '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#dbeafe;color:#1d4ed8;font-weight:700;margin-left:5px;">평일</span>';
+      card.innerHTML = `<div style="padding:8px 14px;background:#e0f2fe;border-bottom:1px solid #bae6fd;font-size:12px;font-weight:800;color:#0c4a6e;">${teacher}${badge}${room?' <span style="font-size:11px;color:#0891b2;font-weight:600;">/ '+room+'</span>':''}</div>`;
+      tlist.sort((a,b)=>(a.start||'')<(b.start||'')?-1:1).forEach(g => {
+        _appendRow(card, g, rowIdx++);
       });
-
-      rows.appendChild(teacherEl);
+      wrap.appendChild(card);
     });
   } else {
-    // 월별 보기: 강의장별 정렬
-    filtered.sort((a,b) => {
-      const rc = getRoomRank(a.room) - getRoomRank(b.room);
-      if (rc !== 0) return rc;
-      return (a.teacher||'').localeCompare(b.teacher||'', 'ko');
-    });
-
-    if (!filtered.length) {
-      rows.innerHTML = '<div style="text-align:center;padding:32px;color:#94a3b8;">해당 조건에 강좌가 없습니다.</div>';
-      return;
-    }
-
-    let lastRoom = null;
-    filtered.forEach((g, idx) => {
+    // 월별 보기: 강의장 → 강사 가나다순
+    list.sort((a,b) => { const dr=rr(a.room)-rr(b.room); return dr!==0?dr:(a.teacher||'').localeCompare(b.teacher||'','ko'); });
+    let lastRoom = null, rowIdx = 0;
+    list.forEach(g => {
       if (g.room !== lastRoom) {
         lastRoom = g.room;
         const rh = document.createElement('div');
-        rh.style.cssText = 'font-size:11px;font-weight:800;color:#0891b2;padding:4px 2px;border-bottom:1.5px solid #bae6fd;margin-bottom:4px;margin-top:8px;';
+        rh.style.cssText = 'font-size:11px;font-weight:800;color:#0891b2;padding:4px 2px;border-bottom:1.5px solid #bae6fd;margin:8px 0 4px;';
         rh.textContent = '🏫 ' + (g.room || '강의장 미지정');
-        rows.appendChild(rh);
+        wrap.appendChild(rh);
       }
-      const rowEl = document.createElement('div');
-      rowEl.style.cssText = 'background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:6px;';
-      _appendGroupRow(rowEl, g, idx);
-      rows.appendChild(rowEl);
+      const card = document.createElement('div');
+      card.style.cssText = 'background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:6px;overflow:hidden;';
+      _appendRow(card, g, rowIdx++);
+      wrap.appendChild(card);
     });
   }
 }
 
-function _appendGroupRow(container, g, idx) {
-  const start = g.start || '';
-  const end   = g.end   || '';
-  const nameStr = g.names.join(', ');
-  const daysStr = g.daysSet.join(' / ');
+function _appendRow(container, g, idx) {
+  const { teacher, names, daysSet, start, end } = g;
+  const nameStr = names.join(', ');
+  const daysStr = daysSet.join(' / ');
+  const uid = 'br' + idx;
 
-  const rowDiv = document.createElement('div');
-  rowDiv.style.cssText = 'padding:10px 14px;';
-  rowDiv.innerHTML = `
-    <div data-teacher="${(g.teacher||'').replace(/"/g,'&quot;')}" data-start="${start}" data-end="${end}"
-      style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px;">
+  const div = document.createElement('div');
+  div.style.cssText = 'padding:10px 14px;';
+  div.dataset.teacher = teacher;
+  div.dataset.start   = start;
+  div.dataset.end     = end;
+  div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
       <div>
-        <div style="font-size:12px;font-weight:700;color:#1e293b;">${nameStr}${daysStr?` <span style="font-size:11px;color:#7c3aed;">(${daysStr})</span>`:''}</div>
+        <div style="font-size:12px;font-weight:700;color:#1e293b;">
+          ${teacher ? '<span style="color:#0891b2;">'+teacher+'</span> / ' : ''}${nameStr}${daysStr?' <span style="font-size:11px;color:#7c3aed;">('+daysStr+')</span>':''}
+        </div>
         <div style="font-size:11px;color:#94a3b8;">${start}${end?' ~ '+end:''}</div>
       </div>
-      <span id="bulk-preview-${idx}" style="font-size:11px;color:#0891b2;white-space:nowrap;"></span>
+      <span id="${uid}-prev" style="font-size:11px;color:#0891b2;white-space:nowrap;flex-shrink:0;"></span>
     </div>
-    <textarea rows="2" placeholder="${start.slice(5).replace('-','/')} ~ ${end.slice(5).replace('-','/')} 출석일 입력..."
+    <textarea id="${uid}-ta" rows="2"
+      placeholder="${start?start.slice(5).replace('-','/'):'MM/DD'} ~ ${end?end.slice(5).replace('-','/'):'MM/DD'} 출석일..."
       style="width:100%;padding:7px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:12px;font-family:'Noto Sans KR',sans-serif;resize:vertical;box-sizing:border-box;outline:none;"
       onfocus="this.style.borderColor='#0891b2'" onblur="this.style.borderColor='#cbd5e1'"
-      oninput="(function(ta){var p=document.getElementById('bulk-preview-${idx}');if(p){var d=parseBulkDates(ta.value,'${start}');p.textContent=d.length?'✅ '+d.length+'일':'';};})(this)"></textarea>`;
-  container.appendChild(rowDiv);
+      oninput="_bulkPreview('${uid}','${start}')"></textarea>`;
+  container.appendChild(div);
 
-  // 기존 출석일 로드
-  if (_db && g.teacher && g.teacher !== '(강사없음)') {
-    _db.ref('gkyilDates/' + g.teacher).once('value').then(snap => {
+  if (_db && teacher) {
+    _db.ref('gkyilDates/' + teacher).once('value').then(snap => {
       const raw = snap.val();
       let existing = [];
       if (typeof raw === 'string') existing = raw.split(',').filter(Boolean);
       else if (Array.isArray(raw)) existing = raw;
-      const fd = existing.filter(d => (!start||d>=start)&&(!end||d<=end));
-      if (fd.length) {
-        const ta = rowDiv.querySelector('textarea');
-        if (ta) {
-          ta.value = fd.map(d => d.slice(5).replace('-','/')).join('\t');
-          const prev = document.getElementById('bulk-preview-' + idx);
-          if (prev) { const pd = parseBulkDates(ta.value, start); prev.textContent = pd.length ? '✅ '+pd.length+'일' : ''; }
-        }
+      const fd = existing.filter(d => (!start||d>=start) && (!end||d<=end));
+      const ta = document.getElementById(uid+'-ta');
+      if (ta && fd.length) {
+        ta.value = fd.map(d => d.slice(5).replace('-','/')).join('\t');
+        _bulkPreview(uid, start);
       }
     }).catch(()=>{});
   }
 }
+
+function _bulkPreview(uid, start) {
+  const ta = document.getElementById(uid+'-ta');
+  const prev = document.getElementById(uid+'-prev');
+  if (!ta || !prev) return;
+  const d = parseBulkDates(ta.value, start);
+  prev.textContent = d.length ? '✅ '+d.length+'일' : '';
+}
+
+function switchBulkMonth(mo) { _bulkMo = mo; }
+function switchBulkType(t) { _bulkType = t; }
 
 function parseBulkDates(raw, startDate) {
   if (!raw || !raw.trim()) return [];
@@ -1534,10 +1496,8 @@ function parseBulkDates(raw, startDate) {
       .map(s => s.trim())
       .filter(s => s)
       .map(s => {
-        // 전체 날짜 형식 (2027/01/05 등)
         const full = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
         if (full) return `${full[1]}-${full[2].padStart(2,'0')}-${full[3].padStart(2,'0')}`;
-        // MM/DD 또는 MM-DD
         const short = s.replace(/[./]/g,'-').match(/^(\d{1,2})-(\d{1,2})$/);
         if (short) return `${year}-${short[1].padStart(2,'0')}-${short[2].padStart(2,'0')}`;
         return null;
@@ -1547,58 +1507,50 @@ function parseBulkDates(raw, startDate) {
 }
 
 async function saveBulkDates() {
-  const rowEls = document.getElementById('bulkDatesRows').querySelectorAll('div[data-teacher]');
-  if (!rowEls.length) { showToast('⚠ 저장할 항목이 없습니다'); return; }
+  // data-teacher가 있는 div들 수집
+  const divs = document.getElementById('bulkDatesRows').querySelectorAll('div[data-teacher]');
+  if (!divs.length) { showToast('⚠ 저장할 항목이 없습니다'); return; }
 
   const statusEl = document.getElementById('bulkDatesStatus');
   statusEl.textContent = '저장 중...';
 
-  // 강사별로 날짜 합산 (같은 강사 월수+화목 등 모두 합쳐서 한번에 저장)
-  const teacherNewDates = {}; // teacher → Set of new dates
-
-  for (const infoDiv of rowEls) {
-    const teacher = infoDiv.dataset.teacher;
-    const start   = infoDiv.dataset.start;
-    if (!teacher || teacher === '(강사없음)') continue;
-
-    const rowEl = infoDiv.parentElement;
-    const ta = rowEl?.querySelector('textarea');
+  // 강사별 날짜 합산 (월수+화목 등 같은 강사 다 합산)
+  const byTeacher = {};
+  for (const div of divs) {
+    const teacher = div.dataset.teacher;
+    const start   = div.dataset.start || '';
+    const end     = div.dataset.end   || '';
+    if (!teacher) continue;
+    // textarea는 같은 div 안에 있음
+    const ta = div.querySelector('textarea');
     if (!ta || !ta.value.trim()) continue;
-
     const newDates = parseBulkDates(ta.value, start);
     if (!newDates.length) continue;
-
-    if (!teacherNewDates[teacher]) teacherNewDates[teacher] = new Set();
-    newDates.forEach(d => teacherNewDates[teacher].add(d));
+    if (!byTeacher[teacher]) byTeacher[teacher] = new Set();
+    newDates.forEach(d => byTeacher[teacher].add(d));
   }
 
-  let savedCount = 0, errorCount = 0;
-
-  for (const [teacher, newSet] of Object.entries(teacherNewDates)) {
-    const newDates = [...newSet].sort();
+  let saved = 0, failed = 0;
+  for (const [teacher, dateSet] of Object.entries(byTeacher)) {
+    const newDates = [...dateSet].sort();
     try {
-      // 기존 날짜 읽기 후 합산 (기존 날짜 삭제 없음 — 카드에서 개강~종강 범위로 필터링)
       let existing = [];
       const snap = await _db.ref('gkyilDates/' + teacher).once('value');
       const raw = snap.val();
       if (typeof raw === 'string') existing = raw.split(',').filter(Boolean);
       else if (Array.isArray(raw)) existing = raw;
-
       const merged = [...new Set([...existing, ...newDates])].sort();
       await _db.ref('gkyilDates/' + teacher).set(merged.join(','));
-      savedCount++;
-    } catch(e) {
-      console.error('저장 실패:', teacher, e);
-      errorCount++;
-    }
+      saved++;
+    } catch(e) { console.error('저장 실패:', teacher, e); failed++; }
   }
 
-  if (errorCount) {
-    statusEl.textContent = `⚠ ${savedCount}명 저장 완료, ${errorCount}명 실패`;
-  } else if (savedCount === 0) {
-    statusEl.textContent = '입력된 날짜가 없습니다 (날짜 형식: 09/14 09/16...)';
+  if (failed) {
+    statusEl.textContent = `⚠ ${saved}명 저장, ${failed}명 실패`;
+  } else if (!saved) {
+    statusEl.textContent = '입력된 날짜가 없습니다';
   } else {
-    showToast(`✅ ${savedCount}명 출석일 저장 완료!`);
+    showToast(`✅ ${saved}명 출석일 저장 완료!`);
     closeBulkDatesModal();
   }
 }
