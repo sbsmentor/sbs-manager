@@ -1314,21 +1314,20 @@ function openBulkDatesModal() {
   items = items.filter(c => c.teacher);
   items.sort((a,b) => (a.start||'') < (b.start||'') ? -1 : 1);
 
-  // 그룹화: 강사+과목명+요일+구분 동일하면 같은 카드, 기수(start~end)는 서브로우
+  // 그룹화: 강사+구분(평일/주말) 기준 → 모든 기수를 한 카드에
   const map = {};
   items.forEach(c => {
     const teacher = c.teacher;
     const name    = c.name    || '(과목없음)';
-    const days    = c.days    || '';
     const type    = c.type    || '평일';
     const room    = getFixedRoom(c.teacher, c.name, c.type, c.room||'');
     const start   = c.start  || '';
     const end     = c.end    || '';
     const startMo = start.slice(0,7);
 
-    // 카드 키: 강사+과목+요일+구분
-    const ck = `${teacher}||${name}||${days}||${type}`;
-    if (!map[ck]) map[ck] = { teacher, names:[name], daysStr:days, type, room, periods:[], startMos:new Set() };
+    // 카드 키: 강사+구분만 (요일/과목 무관하게 한 카드)
+    const ck = `${teacher}||${type}`;
+    if (!map[ck]) map[ck] = { teacher, names:[], type, room, periods:[], startMos:new Set() };
     if (!map[ck].names.includes(name)) map[ck].names.push(name);
     if (!map[ck].room && room) map[ck].room = room;
 
@@ -1426,7 +1425,7 @@ function _renderBulkRows() {
 
     const hdr = document.createElement('div');
     hdr.style.cssText = 'padding:7px 14px;background:#e0f2fe;border-bottom:1px solid #bae6fd;font-size:12px;font-weight:800;color:#0c4a6e;border-radius:10px 10px 0 0;';
-    hdr.innerHTML = `${g.teacher}${badge} <span style="font-size:11px;font-weight:600;color:#475569;">${g.names.join(', ')}</span>${g.daysStr?' <span style="font-size:11px;color:#7c3aed;">('+g.daysStr+')</span>':''}`;
+    hdr.innerHTML = `${g.teacher}${badge} <span style="font-size:11px;font-weight:600;color:#475569;">${g.names.join(', ')}</span>`;
     card.appendChild(hdr);
 
     // 기수별 입력 행
