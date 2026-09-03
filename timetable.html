@@ -1320,20 +1320,15 @@ function openBulkDatesModal() {
     const type    = c.type    || '평일';
     const room    = getFixedRoom(c.teacher, c.name, c.type, c.room||'');
     const startMo = (c.start||'').slice(0,7);
-    // days가 다르면 별도 행 (토/일 vs 토 분리), startMo는 그룹핑에서 제외
-    const gkey    = teacher + '||' + name + '||' + days + '||' + type + '||' + room;
+    // 개강월+요일이 다르면 별도 행 (토/일 vs 토 분리)
+    const gkey    = teacher + '||' + name + '||' + days + '||' + startMo + '||' + type + '||' + room;
     if (!groups[gkey]) groups[gkey] = { teacher, name, days, type, room, startMo, starts:[], ends:[], keys:[] };
-    else if (!groups[gkey].startMo && startMo) groups[gkey].startMo = startMo;
     groups[gkey].keys.push(c.key);
     if (c.start) groups[gkey].starts.push(c.start);
     if (c.end)   groups[gkey].ends.push(c.end);
   });
 
-  _bulkAllGroups = Object.values(groups).map(g => {
-    // startMo를 가장 이른 start 기준으로 재계산
-    if (g.starts.length) g.startMo = [...g.starts].sort()[0].slice(0,7);
-    return g;
-  });
+  _bulkAllGroups = Object.values(groups);
 
   const months = [...new Set(_bulkAllGroups.map(g => g.startMo).filter(Boolean))].sort();
 
