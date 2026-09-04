@@ -1694,6 +1694,16 @@ function onMoneyInput(el) {
   el.dataset.raw = raw; // 저장용 raw 값
 }
 
+function clearAllSchedules() {
+  const total = WEEKDAY.length + WEEKEND.length;
+  if (!confirm(`평일 ${WEEKDAY.length}명 + 주말 ${WEEKEND.length}명, 총 ${total}명의 수업배정 일정을 전체 초기화할까요?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  WEEKDAY.forEach(s => { s['수업배정'] = {}; });
+  WEEKEND.forEach(s => { s['수업배정'] = {}; });
+  saveToLocal();
+  renderContent();
+  showToast(`🗂 전체 ${total}명 수업배정 초기화 완료`);
+}
+
 function clearStudentSchedule(arr, idx) {
   const name = arr[idx]['이름'] || '이 학생';
   if (!confirm(`"${name}"의 수업배정 일정을 전체 삭제할까요?\n이 작업은 되돌릴 수 없습니다.`)) return;
@@ -2552,12 +2562,15 @@ function renderStudents(data){
       <button class="filter-btn ${filterGubn==='주말'?'active':''}" onclick="setGubn('주말');setPurpose('all')">주말</button>
       <div style="width:1px;background:var(--border);height:18px;margin:0 2px;flex-shrink:0;"></div>
       ${['취업','진학','창업','취미'].map(p=>`<button class="filter-btn ${filterPurpose===p?'active':''}" onclick="setPurpose('${p}');setGubn('all')">${p}</button>`).join('')}
-      <div style="margin-left:auto;position:relative;display:flex;align-items:center;">
-        <svg style="position:absolute;left:9px;opacity:.4;pointer-events:none;" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input id="searchInput" type="text" placeholder="이름·연락처·과정 검색..." oninput="applyFilters()"
-          style="padding:5px 10px 5px 28px;border:1px solid var(--border2);border-radius:20px;font-size:12px;font-family:'Noto Sans KR',sans-serif;width:200px;outline:none;background:var(--surface);color:var(--text);transition:border-color .15s;"
-          onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'"
-          onkeydown="if(event.key==='Escape'){this.value='';applyFilters();}">
+      <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+        <button onclick="clearAllSchedules()" style="padding:5px 12px;border-radius:7px;border:1px solid #ef4444;color:#ef4444;background:#fef2f2;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;white-space:nowrap;">🗂 수업배정 전체초기화</button>
+        <div style="position:relative;">
+          <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none;" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input id="searchInput" type="text" placeholder="이름·연락처·과정 검색..." oninput="applyFilters()"
+            style="padding:5px 10px 5px 28px;border:1px solid var(--border2);border-radius:20px;font-size:12px;font-family:'Noto Sans KR',sans-serif;width:200px;outline:none;background:var(--surface);color:var(--text);transition:border-color .15s;"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'"
+            onkeydown="if(event.key==='Escape'){this.value='';applyFilters();}">
+        </div>
       </div>
     </div>
     ${addBar()}
