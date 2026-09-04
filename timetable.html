@@ -777,14 +777,23 @@ async function uploadGkyilFromExcel() {
   let ok = 0, fail = 0;
   for (const [teacher, dates] of Object.entries(GKYIL_DATA)) {
     try {
-      const key = safe(teacher);
-      const snap = await _db.ref('gkyilDates/' + key).once('value');
-      const raw = snap.val();
-      let existing = [];
-      if (typeof raw === 'string') existing = raw.split(',').filter(Boolean);
-      else if (Array.isArray(raw)) existing = raw;
-      const merged = [...new Set([...existing, ...dates])].sort();
-      await _db.ref('gkyilDates/' + key).set(merged.join(','));
+      // 1) 강사명 단독 키에 저장
+      const baseKey = safe(teacher);
+      const snap0 = await _db.ref('gkyilDates/' + baseKey).once('value');
+      const raw0 = snap0.val();
+      let ex0 = typeof raw0 === 'string' ? raw0.split(',').filter(Boolean) : (Array.isArray(raw0) ? raw0 : []);
+      await _db.ref('gkyilDates/' + baseKey).set([...new Set([...ex0, ...dates])].sort().join(','));
+
+      // 2) 시간표에 등록된 과목별 키에도 저장 (teacher|course)
+      const courses = Object.values(allCourses).filter(c => c.teacher === teacher);
+      const courseKeys = [...new Set(courses.map(c => safe(teacher) + '|' + safe(c.name||'')))];
+      for (const ck of courseKeys) {
+        if (!ck || ck === baseKey) continue;
+        const snap1 = await _db.ref('gkyilDates/' + ck).once('value');
+        const raw1 = snap1.val();
+        let ex1 = typeof raw1 === 'string' ? raw1.split(',').filter(Boolean) : (Array.isArray(raw1) ? raw1 : []);
+        await _db.ref('gkyilDates/' + ck).set([...new Set([...ex1, ...dates])].sort().join(','));
+      }
       ok++;
     } catch(e) { console.error(teacher, e); fail++; }
   }
@@ -1373,9 +1382,15 @@ function openBulkDatesModal() {
   _bulkMo   = (curF && _bulkMonths.includes(curF)) ? curF : 'ALL';
   _bulkType = 'all';
 
-  _renderBulkTabs();
-  _renderBulkRows();
   document.getElementById('bulkDatesModalBg').style.display = 'flex';
+  document.getElementById('bulkDatesStatus').textContent = '날짜 불러오는 중...';
+
+  const allTeachers = [...new Set(_bulkGroups.map(g=>g.teacher).filter(Boolean))];
+  _preloadGkyilDates(allTeachers).then(() => {
+    _renderBulkTabs();
+    _renderBulkRows();
+    document.getElementById('bulkDatesStatus').textContent = '';
+  });
 }
 
 function _renderBulkTabs() {
@@ -1395,7 +1410,6 @@ function _renderBulkTabs() {
 
 function switchBulkMonth(mo) { _bulkMo = mo; _renderBulkTabs(); _renderBulkRows(); }
 function switchBulkType(t)   { _bulkType = t; _renderBulkTabs(); _renderBulkRows(); }
-
 function _renderBulkRows() {
   const wrap = document.getElementById('bulkDatesRows');
   wrap.innerHTML = '';
@@ -1457,6 +1471,33 @@ function _renderBulkRows() {
   });
 }
 
+// 강사별 날짜 캐시 (모달 열 때 미리 로드)
+let _gkyilCache = {};
+
+async function _preloadGkyilDates(teachers) {
+  if (!_db) return;
+  const safe = s => (s||'').trim().replace(/[.#$\/\[\]\s]/g,'_');
+  _gkyilCache = {};
+  await Promise.all([...new Set(teachers)].map(async teacher => {
+    if (!teacher) return;
+    const tryKeys = [
+      safe(teacher) + '|' + safe(Object.values(allCourses).find(c=>c.teacher===teacher)?.name||''),
+      safe(teacher),
+      teacher
+    ].filter((k,i,a) => k && k !== '|' && k !== '|_' && a.indexOf(k)===i);
+
+    for (const k of tryKeys) {
+      try {
+        const snap = await _db.ref('gkyilDates/' + k).once('value');
+        const raw = snap.val();
+        if (!raw) continue;
+        let dates = typeof raw === 'string' ? raw.split(',').filter(Boolean) : (Array.isArray(raw) ? raw : []);
+        if (dates.length) { _gkyilCache[teacher] = dates; break; }
+      } catch(e) {}
+    }
+  }));
+}
+
 function _fbKey(teacher, courseName, days) {
   const safe = s => (s||'').trim().replace(/[.#$\/\[\]\s]/g,'_');
   // 강사|과목명 키 (요일 제외 - 같은 과목은 날짜 합산, 개강~종강 범위로 분리)
@@ -1485,35 +1526,18 @@ function _appendRow(container, teacher, courseName, days, start, end, idx) {
       oninput="_bulkPreview('${uid}','${start}')"></textarea>`;
   container.appendChild(div);
 
-  if (_db && teacher) {
-    const safe3 = s => (s||'').trim().replace(/[.#$\/\[\]\s]/g,'_');
-    const sd3 = (days||'').replace(/\s*\([^)]*\)/g,'').trim();
-    const cn3 = (courseName||'').replace(/\s*\([^)]*\)/g,'').trim();
-    const tryKeys = [
-      fbKey,
-      safe3(teacher)+'|'+safe3(courseName||'')+'|'+safe3(sd3),
-      safe3(teacher)+'|'+safe3(cn3)+'|'+safe3(sd3),
-      safe3(teacher)+'|'+safe3(cn3),
-    ].filter((k,i,a) => k && k!=='|' && a.indexOf(k)===i);
-
-    (async () => {
-      for (const k of tryKeys) {
-        const snap = await _db.ref('gkyilDates/' + k).once('value');
-        const raw = snap.val();
-        if (!raw) continue;
-        let existing = [];
-        if (typeof raw === 'string') existing = raw.split(',').filter(Boolean);
-        else if (Array.isArray(raw)) existing = raw;
-        const fd = existing.filter(d => (!start||d>=start) && (!end||d<=end));
-        if (!fd.length) continue;
-        const ta = document.getElementById(uid+'-ta');
-        if (ta) {
-          ta.value = fd.map(d => d.slice(5).replace('-','/')).join('\t');
-          _bulkPreview(uid, start);
-        }
-        break;
+  // 캐시에서 날짜 로드 (openBulkDatesModal에서 미리 전체 로드됨)
+  if (teacher && _gkyilCache[teacher]) {
+    const existing = _gkyilCache[teacher];
+    const fd = existing.filter(d => (!start || d >= start) && (!end || d <= end));
+    const showDates = fd.length ? fd : (start ? [] : existing);
+    if (showDates.length) {
+      const ta = document.getElementById(uid+'-ta');
+      if (ta) {
+        ta.value = showDates.map(d => d.slice(5).replace('-','/')).join('\t');
+        _bulkPreview(uid, start);
       }
-    })().catch(()=>{});
+    }
   }
 }
 
