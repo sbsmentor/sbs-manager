@@ -5416,6 +5416,14 @@ async function openNotiCardFromBoard(arrName, si, mk){
   // endDate는 메인 수업 자체 값 사용
   // 연강 수업은 각자의 startDate~endDate 범위로 따로 조회 후 합산
 
+  // 연강 포함 종강일 → 가장 늦은 날짜로
+  let displayEndDate = endDate;
+  if(linkedMks.length > 0){
+    linkedMks.forEach(({p:pp})=>{
+      if(pp.endDate && pp.endDate > displayEndDate) displayEndDate = pp.endDate;
+    });
+  }
+
   // 연강 포함 강의장 표시: A(웹툰), I(핸드드로잉)
   let displayRoom = mainRoom;
   if(linkedMks.length > 0){
@@ -5617,7 +5625,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
         }).join('<br>')}</div>`
       : `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">시 간 :</b> <span style="${valStyle}">${displayTime||'-'}</span></div>`,
     `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">개 강 :</b> <span style="${valStyle}">${startDate||'-'}</span></div>`,
-    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">종 강 :</b> <span style="${valStyle}">${endDate||'-'}</span></div>`,
+    `<div style="line-height:1.7;display:flex;align-items:baseline;"><b style="${labelStyle}">종 강 :</b> <span style="${valStyle}">${displayEndDate||endDate||'-'}</span></div>`,
     '',  // 출석일은 아래에서 async로 별도 처리
     `<div style="line-height:1.7;margin-top:3px;"><b style="${labelStyle}">출석일 :</b> <span id="notiAttendList" style="font-size:11px;color:#374151;font-family:inherit;">불러오는 중...</span></div>`,
   ].join('');
@@ -5683,7 +5691,7 @@ async function openNotiCardFromBoard(arrName, si, mk){
     if(attendEl) attendEl.innerHTML = attendHtml;
   })();
 
-    _notiCtx={arrName,si,mk:resolvedMk,val,p,noClassNote,sy,sm,startDow,endDow,daysLabel,origDates:classDates,displayRoom};
+    _notiCtx={arrName,si,mk:resolvedMk,val,p,noClassNote,sy,sm,startDow,endDow,daysLabel,origDates:classDates,displayRoom,displayEndDate};
 
   document.getElementById('notiImgCopyBtn').onclick=()=>saveNotiImage(p.cls,startDate);
   document.getElementById('notiTxtCopyBtn').onclick=()=>copyNotiText();
@@ -5854,7 +5862,7 @@ function copyNotiText(){
   const days=getVal('요 일')||daysLabel;
   const time=getVal('시 간')||p.time;
   const sDate=getVal('개 강')||startDate;
-  const eDate=getVal('종 강')||endDate;
+  const eDate=getVal('종 강')||(_notiCtx&&_notiCtx.displayEndDate)||endDate;
   // 출석일 텍스트
   const attendEl=document.getElementById('notiAttendList');
   const attendText=attendEl?attendEl.innerText.replace(/<br>/g,'\n'):'';
