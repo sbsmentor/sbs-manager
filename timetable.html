@@ -774,46 +774,24 @@ const _GKYIL = {"임현철": ["2026-09-14", "2026-09-16", "2026-09-21", "2026-09
 async function uploadGkyilFromExcel() {
   if (!confirm('격일반 강사 9명의 출석일을 일괄입력창에 적용합니다. 계속할까요?')) return;
 
-  // 1. 모달 열기
+  // 캐시에 저장 → 모달 열릴 때 _appendRow에서 바로 읽음
+  Object.assign(_gkyilCache, _GKYIL);
+
+  // 모달 열기 (캐시에 데이터가 있으므로 Firebase 조회 없이 즉시 표시)
   openBulkDatesModal();
 
-  // 2. 모달 렌더링 완료 후 텍스트박스에 직접 채워넣기
-  setTimeout(() => {
-    const divs = document.getElementById('bulkDatesRows').querySelectorAll('div[data-teacher]');
-    let filled = 0;
-    divs.forEach(div => {
-      const teacher = div.dataset.teacher;
-      const start   = div.dataset.start || '';
-      const end     = div.dataset.end   || '';
-      if (!teacher || !_GKYIL[teacher]) return;
-      const dates = _GKYIL[teacher];
-      const fd = dates.filter(d => (!start || d >= start) && (!end || d <= end));
-      if (!fd.length) return;
-      const ta = div.querySelector('textarea');
-      if (!ta) return;
-      ta.value = fd.map(d => d.slice(5).replace('-','/')).join('\t');
-      // 미리보기 업데이트
-      const prev = div.querySelector('span[id$="-prev"]');
-      if (prev) {
-        const pd = parseBulkDates(ta.value, start);
-        prev.textContent = pd.length ? '✅ '+pd.length+'일' : '';
-      }
-      filled++;
-    });
-    showToast('✅ 격일반 ' + filled + '개 기수 날짜 적용 완료! 확인 후 전체저장 누르세요.');
-
-    // 3. Firebase 백그라운드 저장
-    if (_db) {
-      const safe = s => (s||'').trim().replace(/[.#$\/\[\]\s]/g,'_');
-      for (const [teacher, dates] of Object.entries(_GKYIL)) {
-        _db.ref('gkyilDates/' + safe(teacher)).once('value').then(snap => {
-          const raw = snap.val();
-          let ex = typeof raw === 'string' ? raw.split(',').filter(Boolean) : (Array.isArray(raw) ? raw : []);
-          return _db.ref('gkyilDates/' + safe(teacher)).set([...new Set([...ex,...dates])].sort().join(','));
-        }).catch(e => console.error(teacher, e));
-      }
+  // Firebase 백그라운드 저장
+  if (_db) {
+    const safe = s => (s||'').trim().replace(/[.#$\/\[\]\s]/g,'_');
+    for (const [teacher, dates] of Object.entries(_GKYIL)) {
+      _db.ref('gkyilDates/' + safe(teacher)).once('value').then(snap => {
+        const raw = snap.val();
+        let ex = typeof raw === 'string' ? raw.split(',').filter(Boolean) : (Array.isArray(raw) ? raw : []);
+        return _db.ref('gkyilDates/' + safe(teacher)).set([...new Set([...ex,...dates])].sort().join(','));
+      }).catch(e => console.error(teacher, e));
     }
-  }, 800);
+    showToast('✅ 격일반 출석일 일괄입력 적용 완료! 확인 후 전체저장을 눌러주세요.');
+  }
 }
 
 // ════════ 직접 추가 ════════
@@ -1531,15 +1509,14 @@ function _appendRow(container, teacher, courseName, days, start, end, idx) {
       oninput="_bulkPreview('${uid}','${start}')"></textarea>`;
   container.appendChild(div);
 
-  // 캐시에서 날짜 로드 (openBulkDatesModal에서 미리 전체 로드됨)
-  if (teacher && _gkyilCache[teacher]) {
-    const existing = _gkyilCache[teacher];
+  // 날짜 로드: 캐시 → _GKYIL 엑셀 데이터 → Firebase 순
+  const existing = _gkyilCache[teacher] || (typeof _GKYIL !== 'undefined' && _GKYIL[teacher]) || null;
+  if (existing) {
     const fd = existing.filter(d => (!start || d >= start) && (!end || d <= end));
-    const showDates = fd.length ? fd : (start ? [] : existing);
-    if (showDates.length) {
+    if (fd.length) {
       const ta = document.getElementById(uid+'-ta');
       if (ta) {
-        ta.value = showDates.map(d => d.slice(5).replace('-','/')).join('\t');
+        ta.value = fd.map(d => d.slice(5).replace('-','/')).join('\t');
         _bulkPreview(uid, start);
       }
     }
