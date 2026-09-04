@@ -1694,6 +1694,25 @@ function onMoneyInput(el) {
   el.dataset.raw = raw; // 저장용 raw 값
 }
 
+function toggleGubn(arr, idx) {
+  const s = arr[idx];
+  const curGubn = s['구분'] || '평일';
+  const newGubn = curGubn === '평일' ? '주말' : '평일';
+  const name = s['이름'] || '이 학생';
+  if (!confirm(`"${name}"을 ${curGubn} → ${newGubn}으로 변경할까요?`)) return;
+
+  // 현재 배열에서 제거
+  arr.splice(idx, 1);
+  // 새 배열에 추가
+  s['구분'] = newGubn;
+  const targetArr = newGubn === '주말' ? WEEKEND : WEEKDAY;
+  targetArr.push(s);
+
+  saveToLocal();
+  renderContent();
+  showToast(`✅ ${name} ${newGubn}으로 변경 완료`);
+}
+
 function editAppNo(arr, idx, td) {
   const cur = arr[idx]['원서번호'] || '';
   const inp = document.createElement('input');
@@ -1749,6 +1768,7 @@ function openEditModal(arr,idx){
   const FIELD_DEFS=isStudent?[
     {key:'원서번호',type:'text'},
     {key:'이름',type:'text'},
+    {key:'구분',type:'select',opts:['평일','주말']},
     {key:'과정',type:'select',opts:['게임원화','게임그래픽','게임프로그래밍','게임기획','게임아트웍','웹툰','웹소설','기타']},
     {key:'수강목적',type:'select',opts:['취업','진학','창업','취미']},
     {key:'생년월일',type:'date'},{key:'나이',type:'age_auto'},
