@@ -1696,18 +1696,19 @@ function onMoneyInput(el) {
 
 function clearAllSchedules() {
   const total = WEEKDAY.length + WEEKEND.length;
-  if (!confirm(`평일 ${WEEKDAY.length}명 + 주말 ${WEEKEND.length}명, 총 ${total}명의 수업배정 일정을 전체 초기화할까요?\n이 작업은 되돌릴 수 없습니다.`)) return;
-  WEEKDAY.forEach(s => { s['수업배정'] = {}; });
-  WEEKEND.forEach(s => { s['수업배정'] = {}; });
+  if (!confirm(`평일 ${WEEKDAY.length}명 + 주말 ${WEEKEND.length}명, 총 ${total}명의 수업배정 일정과 수강권을 전체 초기화할까요?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  WEEKDAY.forEach(s => { s['수업배정'] = {}; s['수강권'] = ''; });
+  WEEKEND.forEach(s => { s['수업배정'] = {}; s['수강권'] = ''; });
   saveToLocal();
   renderContent();
-  showToast(`🗂 전체 ${total}명 수업배정 초기화 완료`);
+  showToast(`🗂 전체 ${total}명 수업배정·수강권 초기화 완료`);
 }
 
 function clearStudentSchedule(arr, idx) {
   const name = arr[idx]['이름'] || '이 학생';
   if (!confirm(`"${name}"의 수업배정 일정을 전체 삭제할까요?\n이 작업은 되돌릴 수 없습니다.`)) return;
   arr[idx]['수업배정'] = {};
+  arr[idx]['수강권'] = '';
   saveToLocal();
   renderContent();
   showToast(`🗂 ${name} 수업배정 전체 삭제 완료`);
