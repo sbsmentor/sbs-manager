@@ -3286,7 +3286,25 @@ function switchTab(id){
 function setStatus(s){filterStatus=s;renderContent();}
 function setGubn(g){filterGubn=g;renderContent();}
 function setPurpose(p){filterPurpose=p;renderContent();}
-function applyFilters(){searchQ=document.getElementById('searchInput').value;renderContent();}
+function applyFilters(){
+  const inp = document.getElementById('searchInput');
+  searchQ = inp ? inp.value : '';
+  // 테이블 tbody만 갱신 (검색창 포커스 유지)
+  const tbody = document.querySelector('#content table tbody');
+  if (tbody && currentTab === 'students') {
+    renderContent();
+    // 검색창 포커스 복원
+    const newInp = document.getElementById('searchInput');
+    if (newInp) {
+      newInp.value = searchQ;
+      newInp.focus();
+      const len = newInp.value.length;
+      newInp.setSelectionRange(len, len);
+    }
+  } else {
+    renderContent();
+  }
+}
 
 // ════════════════════════════════════════════
 // 데이터 직렬화 / 역직렬화
