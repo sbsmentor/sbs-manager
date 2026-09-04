@@ -815,8 +815,6 @@ async function uploadGkyilFromExcel() {
     }
   }, 800);
 }
-  if (!_db) { alert('Firebase 연결 필요'); return; }
-  if (!confirm('격일반 강사 9명의 출석일(9~12월 개강)을 Firebase에 등록합니다.\n기존 날짜에 추가됩니다. 계속할까요?')) return;
 
 // ════════ 직접 추가 ════════
 window.addNewRow = async function() {
