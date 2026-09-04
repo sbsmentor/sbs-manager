@@ -1714,6 +1714,7 @@ function clearStudentSchedule(arr, idx) {
 }
 
 function openEditModal(arr,idx){
+  const isNew=idx===-1;
   // arr가 WEEKEND 배열이거나 currentTab이 weekend인 경우 주말로 판단
   const isWeekend=(arr===WEEKEND)||(currentTab==='weekend');
   const isStudent=currentTab==='students'||(arr===WEEKDAY)||(arr===WEEKEND);
