@@ -1475,9 +1475,11 @@ let _gkyilCache = {};
 async function _preloadGkyilDates(teachers) {
   if (!_db) return;
   const safe = s => (s||'').trim().replace(/[.#$\/\[\]\s]/g,'_');
-  _gkyilCache = {};
-  await Promise.all([...new Set(teachers)].map(async teacher => {
-    if (!teacher) return;
+  // 캐시에 없는 강사만 Firebase에서 로드 (엑셀 데이터 보존)
+  const needLoad = [...new Set(teachers)].filter(t => t && !_gkyilCache[t]);
+  if (!needLoad.length) return;
+
+  await Promise.all(needLoad.map(async teacher => {
     const tryKeys = [
       safe(teacher) + '|' + safe(Object.values(allCourses).find(c=>c.teacher===teacher)?.name||''),
       safe(teacher),
