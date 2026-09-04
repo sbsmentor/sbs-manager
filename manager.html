@@ -1694,6 +1694,29 @@ function onMoneyInput(el) {
   el.dataset.raw = raw; // 저장용 raw 값
 }
 
+function editAppNo(arr, idx, td) {
+  const cur = arr[idx]['원서번호'] || '';
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = cur;
+  inp.style.cssText = 'width:44px;font-size:11px;font-family:var(--mono);text-align:center;border:1px solid var(--accent);border-radius:4px;padding:1px 3px;outline:none;background:var(--surface);color:var(--text);';
+  td.innerHTML = '';
+  td.appendChild(inp);
+  inp.focus();
+  inp.select();
+  function save() {
+    const val = inp.value.trim();
+    arr[idx]['원서번호'] = val;
+    saveToLocal();
+    td.innerHTML = val || '<span style="color:#cbd5e1">-</span>';
+  }
+  inp.addEventListener('blur', save);
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') inp.blur();
+    if (e.key === 'Escape') { inp.value = cur; inp.blur(); }
+  });
+}
+
 function clearAllSchedules() {
   const total = WEEKDAY.length + WEEKEND.length;
   if (!confirm(`평일 ${WEEKDAY.length}명 + 주말 ${WEEKEND.length}명, 총 ${total}명의 수업배정 일정과 수강권을 전체 초기화할까요?\n이 작업은 되돌릴 수 없습니다.`)) return;
@@ -2610,7 +2633,7 @@ function renderStudents(data){
       const isChk = selectedRows.has(i);
       html+=`<tr onclick="openViewModal(window['${realArr}'][${realIdx}])" style="cursor:pointer;${isChk?'background:var(--accent-dim);outline:1.5px solid var(--accent);':''}">
         <td style="text-align:center;width:32px;" onclick="event.stopPropagation()"><input type="checkbox" class="row-chk" data-idx="${i}" ${isChk?'checked':''} onchange="toggleRowCheck(this,${i})" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent);"></td>
-        <td style="text-align:center;font-size:11px;font-family:var(--mono);color:var(--text3);width:50px;">${s['원서번호']||'-'}</td>
+        <td style="text-align:center;font-size:11px;font-family:var(--mono);color:var(--text3);width:50px;cursor:pointer;" onclick="event.stopPropagation();editAppNo(window['${realArr}'],${realIdx},this)" title="클릭하여 원서번호 수정">${s['원서번호']||'<span style=color:#cbd5e1>-</span>'}</td>
         <td><strong>${s['이름']||'-'}</strong></td>
         <td><span class="status-badge ${s['구분']==='주말'?'s-natl':'s-active'}">${s['구분']||'평일'}</span></td>
         <td><span class="course-tag ${courseClass(s['과정']||'')}">${s['과정']||'-'}</span></td>
